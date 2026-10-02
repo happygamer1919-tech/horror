@@ -3,11 +3,15 @@ import { initReveal } from './reveal';
 import { initLift } from './lift';
 import { initTorch } from './torch';
 import { initNeon } from './neon';
+import { initScroll } from './scroll';
+import { initCorridor } from './corridor';
 
 initLift();
+initScroll();
 initReveal();
 initTorch();
 initNeon();
+initCorridor();
 
 // Heavy or optional parts wait until the browser is idle.
 const idle = (fn: () => void) =>
