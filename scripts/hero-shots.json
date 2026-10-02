@@ -374,12 +374,12 @@
   ],
   "eval": "window.__hero.curtain.set(\"held\")",
   "unit": {
-   "x": 330,
-   "y": 150,
-   "w": 230,
-   "h": 180
+   "x": 400,
+   "y": 170,
+   "w": 150,
+   "h": 140
   },
-  "scale": 3,
+  "scale": 4,
   "wait": 1800,
   "touch": true
  },
@@ -391,12 +391,12 @@
   ],
   "eval": "window.__hero.curtain.set(\"held\")",
   "unit": {
-   "x": 330,
-   "y": 150,
-   "w": 230,
-   "h": 180
+   "x": 400,
+   "y": 170,
+   "w": 150,
+   "h": 140
   },
-  "scale": 2,
+  "scale": 3,
   "wait": 1800,
   "w": 1440,
   "h": 900
@@ -409,12 +409,12 @@
   ],
   "eval": "window.__hero.curtain.set(\"rest\")",
   "unit": {
-   "x": 330,
-   "y": 150,
-   "w": 230,
-   "h": 180
+   "x": 400,
+   "y": 170,
+   "w": 150,
+   "h": 140
   },
-  "scale": 3,
+  "scale": 4,
   "wait": 1800,
   "touch": true
  },
@@ -426,12 +426,12 @@
   ],
   "eval": "window.__hero.curtain.set(\"rest\")",
   "unit": {
-   "x": 330,
-   "y": 150,
-   "w": 230,
-   "h": 180
+   "x": 400,
+   "y": 170,
+   "w": 150,
+   "h": 140
   },
-  "scale": 2,
+  "scale": 3,
   "wait": 1800,
   "w": 1440,
   "h": 900

@@ -179,6 +179,8 @@ export function initFacade() {
     curState = s;
     curSince = performance.now();
     if (curtain) curtain.dataset.curtain = s;
+    // The lightning copy of the building shows the same drape (Hero.astro, .storm-drape).
+    hero.dataset.curtain = s;
   };
   if (curtain) {
     window.setInterval(() => {

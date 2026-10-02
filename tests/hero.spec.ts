@@ -258,6 +258,12 @@ test('touch: no light before the first touch, then it appears at the touch point
     veilCover: getComputedStyle(document.querySelector('.veil')!, '::after').opacity,
   }));
   expect(before).toEqual({ lit: false, touched: false, hasLight: false, cover: '1', veilCover: '1' });
+  // On arrival the copy sits under a thinner veil, so the paragraph reads before any touch:
+  // measured on the paragraph itself, its brightest pixels are well above the black around it.
+  const veilOf = () => page.evaluate(() => Number(getComputedStyle(document.querySelector('.veil')!).opacity));
+  expect(await veilOf()).toBeCloseTo(0.45, 2);
+  const subBox = (await page.locator('.hero__sub').boundingBox())!;
+  expect((await luminance(page, [await page.screenshot({ clip: subBox, type: 'png' })]))[0][0].max).toBeGreaterThan(70);
   // In pixels: where the old resting light used to sit (centre of the upper facade) and
   // the middle of the screen are both as dark as the far edge of the wall.
   const upper = await facadeBox(page, { x: 250, y: 300, w: 100, h: 62 });
@@ -404,6 +410,20 @@ test('the E: an analog fault, uneven sections, never a two-state toggle and neve
   await open(page);
   await expect.poll(() => page.evaluate(() => typeof window.__hero?.e?.level)).toBe('number');
 
+  // The tube sections are cut with feathered masks, never a hard clip, and the letter has
+  // one fill over all of them: no seam where two sections meet.
+  const cut = await page.evaluate(() => {
+    const inks = [...document.querySelectorAll<HTMLElement>('[data-dying] .sign-e__seg .e-ink')];
+    return {
+      n: inks.length,
+      clipped: inks.filter((el) => getComputedStyle(el).clipPath !== 'none').length,
+      masked: inks.filter((el) => /linear-gradient/.test(getComputedStyle(el).maskImage || getComputedStyle(el).webkitMaskImage)).length,
+      filled: inks.filter((el) => getComputedStyle(el).color !== 'rgba(0, 0, 0, 0)').length,
+      fills: document.querySelectorAll('[data-dying] > .e-ink--fill').length,
+    };
+  });
+  expect(cut).toEqual({ n: 12, clipped: 0, masked: 12, filled: 0, fills: 1 });
+
   // It hangs: rotated from its fixing, and swaying.
   const hang = await page.evaluate(async () => {
     const el = document.querySelector<HTMLElement>('[data-dying]')!;
@@ -495,14 +515,18 @@ test('large-area flicker, measured in pixels: the top of the building never flas
   const parts = [await frac({ x: 60, y: 150, w: 480, h: 150 }), await frac({ x: 340, y: 34, w: 110, h: 110 })];
   const cdp = await page.context().newCDPSession(page);
   const shots: { t: number; data: string }[] = [];
+  // A frame can still arrive after the screencast is stopped: the list is closed first, so
+  // it has the same length when it is measured as when it is read.
+  let recording = true;
   cdp.on('Page.screencastFrame', (f) => {
-    shots.push({ t: (f.metadata.timestamp ?? 0) * 1000, data: f.data });
+    if (recording) shots.push({ t: (f.metadata.timestamp ?? 0) * 1000, data: f.data });
     cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {});
   });
   await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, everyNthFrame: 1 });
   // The worst case: a collapse, the ember and the restrike, forced.
   await page.evaluate(() => window.__hero.e.force('dying'));
   await page.waitForTimeout(6000);
+  recording = false;
   await cdp.send('Page.stopScreencast');
   expect(shots.length).toBeGreaterThan(20);
   const fps = shots.length / ((shots[shots.length - 1].t - shots[0].t) / 1000);
@@ -644,6 +668,14 @@ test('the curtain is held aside at the edge of the light and falls when the ligh
   await page.mouse.move(edge.x, edge.y, { steps: 4 });
   await expect.poll(state, { timeout: 4000 }).toBe('held');
   await expect.poll(scaleX, { timeout: 3000 }).toBeLessThan(0.5);
+  // Someone holds it: a face in the gap and fingers on the edge fade in (opacity only), and
+  // the lightning copy of the building shows the same drape, not one at rest.
+  const holder = page.locator('[data-curtain] .curtain__holder');
+  const holderOpacity = () => holder.evaluate((el) => Number(getComputedStyle(el).opacity));
+  await expect.poll(holderOpacity, { timeout: 3000 }).toBeGreaterThan(0.5);
+  expect(await holder.evaluate((el) => getComputedStyle(el).transitionProperty)).toBe('opacity');
+  const stormDrape = () => page.locator('.storm-drape').evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).a);
+  expect(await stormDrape()).toBeLessThan(0.5);
   // It moves by transform alone.
   expect(await drape.evaluate((el) => getComputedStyle(el).transitionProperty)).toBe('transform');
 
@@ -651,6 +683,8 @@ test('the curtain is held aside at the edge of the light and falls when the ligh
   await page.mouse.move(win.x, win.y, { steps: 4 });
   await expect.poll(state, { timeout: 3000 }).toBe('rest');
   await expect.poll(async () => Math.abs((await scaleX()) - 1), { timeout: 3000 }).toBeLessThan(0.01);
+  await expect.poll(holderOpacity, { timeout: 3000 }).toBe(0);
+  expect(await stormDrape()).toBeCloseTo(1, 2);
 
   // Rare: back at the edge straight away, it does not do it again.
   await page.mouse.move(edge.x, edge.y, { steps: 4 });
