@@ -592,8 +592,8 @@ test('lightning: the flash has a single peak and reveals the watchers', async ({
   await expect.poll(() => page.evaluate(() => typeof window.__hero?.storm?.strike)).toBe('function');
   const storm = page.locator('[data-storm]');
   expect(Number(await storm.evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
-  // Few, not a crowd: three windows and the open door.
-  await expect(storm.locator('[data-watcher]')).toHaveCount(4);
+  // Few, not a crowd: three windows.
+  await expect(storm.locator('[data-watcher]')).toHaveCount(3);
   const curve = await page.evaluate(
     () =>
       new Promise<number[]>((resolve) => {

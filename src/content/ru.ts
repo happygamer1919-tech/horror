@@ -23,7 +23,6 @@ export const ru: Copy = {
     preview: 'Предварительная версия',
     whatsapp: 'Написать в WhatsApp',
     waHello: (brand) => `Здравствуйте! У меня вопрос о квесте «${brand}».`,
-    slots: 'Свободное время',
     ask: 'Задать вопрос',
     telegram: 'Написать в Telegram',
     toastTelegram: 'Сообщение скопировано - вставьте его в Telegram',

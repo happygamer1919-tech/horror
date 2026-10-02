@@ -19,7 +19,7 @@ export const VOUCHERS_ENABLED = true;
 // The EasyWeek booking widget: the primary booking action. It collects the slot, name,
 // phone and a comment. The check-in card opens it in a dialog and copies the team size,
 // level, language and total for the comment field. Leave empty to hide the booking button.
-// Components read it as BOOKING_URL (see index.ts).
+// Components read it as BOOKING_URL (see index.ts). Booking always goes through the check-in card.
 export const SLOTS_URL = 'https://widget.easyweek.io/horror-quest-moldova/team/34544/62497';
 
 // Telegram, the second "ask a question" channel next to WhatsApp. A phone link cannot be

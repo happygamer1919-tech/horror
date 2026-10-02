@@ -23,7 +23,6 @@ export const en: Copy = {
     preview: 'Preview version',
     whatsapp: 'Write on WhatsApp',
     waHello: (brand) => `Hello! I have a question about "${brand}".`,
-    slots: 'See free slots',
     ask: 'Ask a question',
     telegram: 'Write on Telegram',
     toastTelegram: 'Message copied - paste it in Telegram',

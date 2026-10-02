@@ -23,7 +23,6 @@ export const ro: Copy = {
     preview: 'Versiune de previzualizare',
     whatsapp: 'Scrieți pe WhatsApp',
     waHello: (brand) => `Bună ziua! Am o întrebare despre „${brand}”.`,
-    slots: 'Vedeți orele libere',
     ask: 'Puneți o întrebare',
     telegram: 'Scrieți pe Telegram',
     toastTelegram: 'Mesaj copiat - lipiți-l în Telegram',

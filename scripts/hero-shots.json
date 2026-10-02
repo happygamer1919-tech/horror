@@ -289,38 +289,6 @@
   "h": 900
  },
  {
-  "out": "docs/screenshots/18-facade-door-1440.jpg",
-  "mouse": [
-   1100,
-   840
-  ],
-  "unit": {
-   "x": 160,
-   "y": 730,
-   "w": 290,
-   "h": 170
-  },
-  "scale": 2,
-  "w": 1440,
-  "h": 900
- },
- {
-  "out": "docs/screenshots/18-facade-door-dark-1440.jpg",
-  "mouse": [
-   40,
-   870
-  ],
-  "unit": {
-   "x": 160,
-   "y": 730,
-   "w": 290,
-   "h": 170
-  },
-  "scale": 2,
-  "w": 1440,
-  "h": 900
- },
- {
   "out": "docs/screenshots/18-facade-lightning-390.jpg",
   "eval": "window.__hero.storm.hold(true)",
   "wait": 600,

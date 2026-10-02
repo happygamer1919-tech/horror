@@ -331,8 +331,12 @@ for (const lang of LANGS) {
       expect(outside).toBe(0);
       await expect(page.locator('[data-booking] a[href*="easyweek"]')).toHaveCount(2);
       await expect(page.locator('a[data-slots]')).toHaveCount(0);
-      // The hero keeps its two approved actions: the card and the phone.
-      expect(await page.locator('#lobby .hero__cta a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))).toEqual(['#checkin', 'tel:+37368232596']);
+      // The hero actions: the card, the route in Google Maps and the phone. None of them books directly.
+      expect(await page.locator('#lobby .hero__cta a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))).toEqual([
+        '#checkin',
+        'https://www.google.com/maps/dir/?api=1&destination=Strada+Onisifor+Ghibu+10%2C+Chi%C8%99in%C4%83u+MD-2071&destination_place_id=ChIJ8UbS8b3Xy0ARaOu6EZ-iXhU',
+        'tel:+37368232596',
+      ]);
     });
   });
 }

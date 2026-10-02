@@ -44,7 +44,6 @@ export interface Copy {
     preview: string;
     whatsapp: string;
     waHello: (brand: string) => string;
-    slots: string;
     ask: string;
     telegram: string;
     toastTelegram: string;
