@@ -5,10 +5,11 @@ export const ro: Copy = {
   locale: 'ro-MD',
   langName: 'Română',
   meta: {
-    title: (brand) => `${brand} - quest horror cu actori, Chișinău`,
+    title: (brand, sub) => `${brand}${sub ? ` (${sub})` : ''} - quest horror cu actori, Chișinău`,
     description:
       'Quest horror cu actori în Chișinău. Un hotel vechi care nu s-a închis niciodată, o gazdă care nu a plecat și 60 de minute ca să găsiți cheia ascunsă.',
     hiddenTitle: 'Cheia vă așteaptă',
+    ogAlt: 'Fațada unui hotel vechi, noaptea, cu o firmă roșie de neon: HOTEL',
   },
   ui: {
     skipToContent: 'Salt la conținut',
@@ -21,14 +22,19 @@ export const ro: Copy = {
     askDesk: 'Întrebați recepția',
     languageNav: 'Limbă',
     preview: 'Versiune de previzualizare',
+    whatsapp: 'Scrieți pe WhatsApp',
+    waHello: (brand) => `Bună ziua! Am o întrebare despre „${brand}”.`,
+    slots: 'Vedeți orele libere',
   },
   places: {
     lobby: 'Hol',
     corridor: 'Etajul 3',
     archive: 'Arhivă',
     reception: 'Recepție',
+    cashier: 'Casierie',
     security: 'Camera de pază',
     guestbook: 'Cartea de oaspeți',
+    gift: 'Cadou',
     registration: 'Cazare',
     info: 'Informații',
   },
@@ -89,6 +95,8 @@ export const ro: Copy = {
     intro: 'Pe panou atârnă patru chei. Luați-o pe a dumneavoastră.',
     labels: { players: 'Jucători', duration: 'Durată', age: 'Vârstă', price: 'Preț' },
     duration: (m) => `${m} min`,
+    priceFrom: (n, cur) => `de la ${n} ${cur}`,
+    limits: 'Actori reali. Spuneți-ne limitele dumneavoastră la rezervare.',
     level: {
       legend: 'Nivel de contact',
       options: {
@@ -108,6 +116,13 @@ export const ro: Copy = {
       note: 'Regulile exacte de contact pentru fiecare nivel le confirmă recepția la rezervare.',
     },
   },
+  prices: {
+    title: 'Lista de prețuri',
+    colTeam: 'Echipă',
+    colPrice: 'Preț',
+    players: (a, b) => (a === b ? `${a} jucători` : `${a}-${b} jucători`),
+    note: 'Prețul este pentru întreaga echipă, în lei moldovenești (MDL).',
+  },
   cctv: {
     title: 'Nimeni nu se uită la monitoare',
     sub: 'Patru camere. Banda merge toată noaptea.',
@@ -121,11 +136,20 @@ export const ro: Copy = {
     reviews: (n) => `${n} de recenzii`,
     source: 'Rating Google',
     link: 'Citiți recenziile pe Google Maps',
+    review: 'Lăsați o recenzie',
     quotesTitle: 'Din cartea de oaspeți',
+  },
+  voucher: {
+    title: 'Voucher cadou',
+    text: 'Dăruiți cuiva o vizită la hotel. Alegeți numărul de jucători, scrieți pentru cine este și trimiteți-ne cererea pe WhatsApp.',
+    team: 'Număr de jucători',
+    recipient: 'Numele destinatarului',
+    submit: 'Cereți voucherul pe WhatsApp',
+    message: (d) => [`Bună ziua! Aș dori un voucher cadou pentru „${d.brand}”.`, `Număr de jucători: ${d.team}`, `Destinatar: ${d.recipient}`].join('\n'),
   },
   checkin: {
     title: 'Fișă de cazare',
-    intro: 'Completați fișa. Se deschide WhatsApp cu datele dumneavoastră deja scrise. Nimic nu se trimite până nu apăsați acolo pe trimitere.',
+    intro: 'Completați fișa. Se deschide WhatsApp cu cererea de rezervare deja scrisă. Nimic nu se trimite până nu apăsați acolo pe trimitere.',
     cardNo: 'Fișa nr.',
     fields: {
       date: 'Data sosirii',
@@ -135,9 +159,12 @@ export const ro: Copy = {
       level: 'Nivel de contact',
       name: 'Nume',
       phone: 'Telefon',
+      comment: 'Comentariu, limitele dumneavoastră',
     },
     languages: { ro: 'Română', ru: 'Rusă', en: 'Engleză' },
+    total: 'Total',
     submit: 'Trimiteți pe WhatsApp',
+    request: 'Aceasta este o cerere de rezervare. O confirmăm printr-un apel telefonic.',
     tel: 'Sau sunați',
     note: 'Nicio plată pe această pagină.',
     signature: 'Semnătura oaspetelui',
@@ -147,10 +174,12 @@ export const ro: Copy = {
         `Data: ${d.date}`,
         `Ora: ${d.time}`,
         `Oaspeți: ${d.team}`,
+        `Total: ${d.total}`,
         `Limba: ${d.language}`,
-        `Nivel de contact: ${d.level}`,
+        ...(d.level ? [`Nivel de contact: ${d.level}`] : []),
         `Nume: ${d.name}`,
         `Telefon: ${d.phone}`,
+        `Comentariu: ${d.comment}`,
       ].join('\n'),
   },
   faq: {
@@ -164,27 +193,45 @@ export const ro: Copy = {
       { q: 'Cât durează?', a: `${v.minutes} de minute.`, known: true },
       {
         q: 'Cât de înfricoșător este?',
-        a: 'Alegeți unul dintre cele trei niveluri de contact: Light, Standard sau Hardcore. Spuneți-ne nivelul la rezervare.',
+        a: v.levels
+          ? 'Alegeți unul dintre cele trei niveluri de contact: Light, Standard sau Hardcore. Spuneți-ne nivelul la rezervare.'
+          : 'Este un quest horror cu actori. Spuneți-ne limitele dumneavoastră la rezervare.',
         known: true,
       },
       {
-        q: 'Câți jucători pot veni?',
-        a: v.players ? `Echipe de ${v.players} jucători.` : 'Confirmăm acest detaliu. Scrieți-ne sau sunați și vă spunem.',
-        known: Boolean(v.players),
-      },
-      {
-        q: 'Există o limită de vârstă?',
+        q: 'Există o vârstă minimă?',
         a: v.age ? `Da: ${v.age}.` : 'Confirmăm acest detaliu. Scrieți-ne sau sunați și vă spunem.',
         known: Boolean(v.age),
       },
       {
+        q: 'Câți jucători pot veni?',
+        a: `De la ${v.players.min} la ${v.players.max} jucători. Minimum ${v.players.min}.`,
+        known: true,
+      },
+      {
         q: 'Cât costă?',
-        a: v.price ? v.price : 'Întrebați prețul actual la rezervare, pe WhatsApp sau la telefon.',
-        known: Boolean(v.price),
+        a: `${v.priceFrom[0].toUpperCase()}${v.priceFrom.slice(1)} pentru echipă. Prețul depinde de numărul de jucători: vedeți lista de prețuri de pe această pagină.`,
+        known: true,
+      },
+      ...(v.vouchers
+        ? [
+            {
+              q: 'Cum cumpăr un voucher cadou?',
+              a: `Completați blocul „Voucher cadou” de pe această pagină: se deschide WhatsApp cu cererea gata scrisă. Sau sunați la ${v.phone}.`,
+              known: true,
+            },
+          ]
+        : []),
+      { q: 'Cum să mă îmbrac?', a: 'Haine ușoare, de culoare închisă.', known: true },
+      { q: 'Unde se explică regulile?', a: 'La sosire, înainte de începerea jocului.', known: true },
+      {
+        q: 'Cum pot plăti?',
+        a: v.payment ? v.payment : 'Confirmăm acest detaliu. Întrebați la rezervare.',
+        known: Boolean(v.payment),
       },
       {
         q: 'Cum rezerv?',
-        a: `Completați fișa de cazare de pe această pagină: se deschide WhatsApp cu mesajul gata scris. Sau sunați la ${v.phone}.`,
+        a: `Completați fișa de cazare de pe această pagină: se deschide WhatsApp cu cererea de rezervare gata scrisă. Confirmăm rezervarea printr-un apel telefonic. Sau sunați la ${v.phone}.`,
         known: true,
       },
       { q: 'Unde este hotelul?', a: `${v.address}.`, known: true },
@@ -194,7 +241,8 @@ export const ro: Copy = {
     title: 'Cum ne găsiți',
     address: 'Adresă',
     hours: 'Program',
-    hoursPlaceholder: 'Întrebați recepția la telefon sau pe WhatsApp',
+    days: { 'mon-thu': 'Luni-Joi', fri: 'Vineri', 'sat-sun': 'Sâmbătă-Duminică' },
+    allDay: 'non-stop',
     phone: 'Recepție',
     directions: 'Traseu în Google Maps',
   },

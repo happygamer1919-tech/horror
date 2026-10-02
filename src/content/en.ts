@@ -5,10 +5,11 @@ export const en: Copy = {
   locale: 'en',
   langName: 'English',
   meta: {
-    title: (brand) => `${brand} - horror quest with live actors in Chisinau`,
+    title: (brand, sub) => `${brand}${sub ? ` (${sub})` : ''} - horror quest with live actors in Chisinau`,
     description:
       'A horror quest with live actors in Chisinau. An old hotel that never closed, a host who never left, and 60 minutes to find the hidden key.',
     hiddenTitle: 'Your key is still here',
+    ogAlt: 'Night facade of an old hotel with a red neon HOTEL sign',
   },
   ui: {
     skipToContent: 'Skip to content',
@@ -21,14 +22,19 @@ export const en: Copy = {
     askDesk: 'Ask the desk',
     languageNav: 'Language',
     preview: 'Preview version',
+    whatsapp: 'Write on WhatsApp',
+    waHello: (brand) => `Hello! I have a question about "${brand}".`,
+    slots: 'See free slots',
   },
   places: {
     lobby: 'Lobby',
     corridor: 'Floor 3',
     archive: 'Archive',
     reception: 'Reception',
+    cashier: 'Cashier',
     security: 'Security room',
     guestbook: 'Guest book',
+    gift: 'Gift',
     registration: 'Registration',
     info: 'Information',
   },
@@ -89,6 +95,8 @@ export const en: Copy = {
     intro: 'Four keys hang on the board. Take the one that is yours.',
     labels: { players: 'Players', duration: 'Duration', age: 'Age', price: 'Price' },
     duration: (m) => `${m} min`,
+    priceFrom: (n, cur) => `from ${n} ${cur}`,
+    limits: 'Live actors. Tell us your limits when you book.',
     level: {
       legend: 'Contact level',
       options: {
@@ -108,6 +116,13 @@ export const en: Copy = {
       note: 'The exact contact rules for each level are confirmed by the desk when you book.',
     },
   },
+  prices: {
+    title: 'Price list',
+    colTeam: 'Team',
+    colPrice: 'Price',
+    players: (a, b) => (a === b ? `${a} players` : `${a}-${b} players`),
+    note: 'The price is for the whole team, in Moldovan lei (MDL).',
+  },
   cctv: {
     title: 'Nobody is watching the monitors',
     sub: 'Four cameras. The tape runs all night.',
@@ -121,11 +136,20 @@ export const en: Copy = {
     reviews: (n) => `${n} reviews`,
     source: 'Google rating',
     link: 'Read the reviews on Google Maps',
+    review: 'Leave a review',
     quotesTitle: 'From the guest book',
+  },
+  voucher: {
+    title: 'Gift voucher',
+    text: 'Give someone a visit to the hotel. Choose the team size, write who it is for, and send us the request on WhatsApp.',
+    team: 'Team size',
+    recipient: "Recipient's name",
+    submit: 'Request a voucher on WhatsApp',
+    message: (d) => [`Hello! I would like a gift voucher for "${d.brand}".`, `Team size: ${d.team}`, `Recipient: ${d.recipient}`].join('\n'),
   },
   checkin: {
     title: 'Registration card',
-    intro: 'Fill in the card. It opens WhatsApp with your details already written. Nothing is sent until you press send there.',
+    intro: 'Fill in the card. It opens WhatsApp with your booking request already written. Nothing is sent until you press send there.',
     cardNo: 'Card No.',
     fields: {
       date: 'Arrival date',
@@ -135,9 +159,12 @@ export const en: Copy = {
       level: 'Contact level',
       name: 'Name',
       phone: 'Phone',
+      comment: 'Comment, your limits',
     },
     languages: { ro: 'Romanian', ru: 'Russian', en: 'English' },
+    total: 'Total',
     submit: 'Send via WhatsApp',
+    request: 'This is a booking request. We confirm it by a phone call.',
     tel: 'Or call',
     note: 'No payment on this page.',
     signature: 'Guest signature',
@@ -147,10 +174,12 @@ export const en: Copy = {
         `Date: ${d.date}`,
         `Time: ${d.time}`,
         `Guests: ${d.team}`,
+        `Total: ${d.total}`,
         `Language: ${d.language}`,
-        `Contact level: ${d.level}`,
+        ...(d.level ? [`Contact level: ${d.level}`] : []),
         `Name: ${d.name}`,
         `Phone: ${d.phone}`,
+        `Comment: ${d.comment}`,
       ].join('\n'),
   },
   faq: {
@@ -164,27 +193,45 @@ export const en: Copy = {
       { q: 'How long does it last?', a: `${v.minutes} minutes.`, known: true },
       {
         q: 'How frightening is it?',
-        a: 'You choose one of three contact levels: Light, Standard or Hardcore. Tell us which one when you book.',
+        a: v.levels
+          ? 'You choose one of three contact levels: Light, Standard or Hardcore. Tell us which one when you book.'
+          : 'It is a horror quest with live actors. Tell us your limits when you book.',
         known: true,
       },
       {
-        q: 'How many players can come?',
-        a: v.players ? `Teams of ${v.players} players.` : 'We are confirming this detail. Write or call and we will tell you.',
-        known: Boolean(v.players),
-      },
-      {
-        q: 'Is there an age limit?',
+        q: 'Is there a minimum age?',
         a: v.age ? `Yes: ${v.age}.` : 'We are confirming this detail. Write or call and we will tell you.',
         known: Boolean(v.age),
       },
       {
+        q: 'How many players can come?',
+        a: `From ${v.players.min} to ${v.players.max} players. The minimum is ${v.players.min}.`,
+        known: true,
+      },
+      {
         q: 'How much does it cost?',
-        a: v.price ? v.price : 'Ask for the current price when you book, on WhatsApp or by phone.',
-        known: Boolean(v.price),
+        a: `${v.priceFrom[0].toUpperCase()}${v.priceFrom.slice(1)} per team. The price depends on the team size: see the price list on this page.`,
+        known: true,
+      },
+      ...(v.vouchers
+        ? [
+            {
+              q: 'How do I buy a gift voucher?',
+              a: `Fill in the gift voucher block on this page: it opens WhatsApp with a ready request. Or call ${v.phone}.`,
+              known: true,
+            },
+          ]
+        : []),
+      { q: 'What should I wear?', a: 'Light clothes in dark colours.', known: true },
+      { q: 'Where are the rules explained?', a: 'On arrival, before the game starts.', known: true },
+      {
+        q: 'How can I pay?',
+        a: v.payment ? v.payment : 'We are confirming this detail. Ask when you book.',
+        known: Boolean(v.payment),
       },
       {
         q: 'How do I book?',
-        a: `Fill in the registration card on this page: it opens WhatsApp with a ready message. Or call ${v.phone}.`,
+        a: `Fill in the registration card on this page: it opens WhatsApp with a ready booking request. We confirm the booking by a phone call. Or call ${v.phone}.`,
         known: true,
       },
       { q: 'Where is the hotel?', a: `${v.address}.`, known: true },
@@ -194,7 +241,8 @@ export const en: Copy = {
     title: 'How to find us',
     address: 'Address',
     hours: 'Hours',
-    hoursPlaceholder: 'Ask the desk by phone or on WhatsApp',
+    days: { 'mon-thu': 'Mon-Thu', fri: 'Fri', 'sat-sun': 'Sat-Sun' },
+    allDay: '24 hours',
     phone: 'Front desk',
     directions: 'Directions in Google Maps',
   },

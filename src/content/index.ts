@@ -5,4 +5,4 @@ import { ru } from './ru';
 import { en } from './en';
 
 export const copy: Record<Lang, Copy> = { ro, ru, en };
-export { site } from './site';
+export { site, priceFor, priceFrom, CONTACT_LEVELS_ENABLED, VOUCHERS_ENABLED, SLOTS_URL } from './site';
