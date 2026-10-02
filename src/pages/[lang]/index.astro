@@ -1,0 +1,21 @@
+---
+import Base from '../../layouts/Base.astro';
+import Header from '../../components/Header.astro';
+import { LANGS, type Lang } from '../../config';
+
+export function getStaticPaths() {
+  return LANGS.map((lang) => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Lang;
+---
+
+<Base lang={lang}>
+  <Header lang={lang} />
+  <main id="main">
+    <div id="top"></div>
+  </main>
+  <script>
+    import '../../scripts/main.ts';
+  </script>
+</Base>

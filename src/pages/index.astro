@@ -1,0 +1,41 @@
+---
+import { DEFAULT_LANG, LANGS, abs, href } from '../config';
+import { copy, site } from '../content';
+
+const target = href(`/${DEFAULT_LANG}/`);
+---
+
+<!doctype html>
+<html lang={DEFAULT_LANG}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{site.brand.ru} / {site.brand.ro} / {site.brand.en}</title>
+    <meta name="robots" content="noindex, follow" />
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <link rel="canonical" href={abs(`/${DEFAULT_LANG}/`)} />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #070606;
+        color: #e8e0d0;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+      }
+      a {
+        color: #e3c887;
+        display: inline-block;
+        padding: 12px 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav aria-label="Language">
+        {LANGS.map((l) => <a href={href(`/${l}/`)} lang={l}>{copy[l].langName}</a>)}
+      </nav>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,82 @@
+---
+import '@fontsource-variable/playfair-display/wght.css';
+import '@fontsource-variable/playfair-display/wght-italic.css';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import '../styles/global.css';
+
+import serifLatin from '@fontsource-variable/playfair-display/files/playfair-display-latin-wght-normal.woff2?url';
+import serifLatinExt from '@fontsource-variable/playfair-display/files/playfair-display-latin-ext-wght-normal.woff2?url';
+import serifCyrillic from '@fontsource-variable/playfair-display/files/playfair-display-cyrillic-wght-normal.woff2?url';
+import monoLatin from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2?url';
+import monoCyrillic from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-cyrillic-400-normal.woff2?url';
+
+import { SITE_INDEXABLE, LANGS, DEFAULT_LANG, abs, href, type Lang } from '../config';
+import { copy, site } from '../content';
+
+interface Props {
+  lang: Lang;
+  title?: string;
+  description?: string;
+  path?: string;
+  alternates?: boolean;
+  jsonLd?: object[];
+}
+
+const { lang, path = `/${lang}/`, alternates = true, jsonLd = [] } = Astro.props;
+const t = copy[lang];
+const brand = site.brand[lang];
+const title = Astro.props.title ?? t.meta.title(brand);
+const description = Astro.props.description ?? t.meta.description;
+
+// Preload only the files the first screen needs for this language.
+const preloads = lang === 'ru' ? [serifCyrillic, monoCyrillic] : lang === 'ro' ? [serifLatin, serifLatinExt, monoLatin] : [serifLatin, monoLatin];
+---
+
+<!doctype html>
+<html lang={lang} data-level="standard">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content={SITE_INDEXABLE ? 'index, follow' : 'noindex, nofollow'} />
+    <meta name="theme-color" content="#070606" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="canonical" href={abs(path)} />
+    {
+      alternates &&
+        LANGS.map((l) => <link rel="alternate" hreflang={l} href={abs(`/${l}/`)} />)
+    }
+    {alternates && <link rel="alternate" hreflang="x-default" href={abs(`/${DEFAULT_LANG}/`)} />}
+    <link rel="icon" type="image/svg+xml" href={href('/favicon.svg')} />
+    {preloads.map((f) => <link rel="preload" as="font" type="font/woff2" href={f} crossorigin />)}
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={abs(path)} />
+    <meta property="og:locale" content={t.locale.replace('-', '_')} />
+    <meta property="og:site_name" content={brand} />
+    {SITE_INDEXABLE && jsonLd.map((data) => <script type="application/ld+json" set:html={JSON.stringify(data)} />)}
+    <script is:inline>
+      (function () {
+        var d = document.documentElement;
+        d.classList.add('js');
+        var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        d.classList.add(still ? 'still' : 'motion');
+        try {
+          if (still || sessionStorage.getItem('hotel:lift')) d.classList.add('no-lift');
+        } catch (e) {
+          d.classList.add('no-lift');
+        }
+      })();
+    </script>
+  </head>
+  <body data-title={title} data-hidden-title={t.meta.hiddenTitle}>
+    <a class="skip-link" href="#main">{t.ui.skipToContent}</a>
+    <slot />
+    <div class="torch" aria-hidden="true"><div class="torch__beam"></div></div>
+    <div class="tint" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+  </body>
+</html>
