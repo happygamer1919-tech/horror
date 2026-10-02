@@ -100,7 +100,7 @@ export const en: Copy = {
     duration: (m) => `${m} min`,
     priceFrom: (n, cur) => `from ${n} ${cur}`,
     age: (min) => (min === null ? 'No age limit' : `${min}+`),
-    ageNote: 'Agreement signed on arrival',
+    ageNote: 'Agreement on arrival. Minors: a parent signs',
     level: {
       legend: 'Game level',
       options: { none: 'No electroshock', weak: 'Weak electroshock', hardcore: 'Hardcore' },
@@ -142,7 +142,7 @@ export const en: Copy = {
   },
   checkin: {
     title: 'Registration card',
-    intro: 'Fill in the card, then choose a time. We copy your line, and you paste it into the comment field of the booking form.',
+    intro: 'Fill in the card, then choose a time. We copy one line with your details, and you paste it into the comment field of the booking form.',
     cardNo: 'Card No.',
     fields: { team: 'Guests', language: 'Language', level: 'Level' },
     languages: { ro: 'Romanian', ru: 'Russian', en: 'English' },

@@ -13,7 +13,7 @@ const k = t.keys;
 const fobs = [
   { no: '01', label: k.labels.players, value: `${site.players.min}-${site.players.max}`, small: false, note: '' },
   { no: '02', label: k.labels.duration, value: k.duration(site.durationMinutes), small: false, note: '' },
-  // No age limit: everyone signs an agreement on arrival (the full answer is in the FAQ).
+  // No age limit: everyone signs an agreement on arrival, a parent signs for a minor.
   { no: '03', label: k.labels.age, value: k.age(site.ageLimit), small: site.ageLimit === null, note: k.ageNote },
   { no: '04', label: k.labels.price, value: k.priceFrom(priceFrom, site.currency), small: true, note: '' },
 ];
@@ -184,8 +184,10 @@ const fobs = [
     line-height: 1.12;
   }
   .fob__note {
-    max-width: 14ch;
+    max-width: 22ch;
     font-size: 10px;
+    font-weight: 500;
+    text-wrap: balance;
     line-height: 1.35;
     letter-spacing: 0.06em;
     text-transform: uppercase;

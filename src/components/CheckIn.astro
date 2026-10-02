@@ -1,6 +1,6 @@
 ---
 import type { Lang } from '../config';
-import { copy, site, priceFor, CONTACT_LEVELS_ENABLED, LEVELS, SLOTS_URL, TELEGRAM_URL } from '../content';
+import { copy, site, priceFor, CONTACT_LEVELS_ENABLED, LEVELS, BOOKING_URL, TELEGRAM_URL } from '../content';
 import SectionHead from './SectionHead.astro';
 
 interface Props {
@@ -46,7 +46,7 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
       data-labels={JSON.stringify(c.summary)}
       data-prices={JSON.stringify(priceMap)}
       data-currency={site.currency}
-      data-slots={SLOTS_URL}
+      data-slots={BOOKING_URL}
       data-reveal
     >
       <div class="card__head">
@@ -91,7 +91,7 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
 
       <div class="card__foot">
         {
-          SLOTS_URL && (
+          BOOKING_URL && (
             <>
               <button class="btn btn--primary card__submit" type="submit" data-book>
                 {c.submit}
@@ -122,8 +122,8 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
     </form>
 
     {
-      SLOTS_URL && (
-        <dialog class="bk" data-booking data-lenis-prevent aria-labelledby="bk-title" data-url={SLOTS_URL} data-copied={b.copied} data-not-copied={b.notCopied}>
+      BOOKING_URL && (
+        <dialog class="bk" data-booking data-lenis-prevent aria-labelledby="bk-title" data-url={BOOKING_URL} data-copied={b.copied} data-not-copied={b.notCopied}>
           <div class="bk__bar">
             <div class="bk__top">
               <p class="bk__title" id="bk-title">
@@ -144,7 +144,7 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
             </div>
             <p class="bk__hint">
               <span>{b.instruction}</span>
-              <a href={SLOTS_URL} target="_blank" rel="noopener noreferrer" data-booking-tab>
+              <a href={BOOKING_URL} target="_blank" rel="noopener noreferrer" data-booking-tab>
                 {b.newTab}
               </a>
             </p>
@@ -152,7 +152,7 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
           <div class="bk__body">
             <p class="bk__slow" data-booking-slow>
               <span>{b.slow}</span>
-              <a class="btn btn--primary" href={SLOTS_URL} target="_blank" rel="noopener noreferrer">
+              <a class="btn btn--primary" href={BOOKING_URL} target="_blank" rel="noopener noreferrer">
                 {b.newTab}
               </a>
             </p>
@@ -369,7 +369,14 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
       background-color 0.25s,
       color 0.25s;
   }
-  .card__ch:hover {
+  /* Hover only where there is a pointer that hovers: on touch it would stick after the tap. */
+  @media (hover: hover) {
+    .card__ch:hover {
+      background: var(--paper-ink);
+      color: var(--paper);
+    }
+  }
+  .card__ch:active {
     background: var(--paper-ink);
     color: var(--paper);
   }
@@ -550,9 +557,9 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
   .bk__state {
     grid-column: 1;
     min-height: 1.5em;
-    font-size: 9px;
+    font-size: 11px;
     line-height: 1.5;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--brass);
   }

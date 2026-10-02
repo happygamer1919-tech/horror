@@ -100,7 +100,7 @@ export const ro: Copy = {
     duration: (m) => `${m} min`,
     priceFrom: (n, cur) => `de la ${n} ${cur}`,
     age: (min) => (min === null ? 'Fără limită' : `${min}+`),
-    ageNote: 'Acord semnat la sosire',
+    ageNote: 'Acord la sosire. Minori: semnează un părinte',
     level: {
       legend: 'Nivelul jocului',
       options: { none: 'Fără electroșoc', weak: 'Electroșoc slab', hardcore: 'Hardcore' },
@@ -142,7 +142,7 @@ export const ro: Copy = {
   },
   checkin: {
     title: 'Fișă de cazare',
-    intro: 'Completați fișa, apoi alegeți ora. Noi copiem rândul dumneavoastră, iar dumneavoastră îl lipiți în câmpul de comentariu al formularului de rezervare.',
+    intro: 'Completați fișa, apoi alegeți ora. Noi copiem un rând cu datele dumneavoastră, iar dumneavoastră îl lipiți în câmpul de comentariu al formularului de rezervare.',
     cardNo: 'Fișa nr.',
     fields: { team: 'Oaspeți', language: 'Limba', level: 'Nivel' },
     languages: { ro: 'Română', ru: 'Rusă', en: 'Engleză' },
@@ -152,7 +152,7 @@ export const ro: Copy = {
     tel: 'Sau sunați',
     note: 'Nicio plată pe această pagină. Plata se face în numerar, la fața locului.',
     signature: 'Semnătura oaspetelui',
-    summary: { team: 'Echipă', level: 'Nivel', language: 'Limba', total: 'Total' },
+    summary: { team: 'Echipă', level: 'Nivel', language: 'Limbă', total: 'Total' },
     hello: (brand) => `Bună ziua! Am o întrebare despre rezervarea la „${brand}”.`,
   },
   booking: {
