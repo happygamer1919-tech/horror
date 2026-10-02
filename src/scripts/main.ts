@@ -5,7 +5,10 @@ import { initTorch } from './torch';
 import { initNeon } from './neon';
 import { initScroll } from './scroll';
 import { initCorridor } from './corridor';
-import { initToday, initTitle } from './misc';
+import { initLevel } from './level';
+import { initCheckin } from './checkin';
+import { initToday, initTitle, initSticky, initHanger } from './misc';
+import { initAudio } from './audio';
 
 initLift();
 initScroll();
@@ -15,11 +18,17 @@ initNeon();
 initCorridor();
 initToday();
 initTitle();
+initLevel();
+initCheckin();
+initSticky();
+initHanger();
+initAudio();
 
 // Heavy or optional parts wait until the browser is idle.
 const idle = (fn: () => void) =>
   'requestIdleCallback' in window ? window.requestIdleCallback(fn, { timeout: 2500 }) : window.setTimeout(fn, 600);
 
 idle(() => {
+  import('./cctv').then((m) => m.initCctv()).catch(() => {});
   import('./fog').then((m) => m.initFog()).catch(() => {});
 });

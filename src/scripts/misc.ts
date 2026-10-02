@@ -18,3 +18,31 @@ export function initTitle() {
     document.title = document.hidden ? hiddenTitle : title;
   });
 }
+
+// Mobile "Book" bar: away over the hero and while the check-in card is on screen.
+export function initSticky() {
+  const bar = document.querySelector<HTMLElement>('[data-sticky]');
+  const hero = document.getElementById('lobby');
+  const card = document.getElementById('checkin');
+  if (!bar || !hero || !card || !('IntersectionObserver' in window)) return;
+  const state = { hero: true, card: false };
+  const update = () => bar.classList.toggle('is-away', state.hero || state.card);
+  update();
+  new IntersectionObserver((e) => {
+    state.hero = e[0].isIntersecting;
+    update();
+  }, { threshold: 0.25 }).observe(hero);
+  new IntersectionObserver((e) => {
+    state.card = e[0].isIntersecting;
+    update();
+  }, { threshold: 0.12 }).observe(card);
+}
+
+// "Do not disturb" hanger in the footer: click to turn it over.
+export function initHanger() {
+  const btn = document.querySelector<HTMLButtonElement>('[data-hanger]');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    btn.setAttribute('aria-pressed', String(btn.getAttribute('aria-pressed') !== 'true'));
+  });
+}

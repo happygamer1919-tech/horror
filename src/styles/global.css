@@ -424,3 +424,18 @@ html.lenis body {
 .lenis.lenis-stopped {
   overflow: hidden;
 }
+
+/* Idle: after 20 seconds without input the lights go down (see torch.ts). */
+.dim {
+  position: fixed;
+  inset: 0;
+  z-index: 88;
+  background: #030202;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s;
+}
+html.idle .dim {
+  opacity: 0.55;
+  transition: opacity 3.5s;
+}
