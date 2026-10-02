@@ -341,7 +341,10 @@ html.motion .grain {
   transition: opacity 0.6s;
 }
 
-/* Flashlight. A huge element with a transparent centre, moved by transform only. */
+/* Flashlight. Darkness with a hole in it, moved by transform only (torch.ts).
+   The beam is a zero-size anchor. Its ::before is the hole: one square texture holding the
+   soft edge. The four <i> panels around it are flat colour, which the compositor draws
+   without a texture. Nothing here is repainted while the light moves or the page scrolls. */
 
 .torch {
   position: fixed;
@@ -356,26 +359,92 @@ html.motion .torch {
   display: block;
 }
 .torch__beam {
+  /* --torch-r: where the light has faded to about a third. --torch-h: where it is gone. */
+  --torch-r: 16.5vmax;
+  --torch-h: calc(var(--torch-r) * 2.6);
+  --torch-far: 130vmax;
   position: absolute;
   left: 0;
   top: 0;
-  width: 300vmax;
-  height: 300vmax;
-  margin: -150vmax 0 0 -150vmax;
+  width: 0;
+  height: 0;
   transform: translate3d(50vw, 38vh, 0);
+  will-change: transform;
+}
+.torch__beam::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--torch-h) * -1);
+  top: calc(var(--torch-h) * -1);
+  width: calc(var(--torch-h) * 2);
+  height: calc(var(--torch-h) * 2);
   background: radial-gradient(
     circle closest-side,
     rgba(4, 3, 3, 0) 0,
-    rgba(4, 3, 3, 0.1) calc(var(--torch-r, 11%) * 0.45),
-    rgba(4, 3, 3, 0.62) var(--torch-r, 11%),
-    rgba(4, 3, 3, 0.9) calc(var(--torch-r, 11%) * 1.7),
-    rgb(4, 3, 3) calc(var(--torch-r, 11%) * 2.6)
+    rgba(4, 3, 3, 0.1) 17.3%,
+    rgba(4, 3, 3, 0.62) 38.5%,
+    rgba(4, 3, 3, 0.9) 65.4%,
+    rgb(4, 3, 3) 100%
   );
-  will-change: transform;
+}
+.torch__beam > i {
+  position: absolute;
+  background: rgb(4, 3, 3);
+}
+.torch__beam > i:nth-child(1),
+.torch__beam > i:nth-child(2) {
+  left: calc(var(--torch-far) * -1);
+  width: calc(var(--torch-far) * 2);
+  height: var(--torch-far);
+}
+.torch__beam > i:nth-child(1) {
+  bottom: calc(var(--torch-h) - 1px);
+}
+.torch__beam > i:nth-child(2) {
+  top: calc(var(--torch-h) - 1px);
+}
+.torch__beam > i:nth-child(3),
+.torch__beam > i:nth-child(4) {
+  top: calc(var(--torch-h) * -1);
+  height: calc(var(--torch-h) * 2);
+  width: var(--torch-far);
+}
+.torch__beam > i:nth-child(3) {
+  right: calc(var(--torch-h) - 1px);
+}
+.torch__beam > i:nth-child(4) {
+  left: calc(var(--torch-h) - 1px);
+}
+/* A flat cover over the hole. Touch screens start with it up: there is no light until the
+   first touch. torch.ts then sets html.has-light and the cover fades out (opacity only),
+   which brings the light in at the finger. Shared by the copy veil in the hero. */
+.torch::after,
+.veil::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(4, 3, 3);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
 }
 @media (hover: none) {
+  /* Touch: a wider light. */
   .torch__beam {
-    --torch-r: 14%;
+    --torch-r: 21vmax;
+  }
+  .torch::after,
+  .veil::after {
+    opacity: 1;
+    visibility: visible;
+  }
+  html.has-light .torch::after,
+  html.has-light .veil::after {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 0.4s ease-out,
+      visibility 0s linear 0.4s;
   }
 }
 

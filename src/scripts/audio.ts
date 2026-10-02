@@ -97,3 +97,33 @@ export function initAudio() {
     master.gain.setTargetAtTime(document.hidden || !on ? 0 : 0.16, ctx.currentTime, 0.4);
   });
 }
+
+// Faint electrical buzz for the loose letter of the sign (neon.ts calls this a few times a
+// second). Silent unless the visitor has switched the sound on with the header button.
+let buzzCtx: AudioContext | null = null;
+let buzzGain: GainNode | null = null;
+export function signBuzz(level: number, arc: boolean) {
+  const on = !document.hidden && document.querySelector('[data-sound]')?.getAttribute('aria-pressed') === 'true';
+  if (!buzzCtx) {
+    if (!on) return;
+    try {
+      buzzCtx = new (window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      buzzGain = buzzCtx.createGain();
+      buzzGain.gain.value = 0;
+      const bp = buzzCtx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1900;
+      bp.Q.value = 0.8;
+      const osc = buzzCtx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 100; // mains hum, second harmonic
+      osc.connect(bp).connect(buzzGain).connect(buzzCtx.destination);
+      osc.start();
+    } catch {
+      return;
+    }
+  }
+  if (!buzzCtx || !buzzGain) return;
+  if (on && buzzCtx.state === 'suspended') void buzzCtx.resume().catch(() => {});
+  buzzGain.gain.setTargetAtTime(on ? 0.004 + 0.012 * level + (arc ? 0.035 : 0) : 0, buzzCtx.currentTime, 0.03);
+}

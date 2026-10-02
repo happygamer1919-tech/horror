@@ -47,9 +47,11 @@ export const en: Copy = {
     line: 'We have been expecting you.',
     sub: 'An old hotel that never closed. A host who never left. One hour to find the key and learn why.',
     cta: 'Check in',
+    route: 'Directions',
+    routeNote: 'Directions in Google Maps, opens in a new tab',
     tel: 'Call the front desk',
     hint: 'The lift only goes down',
-    facadeAlt: 'Night facade of an old hotel. A red neon sign reads HOTEL, one letter is failing.',
+    facadeAlt: 'Night facade of an old hotel in the rain. A red neon sign reads HOTEL: the letter E hangs from a single fixing and flickers.',
   },
   corridor: {
     title: 'The corridor',
