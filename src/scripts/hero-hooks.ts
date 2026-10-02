@@ -11,6 +11,7 @@ export interface HeroHooks {
     hold: (pose: 'normal' | 'arc' | 'ember' | null) => void;
   };
   figure?: { readonly state: string; readonly lit: boolean; set: (s: 'far' | 'near' | 'gone') => void };
+  curtain?: { readonly state: string; set: (s: 'rest' | 'held' | null) => void };
   storm?: { readonly count: number; readonly active: boolean; strike: () => void; hold: (on: boolean) => void };
   rain?: { readonly running: boolean; readonly drops: number };
 }

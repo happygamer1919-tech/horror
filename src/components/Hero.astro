@@ -38,6 +38,13 @@ for (let r = 0; r < ROWS; r++) {
 }
 const mullion = `M${WIN_W / 2} 0V${WIN_H}M0 ${WIN_H * 0.42}H${WIN_W}`;
 
+// The curtain that moves: top floor, far right. Its right drape is a layer of its own
+// (transform only, facade.ts). Somebody holds it aside while the light is near but not on
+// it, and lets it fall the moment the light arrives.
+const CURTAIN = { r: 0, c: 4 };
+const drapeL = `M0 0H${WIN_W / 2}V6C24 20 16 50 14 ${WIN_H}H0Z`;
+const drapeR = `M${WIN_W / 2} 0H${WIN_W}V${WIN_H}H${WIN_W - 14}C${WIN_W - 16} 50 ${WIN_W - 24} 20 ${WIN_W / 2} 6Z`;
+
 // The sign. Four letters are bolted down. The E hangs from one fixing and is built apart,
 // as its own small layers, so its flicker never repaints anything else (see neon.ts).
 const letters = ['H', 'O', 'T', 'E', 'L'].map((ch, i) => ({ ch, x: 112 + i * 94 }));
@@ -130,7 +137,8 @@ const watchers = [
             <g transform={`translate(${w.x} ${w.y})`}>
               <rect x="-5" y="-5" width={WIN_W + 10} height={WIN_H + 10} fill="#43382f" />
               <rect width={WIN_W} height={WIN_H} fill="#090808" />
-              {w.kind === 'c' && <path d={`M0 0H${WIN_W}V${WIN_H}H${WIN_W - 14}C${WIN_W - 16} 50 ${WIN_W - 24} 20 ${WIN_W / 2} 6C24 20 16 50 14 ${WIN_H}H0Z`} fill="#2a221d" />}
+              {w.kind === 'c' && !(w.r === CURTAIN.r && w.c === CURTAIN.c) && <path d={`M0 0H${WIN_W}V${WIN_H}H${WIN_W - 14}C${WIN_W - 16} 50 ${WIN_W - 24} 20 ${WIN_W / 2} 6C24 20 16 50 14 ${WIN_H}H0Z`} fill="#2a221d" />}
+              {w.r === CURTAIN.r && w.c === CURTAIN.c && <path d={drapeL} fill="#2a221d" />}
               {w.kind === 'h' && <path d={`M0 0H${WIN_W * 0.62}C${WIN_W * 0.55} 30 ${WIN_W * 0.4} 60 ${WIN_W * 0.3} ${WIN_H}H0Z`} fill="#2a221d" />}
               {w.kind === 'b' && <path d={Array.from({ length: 9 }, (_, i) => `M2 ${6 + i * 6}H${WIN_W - 2}`).join('')} stroke="#2c241f" stroke-width="3" />}
             </g>
@@ -167,6 +175,13 @@ const watchers = [
         </g>
       </g>
     </svg>
+    <!-- the drape that moves, under the darkness like the rest of the wall -->
+    <div class="fx curtain" data-curtain="rest" aria-hidden="true" style={`--x:${winX(CURTAIN.c) + WIN_W / 2};--y:${winY(CURTAIN.r)};--w:${WIN_W / 2};--h:${WIN_H}`}>
+      <div class="curtain__drape">
+        <svg viewBox={`${WIN_W / 2} 0 ${WIN_W / 2} ${WIN_H}`}><path d={drapeR} fill="#2a221d"></path></svg>
+      </div>
+      <svg viewBox={`${WIN_W / 2} 0 ${WIN_W / 2} ${WIN_H}`}><path d={`M${WIN_W / 2} 0V${WIN_H}M${WIN_W / 2} ${WIN_H * 0.42}H${WIN_W}`} stroke="#43382f" stroke-width="4"></path></svg>
+    </div>
   </div>
 
   <div class="facade facade--lit" aria-hidden="true">
@@ -227,7 +242,10 @@ const watchers = [
         }
         <path d="M321 846c3-1 5-1 6 1v7c-2 2-4 2-6 1Z" fill="#aebbd4" opacity="0.75"></path>
       </g>
-      <g filter="url(#stormlit)"><use href="#bldg-bars"></use></g>
+      <g filter="url(#stormlit)">
+        <path d={drapeR} fill="#2a221d" transform={`translate(${winX(CURTAIN.c)} ${winY(CURTAIN.r)})`}></path>
+        <use href="#bldg-bars"></use>
+      </g>
     </svg>
 
     <svg class="facade__lit" viewBox="0 0 600 900" preserveAspectRatio="xMidYMin slice">
@@ -599,6 +617,23 @@ const watchers = [
     transform: translate(-7px, 0) scale(1.42);
   }
 
+  /* The curtain. Held aside: the drape is gathered against the frame. It is let go fast
+     and swings a little past its place before it hangs still. Transform only. */
+  .curtain {
+    overflow: hidden;
+  }
+  .curtain__drape {
+    position: absolute;
+    inset: 0;
+    transform-origin: 100% 0;
+    will-change: transform;
+    transition: transform 0.42s cubic-bezier(0.3, 1.7, 0.5, 1);
+  }
+  .curtain[data-curtain='held'] .curtain__drape {
+    transform: scaleX(0.34) skewX(5deg);
+    transition: transform 1.1s cubic-bezier(0.4, 0, 0.3, 1);
+  }
+
   /* Lightning: one soft flash with a short decay. Never a double strobe. */
   .facade__storm,
   .hero__sky {
@@ -948,7 +983,8 @@ const watchers = [
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .figure {
+    .figure,
+    .curtain__drape {
       transition: none;
     }
   }

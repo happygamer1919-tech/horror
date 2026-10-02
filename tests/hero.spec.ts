@@ -16,6 +16,7 @@ interface Hooks {
   figure: { state: string; lit: boolean; set: (s: string) => void };
   storm: { count: number; active: boolean; strike: () => void; hold: (on: boolean) => void };
   rain: { running: boolean; drops: number };
+  curtain: { state: string; set: (s: string | null) => void };
 }
 declare global {
   interface Window {
@@ -620,6 +621,43 @@ test('the guest in the lit room is there on one pass of the light and gone on th
   expect(Number(await page.locator('[data-figure]').evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
 });
 
+test('the curtain is held aside at the edge of the light and falls when the light arrives', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'driven with the cursor on the desktop project');
+  test.setTimeout(40000);
+  await open(page);
+  await expect.poll(() => page.evaluate(() => window.__hero?.curtain?.state)).toBe('rest');
+  const drape = page.locator('[data-curtain] .curtain__drape');
+  const scaleX = () => drape.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).a);
+  const box = (await page.locator('[data-curtain]').boundingBox())!;
+  const win = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const r = await page.evaluate(() => window.__hero.torch.r);
+  const state = () => page.evaluate(() => window.__hero.curtain.state);
+  expect(await scaleX()).toBeCloseTo(1, 2);
+
+  // The light far away: nothing happens, however long.
+  await page.mouse.move(80, 820, { steps: 3 });
+  await page.waitForTimeout(7000);
+  expect(await state()).toBe('rest');
+
+  // The window at the edge of the light: the drape is drawn aside.
+  const edge = { x: win.x - r * 0.9, y: win.y + r * 0.8 };
+  await page.mouse.move(edge.x, edge.y, { steps: 4 });
+  await expect.poll(state, { timeout: 4000 }).toBe('held');
+  await expect.poll(scaleX, { timeout: 3000 }).toBeLessThan(0.5);
+  // It moves by transform alone.
+  expect(await drape.evaluate((el) => getComputedStyle(el).transitionProperty)).toBe('transform');
+
+  // The light on the window: it is let go, and hangs as before.
+  await page.mouse.move(win.x, win.y, { steps: 4 });
+  await expect.poll(state, { timeout: 3000 }).toBe('rest');
+  await expect.poll(async () => Math.abs((await scaleX()) - 1), { timeout: 3000 }).toBeLessThan(0.01);
+
+  // Rare: back at the edge straight away, it does not do it again.
+  await page.mouse.move(edge.x, edge.y, { steps: 4 });
+  await page.waitForTimeout(5000);
+  expect(await state()).toBe('rest');
+});
+
 test('off screen the hero stands still: rain stops, the sway pauses', async ({ page }) => {
   await open(page);
   await expect.poll(() => page.evaluate(() => window.__hero?.rain?.running)).toBe(true);
@@ -647,8 +685,9 @@ for (const lang of LANGS) {
     // No flashlight, no veil, no rain canvas, no spark canvas.
     for (const sel of ['.torch', '.hero__veil', '[data-rain]', '[data-sparks]']) await expect(page.locator(sel).first()).toBeHidden();
     // No loops were started.
-    const hooks = await page.evaluate(() => ({ e: typeof window.__hero?.e, rain: typeof window.__hero?.rain, storm: typeof window.__hero?.storm }));
-    expect(hooks).toEqual({ e: 'undefined', rain: 'undefined', storm: 'undefined' });
+    const hooks = await page.evaluate(() => ({ e: typeof window.__hero?.e, rain: typeof window.__hero?.rain, storm: typeof window.__hero?.storm, curtain: typeof window.__hero?.curtain }));
+    expect(hooks).toEqual({ e: 'undefined', rain: 'undefined', storm: 'undefined', curtain: 'undefined' });
+    await expect(page.locator('[data-curtain]')).toHaveAttribute('data-curtain', 'rest');
     // The E is still, leaning from its fixing, partly lit, and it does not change.
     const read = () =>
       page.evaluate(() => {

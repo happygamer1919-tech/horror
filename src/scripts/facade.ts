@@ -1,4 +1,4 @@
-// The hotel front, beyond the sign: the guest in the lit room, lightning, rain.
+// The hotel front, beyond the sign: the guest in the lit room, the curtain, lightning, rain.
 // Nothing here reads layout per frame. Positions are measured on load and on resize, and
 // everything stops while the hero is off screen or the tab is hidden.
 import { still } from './env';
@@ -62,6 +62,7 @@ export function initFacade() {
   if (still) return;
 
   const figure = document.querySelector<HTMLElement>('[data-figure]');
+  const curtain = document.querySelector<HTMLElement>('[data-curtain]');
   const canvas = document.querySelector<HTMLCanvasElement>('[data-rain]');
   const ctx = canvas?.getContext('2d') ?? null;
 
@@ -71,6 +72,7 @@ export function initFacade() {
   let unit = 1;
   let sign = { x: 0, y: 0 };
   let room = { x: 0, y: 0 };
+  let drape = { x: 0, y: 0 };
   let cw = 0; // rain canvas, CSS px
   let ch = 0;
   let scale = 1;
@@ -88,6 +90,8 @@ export function initFacade() {
     // The lit room is placed by CSS (one window on phones, another on wide screens).
     const fr = figure?.getBoundingClientRect();
     room = fr && fr.width ? { x: fr.left + fr.width / 2, y: fr.top + scrollY + fr.height / 2 } : { x: ox + 388 * unit, y: oy + 350 * unit };
+    const cr = curtain?.getBoundingClientRect();
+    if (cr && cr.width) drape = { x: cr.left + cr.width / 2, y: cr.top + scrollY + cr.height / 2 };
     if (canvas) {
       const c = canvas.getBoundingClientRect();
       cw = c.width;
@@ -161,6 +165,42 @@ export function initFacade() {
       figForced = true;
       window.clearTimeout(figTimer);
       setFigure(s);
+    },
+  };
+
+  // --- the curtain -----------------------------------------------------------------------
+  // Seen at the edge of the light: while the beam is near the window but not on it, the
+  // drape is held aside. When the light comes to it, it is let go. Then nothing for a while.
+  let curState: 'rest' | 'held' = 'rest';
+  let curForced = false;
+  let curSince = 0;
+  let curNext = performance.now() + rnd(3000, 6000);
+  const setCurtain = (s: 'rest' | 'held') => {
+    curState = s;
+    curSince = performance.now();
+    if (curtain) curtain.dataset.curtain = s;
+  };
+  if (curtain) {
+    window.setInterval(() => {
+      if (!awake() || curForced || !torchState.lit) return;
+      const now = performance.now();
+      const r = torchState.r || 200;
+      const d = Math.hypot(torchState.x - drape.x, torchState.y + scrollY - drape.y) / r;
+      if (curState === 'rest') {
+        if (now > curNext && d > 0.85 && d < 1.7) setCurtain('held');
+      } else if ((d < 0.6 && now - curSince > 500) || now - curSince > rnd(7000, 10000)) {
+        setCurtain('rest');
+        curNext = now + rnd(14000, 26000);
+      }
+    }, 140);
+  }
+  hooks.curtain = {
+    get state() {
+      return curState;
+    },
+    set(s) {
+      curForced = s !== null;
+      if (s) setCurtain(s);
     },
   };
 

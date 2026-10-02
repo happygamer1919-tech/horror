@@ -1,0 +1,439 @@
+[
+ {
+  "out": "docs/screenshots/02-hero-ro-390.jpg",
+  "lang": "ro",
+  "tap": [
+   150,
+   330
+  ],
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/02-hero-ro-1440.jpg",
+  "lang": "ro",
+  "mouse": [
+   430,
+   430
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/02-hero-ru-390.jpg",
+  "lang": "ru",
+  "tap": [
+   150,
+   330
+  ],
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/02-hero-ru-1440.jpg",
+  "lang": "ru",
+  "mouse": [
+   430,
+   430
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/02-hero-en-390.jpg",
+  "lang": "en",
+  "tap": [
+   150,
+   330
+  ],
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/02-hero-en-1440.jpg",
+  "lang": "en",
+  "mouse": [
+   430,
+   430
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/12-flashlight-390.jpg",
+  "tap": [
+   250,
+   230
+  ],
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/12-flashlight-1440.jpg",
+  "mouse": [
+   1080,
+   480
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/15-hero-dark-390.jpg",
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/15-hero-dark-1440.jpg",
+  "mouse": [
+   40,
+   870
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/16-hero-touch-a-390.jpg",
+  "tap": [
+   70,
+   640
+  ],
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/16-hero-touch-b-390.jpg",
+  "tap": [
+   320,
+   170
+  ],
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/17-sign-e-1-390.jpg",
+  "eval": "window.__hero.e.hold(\"normal\")",
+  "unit": {
+   "x": 300,
+   "y": 26,
+   "w": 200,
+   "h": 150
+  },
+  "wait": 500,
+  "scale": 3,
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/17-sign-e-1-1440.jpg",
+  "eval": "window.__hero.e.hold(\"normal\")",
+  "unit": {
+   "x": 300,
+   "y": 26,
+   "w": 200,
+   "h": 150
+  },
+  "wait": 500,
+  "scale": 2,
+  "mouse": [
+   40,
+   870
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/17-sign-e-2-390.jpg",
+  "eval": "window.__hero.e.hold(\"arc\")",
+  "unit": {
+   "x": 300,
+   "y": 26,
+   "w": 200,
+   "h": 150
+  },
+  "wait": 500,
+  "scale": 3,
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/17-sign-e-2-1440.jpg",
+  "eval": "window.__hero.e.hold(\"arc\")",
+  "unit": {
+   "x": 300,
+   "y": 26,
+   "w": 200,
+   "h": 150
+  },
+  "wait": 500,
+  "scale": 2,
+  "mouse": [
+   40,
+   870
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/17-sign-e-3-390.jpg",
+  "eval": "window.__hero.e.hold(\"ember\")",
+  "unit": {
+   "x": 300,
+   "y": 26,
+   "w": 200,
+   "h": 150
+  },
+  "wait": 500,
+  "scale": 3,
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/17-sign-e-3-1440.jpg",
+  "eval": "window.__hero.e.hold(\"ember\")",
+  "unit": {
+   "x": 300,
+   "y": 26,
+   "w": 200,
+   "h": 150
+  },
+  "wait": 500,
+  "scale": 2,
+  "mouse": [
+   40,
+   870
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/18-facade-figure-390.jpg",
+  "eval": "window.__hero.figure.set(\"far\")",
+  "unit": {
+   "x": 140,
+   "y": 160,
+   "w": 150,
+   "h": 150
+  },
+  "scale": 3,
+  "wait": 700,
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/18-facade-figure-1440.jpg",
+  "eval": "window.__hero.figure.set(\"far\")",
+  "unit": {
+   "x": 316,
+   "y": 270,
+   "w": 150,
+   "h": 150
+  },
+  "scale": 2,
+  "wait": 700,
+  "mouse": [
+   40,
+   870
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/18-facade-figure-gone-390.jpg",
+  "eval": "window.__hero.figure.set(\"gone\")",
+  "unit": {
+   "x": 140,
+   "y": 160,
+   "w": 150,
+   "h": 150
+  },
+  "scale": 3,
+  "wait": 700,
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/18-facade-figure-gone-1440.jpg",
+  "eval": "window.__hero.figure.set(\"gone\")",
+  "unit": {
+   "x": 316,
+   "y": 270,
+   "w": 150,
+   "h": 150
+  },
+  "scale": 2,
+  "wait": 700,
+  "mouse": [
+   40,
+   870
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/18-facade-figure-near-390.jpg",
+  "eval": "window.__hero.figure.set(\"near\")",
+  "unit": {
+   "x": 140,
+   "y": 160,
+   "w": 150,
+   "h": 150
+  },
+  "scale": 3,
+  "wait": 700,
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/18-facade-figure-near-1440.jpg",
+  "eval": "window.__hero.figure.set(\"near\")",
+  "unit": {
+   "x": 316,
+   "y": 270,
+   "w": 150,
+   "h": 150
+  },
+  "scale": 2,
+  "wait": 700,
+  "mouse": [
+   40,
+   870
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/18-facade-door-1440.jpg",
+  "mouse": [
+   1100,
+   840
+  ],
+  "unit": {
+   "x": 160,
+   "y": 730,
+   "w": 290,
+   "h": 170
+  },
+  "scale": 2,
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/18-facade-door-dark-1440.jpg",
+  "mouse": [
+   40,
+   870
+  ],
+  "unit": {
+   "x": 160,
+   "y": 730,
+   "w": 290,
+   "h": 170
+  },
+  "scale": 2,
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/18-facade-lightning-390.jpg",
+  "eval": "window.__hero.storm.hold(true)",
+  "wait": 600,
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/18-facade-lightning-1440.jpg",
+  "eval": "window.__hero.storm.hold(true)",
+  "wait": 600,
+  "mouse": [
+   40,
+   870
+  ],
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/18-facade-rain-390.jpg",
+  "tap": [
+   230,
+   190
+  ],
+  "clip": {
+   "x": 0,
+   "y": 40,
+   "width": 390,
+   "height": 330
+  },
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/18-facade-rain-1440.jpg",
+  "mouse": [
+   1000,
+   330
+  ],
+  "clip": {
+   "x": 700,
+   "y": 0,
+   "width": 740,
+   "height": 640
+  },
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/18-facade-curtain-held-390.jpg",
+  "tap": [
+   300,
+   300
+  ],
+  "eval": "window.__hero.curtain.set(\"held\")",
+  "unit": {
+   "x": 330,
+   "y": 150,
+   "w": 230,
+   "h": 180
+  },
+  "scale": 3,
+  "wait": 1800,
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/18-facade-curtain-held-1440.jpg",
+  "mouse": [
+   1170,
+   400
+  ],
+  "eval": "window.__hero.curtain.set(\"held\")",
+  "unit": {
+   "x": 330,
+   "y": 150,
+   "w": 230,
+   "h": 180
+  },
+  "scale": 2,
+  "wait": 1800,
+  "w": 1440,
+  "h": 900
+ },
+ {
+  "out": "docs/screenshots/18-facade-curtain-390.jpg",
+  "tap": [
+   300,
+   300
+  ],
+  "eval": "window.__hero.curtain.set(\"rest\")",
+  "unit": {
+   "x": 330,
+   "y": 150,
+   "w": 230,
+   "h": 180
+  },
+  "scale": 3,
+  "wait": 1800,
+  "touch": true
+ },
+ {
+  "out": "docs/screenshots/18-facade-curtain-1440.jpg",
+  "mouse": [
+   1170,
+   400
+  ],
+  "eval": "window.__hero.curtain.set(\"rest\")",
+  "unit": {
+   "x": 330,
+   "y": 150,
+   "w": 230,
+   "h": 180
+  },
+  "scale": 2,
+  "wait": 1800,
+  "w": 1440,
+  "h": 900
+ }
+]
