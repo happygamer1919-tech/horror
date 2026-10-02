@@ -34,6 +34,7 @@ const t = copy[lang];
       data-off={t.ui.soundOff}
       aria-label={`${t.ui.sound}: ${t.ui.soundOff}`}
     >
+      <span class="sound__text" aria-hidden="true">{t.ui.sound}</span>
       <span class="sound__bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
     </button>
   </div>
@@ -49,7 +50,7 @@ const t = copy[lang];
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding-inline: var(--gutter);
+    padding-inline: max(var(--gutter), calc((100vw - var(--max)) / 2));
     background: linear-gradient(rgba(7, 6, 6, 0.92), rgba(7, 6, 6, 0));
     font-size: 11px;
     letter-spacing: 0.18em;
@@ -112,13 +113,30 @@ const t = copy[lang];
     color: var(--bone);
   }
   .sound {
-    display: grid;
-    place-items: center;
-    width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-width: 44px;
     height: 44px;
-    padding: 0;
+    padding: 0 0 0 8px;
     border: 0;
     background: none;
+    color: var(--ash);
+    letter-spacing: inherit;
+    text-transform: inherit;
+  }
+  .sound:hover,
+  .sound[aria-pressed='true'] {
+    color: var(--bone);
+  }
+  .sound__text {
+    display: none;
+  }
+  @media (min-width: 900px) {
+    .sound__text {
+      display: inline;
+    }
   }
   .sound__bars {
     display: flex;

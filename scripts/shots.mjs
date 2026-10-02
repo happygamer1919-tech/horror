@@ -1,0 +1,50 @@
+// Screenshot helper for the build loop.
+// Usage: node scripts/shots.mjs <name> [selector] [lang] [--lift] [--full] [--y=0.5] [--wait=800] [--still]
+// Needs `npm run preview` running on port 4321. Writes docs/screenshots/<name>-<width>.png
+import { chromium } from '@playwright/test';
+
+const args = process.argv.slice(2);
+const flags = Object.fromEntries(args.filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')).map(([k, v]) => [k, v ?? true]));
+const [name = 'page', selector = '', lang = 'ro'] = args.filter((a) => !a.startsWith('--'));
+const url = `http://localhost:4321/horror/${lang}/`;
+const sizes = [
+  { w: 390, h: 844, dpr: 2, mobile: true },
+  { w: 1440, h: 900, dpr: 1, mobile: false },
+];
+
+const browser = await chromium.launch();
+for (const s of sizes) {
+  const ctx = await browser.newContext({
+    viewport: { width: s.w, height: s.h },
+    deviceScaleFactor: s.dpr,
+    isMobile: s.mobile,
+    hasTouch: s.mobile,
+    reducedMotion: flags.still ? 'reduce' : 'no-preference',
+  });
+  if (!flags.lift) await ctx.addInitScript(() => sessionStorage.setItem('hotel:lift', '1'));
+  const page = await ctx.newPage();
+  page.on('console', (m) => m.type() === 'error' && console.log('console error:', m.text()));
+  page.on('pageerror', (e) => console.log('page error:', e.message));
+  await page.goto(url, { waitUntil: 'load' });
+  if (selector) {
+    const frac = Number(flags.y ?? 0);
+    await page.evaluate(
+      ([sel, f]) => {
+        const el = document.querySelector(sel);
+        const r = el.getBoundingClientRect();
+        window.scrollTo(0, window.scrollY + r.top + (r.height - window.innerHeight) * f);
+      },
+      [selector, frac],
+    );
+  }
+  if (!s.mobile && flags.mouse) {
+    const [mx, my] = String(flags.mouse).split(',').map(Number);
+    await page.mouse.move(mx, my);
+  }
+  await page.waitForTimeout(Number(flags.wait ?? 1200));
+  const path = `docs/screenshots/${name}-${s.w}.png`;
+  await page.screenshot({ path, fullPage: Boolean(flags.full) });
+  console.log(path);
+  await ctx.close();
+}
+await browser.close();

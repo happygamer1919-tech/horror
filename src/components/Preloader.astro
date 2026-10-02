@@ -1,0 +1,144 @@
+---
+import type { Lang } from '../config';
+import { copy } from '../content';
+
+interface Props {
+  lang: Lang;
+}
+const t = copy[Astro.props.lang];
+// Dial: floors 5 to 1 along a half circle, the needle sweeps from 5 down to 1.
+const floors = [5, 4, 3, 2, 1].map((n, i) => {
+  const a = Math.PI - (i * Math.PI) / 4; // 180deg to 0deg
+  return { n, x: 100 + Math.cos(a) * 93, y: 104 - Math.sin(a) * 90 };
+});
+---
+
+<div class="lift" data-lift>
+  <div class="lift__door lift__door--l"></div>
+  <div class="lift__door lift__door--r"></div>
+  <div class="lift__panel">
+    <svg class="lift__dial" viewBox="-8 -6 216 122" aria-hidden="true">
+      <path d="M22 100A78 78 0 0 1 178 100" fill="none" stroke="#6b5327" stroke-width="1.5"></path>
+      <path d="M36 100A64 64 0 0 1 164 100" fill="none" stroke="#2b2522" stroke-width="1"></path>
+      {
+        floors.map((f) => (
+          <text x={f.x} y={f.y} text-anchor="middle">
+            {f.n}
+          </text>
+        ))
+      }
+      <g class="lift__needle"><path d="M100 100L30 100" stroke="#ff2d2d" stroke-width="2.5"></path></g>
+      <circle cx="100" cy="100" r="6" fill="#b9975b"></circle>
+    </svg>
+    <p class="lift__label">{t.preloader.label}</p>
+  </div>
+  <button class="lift__skip" type="button" data-lift-skip>{t.ui.skip}</button>
+</div>
+
+<style>
+  /* Total run: 1.4s. Dial 0.85s, doors 0.5s. Pure CSS, so it also clears without JS. */
+  .lift {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    animation: lift-gone 0.01s linear 1.4s forwards;
+  }
+  :global(html.no-lift) .lift,
+  .lift.is-skipped {
+    display: none;
+  }
+  .lift__door {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50.5%;
+    background:
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 7px),
+      #0d0b0a;
+    animation: lift-open 0.5s cubic-bezier(0.7, 0, 0.3, 1) 0.88s forwards;
+  }
+  .lift__door--l {
+    left: 0;
+    border-right: 1px solid var(--brass-lo);
+    --to: -101%;
+  }
+  .lift__door--r {
+    right: 0;
+    border-left: 1px solid var(--brass-lo);
+    --to: 101%;
+  }
+  .lift__panel {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    padding: 22px 26px 16px;
+    background: var(--ink);
+    border: 1px solid var(--brass-lo);
+    animation: lift-fade 0.2s linear 0.8s forwards;
+  }
+  .lift__dial {
+    width: min(58vw, 240px);
+  }
+  .lift__dial text {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 15px;
+    fill: var(--brass-hi);
+  }
+  .lift__needle {
+    transform-origin: 100px 100px;
+    animation: lift-needle 0.8s cubic-bezier(0.5, 0, 0.3, 1) forwards;
+  }
+  .lift__label {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  .lift__skip {
+    position: absolute;
+    right: var(--gutter);
+    bottom: 24px;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    background: var(--ink);
+    color: var(--ash);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    animation: lift-fade 0.2s linear 0.8s forwards;
+  }
+  @keyframes lift-needle {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(180deg);
+    }
+  }
+  @keyframes lift-open {
+    to {
+      transform: translate3d(var(--to), 0, 0);
+    }
+  }
+  @keyframes lift-fade {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes lift-gone {
+    to {
+      visibility: hidden;
+      pointer-events: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lift {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,387 @@
+---
+import type { Lang } from '../config';
+import { copy, site } from '../content';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = copy[lang];
+const brand = site.brand[lang];
+const cut = brand.lastIndexOf(' ');
+const brandLines = cut > 0 ? [brand.slice(0, cut), brand.slice(cut + 1)] : [brand];
+
+// Facade geometry, viewBox 600 x 900. Everything is generated, there are no image files.
+const COLS = 5;
+const ROWS = 5;
+const WIN_W = 64;
+const WIN_H = 84;
+const winX = (c: number) => 92 + c * 88;
+const winY = (r: number) => 198 + r * 110;
+
+// The one lit room: third floor (rows count from the top, floor 6 down to 2).
+const LIT = { r: 1, c: 3 };
+// Window dressing per cell: c = curtains, b = blinds, h = half curtain, - = bare glass.
+const dressing = ['c-b-c', '-ch-b', 'b--c-', 'ch-hc', '-b-c-'];
+
+const windows = [];
+for (let r = 0; r < ROWS; r++) {
+  for (let c = 0; c < COLS; c++) {
+    windows.push({ r, c, x: winX(c), y: winY(r), kind: dressing[r][c], lit: r === LIT.r && c === LIT.c });
+  }
+}
+const letters = ['H', 'O', 'T', 'E', 'L'].map((ch, i) => ({ ch, x: 112 + i * 94, dying: ch === 'E' }));
+const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i === 3 || i === 8 }));
+---
+
+<section class="hero" id="lobby" data-dark="0.9" aria-labelledby="hero-title">
+  <canvas class="hero__fog" data-fog aria-hidden="true"></canvas>
+
+  <div class="facade" data-facade>
+    <svg class="facade__base" viewBox="0 0 600 900" preserveAspectRatio="xMidYMin slice" role="img" aria-label={t.hero.facadeAlt}>
+      <defs>
+        <pattern id="brick" width="28" height="14" patternUnits="userSpaceOnUse">
+          <path d="M0 13.5H28M14 0V7M0 7H28M0 7V14M28 7V14" stroke="#262019" stroke-width="1" fill="none"></path>
+        </pattern>
+        <linearGradient id="wallfade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#1e1917"></stop>
+          <stop offset="1" stop-color="#141110"></stop>
+        </linearGradient>
+      </defs>
+
+      <!-- sign scaffold on the roof -->
+      <g stroke="#2a2420" stroke-width="2" fill="none">
+        <path d="M70 150V34M530 150V34M70 34H530M70 140H530"></path>
+        <path d="M70 140L112 34M159 140L112 34M159 140L206 34M253 140L206 34M253 140L300 34M347 140L300 34M347 140L394 34M441 140L394 34M441 140L488 34M530 140L488 34" stroke-width="1" opacity="0.6"></path>
+      </g>
+      <!-- dead tubes: what the sign looks like with the power off -->
+      <g class="tubes tubes--dead" aria-hidden="true">
+        {letters.map((l) => <text x={l.x} y="128">{l.ch}</text>)}
+      </g>
+
+      <!-- building -->
+      <rect x="60" y="150" width="480" height="750" fill="url(#wallfade)"></rect>
+      <rect x="60" y="150" width="480" height="750" fill="url(#brick)"></rect>
+      <rect x="48" y="150" width="504" height="18" fill="#2a2420"></rect>
+      <rect x="54" y="168" width="492" height="6" fill="#0f0d0c"></rect>
+      <path d="M76 174V900" stroke="#0f0d0c" stroke-width="5"></path>
+      <path d="M524 174V900" stroke="#0f0d0c" stroke-width="5"></path>
+      <rect x="60" y="742" width="480" height="8" fill="#2a2420"></rect>
+
+      {
+        windows.map((w) => (
+          <g transform={`translate(${w.x} ${w.y})`}>
+            <rect x="-5" y="-5" width={WIN_W + 10} height={WIN_H + 10} fill="#2d2622" />
+            <rect width={WIN_W} height={WIN_H} fill="#090808" />
+            {w.kind === 'c' && <path d={`M0 0H${WIN_W}V${WIN_H}H${WIN_W - 14}C${WIN_W - 16} 50 ${WIN_W - 24} 20 ${WIN_W / 2} 6C24 20 16 50 14 ${WIN_H}H0Z`} fill="#1b1614" />}
+            {w.kind === 'h' && <path d={`M0 0H${WIN_W * 0.62}C${WIN_W * 0.55} 30 ${WIN_W * 0.4} 60 ${WIN_W * 0.3} ${WIN_H}H0Z`} fill="#1b1614" />}
+            {w.kind === 'b' && <path d={Array.from({ length: 9 }, (_, i) => `M2 ${6 + i * 6}H${WIN_W - 2}`).join('')} stroke="#1d1815" stroke-width="3" />}
+            <path d={`M${WIN_W / 2} 0V${WIN_H}M0 ${WIN_H * 0.42}H${WIN_W}`} stroke="#2d2622" stroke-width="4" />
+            <rect x="-9" y={WIN_H + 5} width={WIN_W + 18} height="6" fill="#322b26" />
+          </g>
+        ))
+      }
+
+      <!-- ground floor -->
+      <g>
+        <rect x="92" y="772" width="88" height="106" fill="#090808" stroke="#2d2622" stroke-width="5"></rect>
+        <rect x="420" y="772" width="88" height="106" fill="#090808" stroke="#2d2622" stroke-width="5"></rect>
+        <path d="M136 772V878M464 772V878" stroke="#2d2622" stroke-width="4"></path>
+        <rect x="236" y="776" width="128" height="124" fill="#0b0909" stroke="#3a312b" stroke-width="6"></rect>
+        <path d="M300 776V900" stroke="#3a312b" stroke-width="5"></path>
+        <rect x="288" y="836" width="5" height="20" fill="#6b5327"></rect>
+        <rect x="307" y="836" width="5" height="20" fill="#6b5327"></rect>
+        <path d="M184 752H416L430 774H170Z" fill="#231d1a"></path>
+        <rect x="170" y="774" width="260" height="6" fill="#0f0d0c"></rect>
+      </g>
+    </svg>
+
+    <div class="hero__glow" aria-hidden="true"></div>
+
+    <svg class="facade__lit" viewBox="0 0 600 900" preserveAspectRatio="xMidYMin slice" aria-hidden="true">
+      <defs>
+        <filter id="neonblur" x="-30%" y="-60%" width="160%" height="220%">
+          <feGaussianBlur stdDeviation="7"></feGaussianBlur>
+        </filter>
+        <filter id="softblur" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="10"></feGaussianBlur>
+        </filter>
+        <linearGradient id="redwash" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ff2d2d" stop-opacity="0.2"></stop>
+          <stop offset="1" stop-color="#ff2d2d" stop-opacity="0"></stop>
+        </linearGradient>
+        <linearGradient id="doorlight" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#d9b46c" stop-opacity="0.34"></stop>
+          <stop offset="1" stop-color="#d9b46c" stop-opacity="0.06"></stop>
+        </linearGradient>
+        <linearGradient id="roomlight" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#d9b46c"></stop>
+          <stop offset="1" stop-color="#8a6a34"></stop>
+        </linearGradient>
+      </defs>
+
+      <!-- red light spilling from the sign onto the top floors -->
+      <rect x="60" y="150" width="480" height="300" fill="url(#redwash)"></rect>
+
+      <!-- the sign: one group per letter so a single letter can fail -->
+      {
+        letters.map((l) => (
+          <g class="letter" data-dying={l.dying ? '' : undefined}>
+            <text class="tubes tubes--glow" x={l.x} y="128" filter="url(#neonblur)">
+              {l.ch}
+            </text>
+            <text class="tubes tubes--live" x={l.x} y="128">
+              {l.ch}
+            </text>
+          </g>
+        ))
+      }
+
+      <!-- room 3-something: someone left the lamp on -->
+      <g transform={`translate(${winX(LIT.c)} ${winY(LIT.r)})`}>
+        <rect x="-10" y="-10" width={WIN_W + 20} height={WIN_H + 20} fill="#d9b46c" opacity="0.28" filter="url(#softblur)"></rect>
+        <rect width={WIN_W} height={WIN_H} fill="url(#roomlight)" opacity="0.72"></rect>
+        <path d={`M0 0H${WIN_W * 0.5}C${WIN_W * 0.46} 34 ${WIN_W * 0.3} 62 ${WIN_W * 0.22} ${WIN_H}H0Z`} fill="#2a2018" opacity="0.9"></path>
+        <path d={`M${WIN_W / 2} 0V${WIN_H}M0 ${WIN_H * 0.42}H${WIN_W}`} stroke="#1a1512" stroke-width="4"></path>
+      </g>
+
+      <!-- entrance: light behind the door glass, bulbs under the canopy -->
+      <rect x="236" y="776" width="128" height="124" fill="#d9b46c" opacity="0.1" filter="url(#softblur)"></rect>
+      <rect x="244" y="784" width="50" height="116" fill="url(#doorlight)"></rect>
+      <rect x="306" y="784" width="50" height="116" fill="url(#doorlight)"></rect>
+      <path d="M244 822H294M306 822H356" stroke="#1a1512" stroke-width="3"></path>
+      {bulbs.map((b) => <circle cx={b.x} cy="779" r="2.6" fill={b.dead ? '#3a2f22' : '#f0cd86'} opacity={b.dead ? 1 : 0.9} />)}
+    </svg>
+  </div>
+
+  <div class="hero__body wrap">
+    <p class="hero__kicker">
+      {t.hero.kicker.map((k, i) => <span>{i > 0 && <i aria-hidden="true">/</i>}{k}</span>)}
+    </p>
+    <h1 class="hero__title" id="hero-title">
+      {brandLines.map((l) => <span>{l}</span>)}
+    </h1>
+    <p class="hero__line">{t.hero.line}</p>
+    <p class="hero__sub">{t.hero.sub}</p>
+    <div class="hero__cta">
+      <a class="btn btn--primary" href="#checkin" data-cta>{t.hero.cta}</a>
+      <a class="link hero__tel" href={`tel:${site.phone.e164}`}>{t.hero.tel}</a>
+    </div>
+  </div>
+
+  <p class="hero__hint" aria-hidden="true"><span></span>{t.hero.hint}</p>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: calc(var(--header-h) + 12px) 0 64px;
+    overflow: clip;
+  }
+
+  /* WebGL fog. Additive over the darkness, so it reads as light in the air. */
+  .hero__fog {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 44;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.6s;
+  }
+  .hero.has-gl .hero__fog {
+    opacity: 1;
+  }
+
+  .facade {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(var(--header-h) - 6px);
+    height: 70vh;
+    height: 70svh;
+  }
+  .facade svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .facade__lit {
+    z-index: 45;
+    pointer-events: none;
+  }
+
+  /* CSS fallback for the fog: a still halo behind the sign. Hidden once WebGL runs. */
+  .hero__glow {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 130%;
+    aspect-ratio: 2 / 1;
+    transform: translate(-50%, -34%);
+    background: radial-gradient(closest-side, rgba(var(--neon-rgb), 0.3), rgba(var(--neon-rgb), 0.08) 55%, transparent 100%);
+    z-index: 44;
+    pointer-events: none;
+    transition: opacity 1.6s;
+  }
+  .hero.has-gl .hero__glow {
+    opacity: 0;
+  }
+
+  .tubes {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 104px;
+    text-anchor: middle;
+    fill: none;
+  }
+  /* The variable font has overlapping contours. Painting the stroke first and a dark
+     fill over it hides the inner overlaps, so only the outer tube line is left. */
+  .tubes--dead {
+    stroke: #3a1a18;
+    stroke-width: 5;
+    fill: #100909;
+    paint-order: stroke fill;
+  }
+  .tubes--glow {
+    stroke: var(--neon);
+    stroke-width: 9;
+    opacity: 0.85;
+  }
+  .tubes--live {
+    stroke: #ffd9d2;
+    stroke-width: 5;
+    fill: #1d0606;
+    paint-order: stroke fill;
+    filter: drop-shadow(0 0 3px var(--neon));
+  }
+  .letter {
+    transition: opacity 0.07s linear;
+  }
+
+  /* Scrim so the copy stays readable where it overlaps the building on phones. */
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: 30% 0 0 0;
+    background: linear-gradient(rgba(7, 6, 6, 0), rgba(7, 6, 6, 0.9) 34%, var(--ink) 56%);
+    z-index: 46;
+    pointer-events: none;
+  }
+
+  .hero__body {
+    position: relative;
+    z-index: 47;
+    display: grid;
+    gap: 14px;
+  }
+  .hero__kicker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--brass-hi);
+  }
+  .hero__kicker i {
+    font-style: normal;
+    color: var(--brass-lo);
+    margin-right: 10px;
+  }
+  .hero__title {
+    font-family: var(--serif);
+    font-weight: 900;
+    font-size: clamp(3.1rem, 14.6vw, 7.4rem);
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+    margin-top: 4px;
+  }
+  .hero__title span {
+    display: block;
+  }
+  .hero__line {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 500;
+    font-size: clamp(1.5rem, 6.2vw, 2.6rem);
+    line-height: 1.1;
+    color: var(--neon);
+    text-shadow: 0 0 22px rgba(var(--neon-rgb), 0.45);
+  }
+  .hero__sub {
+    max-width: 46ch;
+    color: var(--bone);
+    opacity: 0.86;
+  }
+  .hero__cta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 26px;
+    margin-top: 12px;
+  }
+  .hero__tel {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+  }
+  .hero__hint {
+    position: absolute;
+    left: max(var(--gutter), calc((100vw - var(--max)) / 2));
+    bottom: 18px;
+    z-index: 47;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ash);
+  }
+  .hero__hint span {
+    width: 1px;
+    height: 26px;
+    background: linear-gradient(var(--ash), transparent);
+  }
+
+  @media (min-width: 900px) {
+    .hero {
+      padding-bottom: 96px;
+    }
+    .hero::after {
+      display: none;
+    }
+    .facade {
+      left: auto;
+      right: max(4vw, calc((100vw - var(--max)) / 2 - 40px));
+      top: 0;
+      height: 100vh;
+      height: 100svh;
+      width: 66.6vh;
+      width: 66.6svh;
+      max-width: 46vw;
+    }
+    .hero__body {
+      gap: 18px;
+    }
+    .hero__title,
+    .hero__line,
+    .hero__sub,
+    .hero__kicker {
+      max-width: min(56vw, 760px);
+    }
+    .hero__hint {
+      bottom: 34px;
+    }
+  }
+</style>
