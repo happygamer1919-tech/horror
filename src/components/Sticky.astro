@@ -1,0 +1,48 @@
+---
+import type { Lang } from '../config';
+import { copy, site } from '../content';
+
+interface Props {
+  lang: Lang;
+}
+const t = copy[Astro.props.lang];
+---
+
+<div class="sticky" data-sticky>
+  <a class="btn btn--primary" href="#checkin">{t.ui.book}</a>
+  <a class="btn btn--ghost" href={`tel:${site.phone.e164}`}>{t.ui.call}</a>
+</div>
+
+<style>
+  /* Phones only. Visible by default so it also works without JS; JS hides it over the
+     hero and while the check-in card is on screen. */
+  .sticky {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 60;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
+    background: rgba(7, 6, 6, 0.94);
+    border-top: 1px solid var(--line);
+    transition: transform 0.4s cubic-bezier(0.3, 0.8, 0.2, 1);
+  }
+  .sticky.is-away {
+    transform: translate3d(0, 110%, 0);
+    visibility: hidden;
+    transition:
+      transform 0.4s cubic-bezier(0.3, 0.8, 0.2, 1),
+      visibility 0s 0.4s;
+  }
+  .sticky .btn {
+    min-height: 48px;
+    padding-block: 10px;
+    box-shadow: none;
+  }
+  @media (min-width: 900px) {
+    .sticky {
+      display: none;
+    }
+  }
+</style>

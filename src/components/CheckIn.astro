@@ -1,0 +1,289 @@
+---
+import { LANGS, type Lang } from '../config';
+import type { Level } from '../content/types';
+import { copy, site } from '../content';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = copy[lang];
+const c = t.checkin;
+const levels: Level[] = ['light', 'standard', 'hardcore'];
+
+// The message is written in the page language. Tokens are filled in by the browser.
+const template = c.message({
+  brand: site.brand[lang],
+  date: '{date}',
+  time: '{time}',
+  team: '{team}',
+  language: '{language}',
+  level: '{level}',
+  name: '{name}',
+  phone: '{phone}',
+});
+---
+
+<section class="sec checkin" id="checkin" data-dark="0.18" aria-labelledby="checkin-title">
+  <div class="wrap">
+    <SectionHead no="07" place={t.places.registration} title={c.title} id="checkin-title">
+      <p class="lead" data-reveal style="--d:.14s">{c.intro}</p>
+    </SectionHead>
+
+    <form class="card" data-checkin data-wa={site.phone.whatsapp} data-template={template} novalidate={false} data-reveal>
+      <div class="card__head">
+        <span class="card__brand">{site.brand[lang]}</span>
+        <span class="card__no">{c.cardNo} 0313</span>
+      </div>
+
+      <div class="card__grid">
+        <label class="f f--half">
+          <span>{c.fields.date}</span>
+          <input type="date" name="date" required data-min-today />
+        </label>
+        <label class="f f--half">
+          <span>{c.fields.time}</span>
+          <input type="time" name="time" required />
+        </label>
+        <label class="f f--half">
+          <span>{c.fields.team}</span>
+          <input type="number" name="team" inputmode="numeric" min={site.teamSizeInput.min} max={site.teamSizeInput.max} value={site.teamSizeInput.default} required />
+        </label>
+        <label class="f f--half">
+          <span>{c.fields.language}</span>
+          <select name="language" required>
+            {LANGS.map((l) => <option value={c.languages[l]} selected={l === lang}>{c.languages[l]}</option>)}
+          </select>
+        </label>
+
+        <fieldset class="f f--full card__lvl">
+          <legend>{c.fields.level}</legend>
+          <div>
+            {
+              levels.map((l) => (
+                <label>
+                  <input type="radio" name="level" value={l} data-name={t.keys.level.options[l].name} checked={l === 'standard'} data-level-input />
+                  <span>{t.keys.level.options[l].name}</span>
+                </label>
+              ))
+            }
+          </div>
+        </fieldset>
+
+        <label class="f f--full">
+          <span>{c.fields.name}</span>
+          <input type="text" name="name" autocomplete="name" required maxlength="80" />
+        </label>
+        <label class="f f--full">
+          <span>{c.fields.phone}</span>
+          <input type="tel" name="phone" autocomplete="tel" inputmode="tel" required maxlength="24" pattern="[0-9+() \-]{6,24}" />
+        </label>
+      </div>
+
+      <div class="card__foot">
+        <button class="btn btn--primary card__submit" type="submit">{c.submit}</button>
+        <p class="card__tel">
+          {c.tel}: <a href={`tel:${site.phone.e164}`}>{site.phone.display}</a>
+        </p>
+        <p class="card__note">{c.note}</p>
+      </div>
+      <p class="card__sign" aria-hidden="true"><span>{c.signature}</span></p>
+    </form>
+  </div>
+</section>
+
+<style>
+  .card {
+    position: relative;
+    max-width: 760px;
+    padding: 22px 18px 26px;
+    background: var(--paper);
+    color: var(--paper-ink);
+    box-shadow:
+      inset 0 0 70px rgba(84, 62, 30, 0.3),
+      0 30px 70px rgba(0, 0, 0, 0.7);
+  }
+  .card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+    border-bottom: 3px double var(--paper-ink);
+  }
+  .card__brand {
+    font-family: var(--serif);
+    font-weight: 900;
+    font-size: 1.05rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .card__no {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--stamp);
+    white-space: nowrap;
+  }
+  .card__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 16px;
+  }
+  .f {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+  .f--full {
+    grid-column: 1 / -1;
+  }
+  .f > span,
+  .card__lvl legend {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--paper-ash);
+  }
+  .card__lvl legend {
+    padding: 0;
+    margin-bottom: 8px;
+  }
+  .f input:not([type='radio']),
+  .f select {
+    width: 100%;
+    min-width: 0;
+    height: 46px;
+    padding: 6px 2px;
+    border: 0;
+    border-bottom: 1px solid var(--paper-ink);
+    border-radius: 0;
+    background: transparent;
+    color: var(--paper-ink);
+    font-family: var(--mono);
+    font-size: 16px;
+    color-scheme: light;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .f select {
+    background-image: linear-gradient(45deg, transparent 50%, var(--paper-ink) 50%), linear-gradient(135deg, var(--paper-ink) 50%, transparent 50%);
+    background-position:
+      calc(100% - 12px) 20px,
+      calc(100% - 6px) 20px;
+    background-size: 6px 6px;
+    background-repeat: no-repeat;
+  }
+  .f input:focus-visible,
+  .f select:focus-visible {
+    outline: 2px solid var(--stamp);
+    outline-offset: 2px;
+  }
+  .card__lvl > div {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border: 1px solid var(--paper-ink);
+  }
+  .card__lvl label {
+    position: relative;
+    display: grid;
+    cursor: pointer;
+  }
+  .card__lvl label + label {
+    border-left: 1px solid var(--paper-ink);
+  }
+  .card__lvl input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .card__lvl label span {
+    display: grid;
+    place-items: center;
+    min-height: 46px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .card__lvl input:checked + span {
+    background: var(--paper-ink);
+    color: var(--paper);
+  }
+  .card__lvl input:focus-visible + span {
+    outline: 2px solid var(--stamp);
+    outline-offset: 2px;
+  }
+  .card__foot {
+    display: grid;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .card__submit {
+    width: 100%;
+    border-color: var(--stamp);
+    background: var(--stamp);
+    color: #f6efe0;
+    box-shadow: none;
+  }
+  .card__submit:hover {
+    background: #6f1410;
+    box-shadow: none;
+  }
+  .card__tel {
+    font-size: 14px;
+  }
+  .card__tel a {
+    display: inline-block;
+    padding-block: 10px;
+    font-weight: 500;
+    text-underline-offset: 4px;
+  }
+  .card__note {
+    font-size: 12px;
+    color: var(--paper-ash);
+  }
+  .card__sign {
+    margin-top: 30px;
+    padding-top: 6px;
+    border-top: 1px solid var(--paper-ink);
+    width: 62%;
+    margin-left: auto;
+    text-align: right;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--paper-ash);
+  }
+  @media (min-width: 900px) {
+    .card {
+      padding: 40px 44px 44px;
+      margin-left: calc((100% + 24px) / 12 * 2);
+      transform: rotate(-0.5deg);
+    }
+    .card__grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 26px 24px;
+    }
+    .f--half {
+      grid-column: span 1;
+    }
+    .card__foot {
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      column-gap: 28px;
+    }
+    .card__submit {
+      width: auto;
+    }
+    .card__note {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
