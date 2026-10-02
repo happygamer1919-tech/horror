@@ -1,0 +1,171 @@
+---
+import type { Lang } from '../config';
+import type { FaqItem } from '../content/types';
+import { copy, site } from '../content';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  lang: Lang;
+  items: FaqItem[];
+}
+const { lang, items } = Astro.props;
+const t = copy[lang];
+const hours = site.hours ? site.hours[lang] : null;
+---
+
+<section class="sec info" id="info" data-dark="0.35" aria-labelledby="info-title">
+  <div class="wrap">
+    <SectionHead no="08" place={t.places.info} title={t.faq.title} id="info-title" />
+    <div class="grid">
+      <div class="faq">
+        {
+          items.map((item) => (
+            <details class="faq__item">
+              <summary>
+                <span>{item.q}</span>
+                <i aria-hidden="true" />
+              </summary>
+              <p>{item.a}</p>
+            </details>
+          ))
+        }
+      </div>
+
+      <aside class="loc" id="location" aria-labelledby="loc-title" data-reveal>
+        <h3 class="loc__title" id="loc-title">{t.location.title}</h3>
+        <dl>
+          <div>
+            <dt>{t.location.address}</dt>
+            <dd>
+              {site.address.street}<br />
+              {site.address.postalCode}, {site.city[lang]}, {site.country[lang]}
+            </dd>
+          </div>
+          <div>
+            <dt>{t.location.hours}</dt>
+            <dd class:list={[{ 'is-todo': !hours }]}>{hours ?? t.location.hoursPlaceholder}</dd>
+          </div>
+          <div>
+            <dt>{t.location.phone}</dt>
+            <dd><a class="loc__tel" href={`tel:${site.phone.e164}`}>{site.phone.display}</a></dd>
+          </div>
+        </dl>
+        <a class="btn" href={site.maps.directionsUrl} target="_blank" rel="noopener noreferrer">{t.location.directions}</a>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<style>
+  .faq,
+  .loc {
+    grid-column: 1 / -1;
+  }
+  .faq {
+    border-top: 1px solid var(--line);
+  }
+  .faq__item {
+    border-bottom: 1px solid var(--line);
+  }
+  .faq__item summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    min-height: 68px;
+    padding-block: 16px;
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--serif);
+    font-size: clamp(1.15rem, 4.6vw, 1.5rem);
+    line-height: 1.2;
+  }
+  .faq__item summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq__item summary:hover {
+    color: var(--brass-hi);
+  }
+  /* plus sign that folds to a minus */
+  .faq__item i {
+    position: relative;
+    flex: none;
+    width: 16px;
+    height: 16px;
+  }
+  .faq__item i::before,
+  .faq__item i::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 16px;
+    height: 2px;
+    background: var(--neon);
+    transition: transform 0.3s;
+  }
+  .faq__item i::after {
+    transform: rotate(90deg);
+  }
+  .faq__item[open] i::after {
+    transform: none;
+  }
+  .faq__item p {
+    max-width: 62ch;
+    padding: 0 36px 24px 0;
+    color: var(--ash);
+  }
+
+  .loc {
+    margin-top: 64px;
+    padding: 26px 22px 28px;
+    border: 1px solid var(--brass-lo);
+    display: grid;
+    gap: 24px;
+    align-content: start;
+  }
+  .loc__title {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 1.7rem;
+    line-height: 1.05;
+  }
+  .loc dl {
+    display: grid;
+    gap: 18px;
+  }
+  .loc dt {
+    margin-bottom: 4px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  .loc dd.is-todo {
+    color: var(--ash);
+  }
+  .loc__tel {
+    display: inline-block;
+    padding-block: 8px;
+    font-size: 1.15rem;
+    color: var(--bone);
+    text-underline-offset: 5px;
+    text-decoration-color: var(--neon);
+  }
+  .loc .btn {
+    justify-self: start;
+  }
+  @media (min-width: 900px) {
+    .faq {
+      grid-column: 1 / span 7;
+    }
+    .loc {
+      grid-column: 9 / -1;
+      margin-top: 0;
+      padding: 34px 32px 36px;
+      align-self: start;
+      position: sticky;
+      top: calc(var(--header-h) + 24px);
+    }
+  }
+</style>

@@ -1,0 +1,223 @@
+---
+import { LANGS, href, SITE_INDEXABLE, type Lang } from '../config';
+import { copy, site } from '../content';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = copy[lang];
+const year = new Date().getFullYear();
+// The page language leads, the other two names follow as on a trilingual letterhead.
+const names = [lang, ...LANGS.filter((l) => l !== lang)];
+---
+
+<footer class="foot" data-dark="0.5">
+  <div class="wrap foot__grid">
+    <div class="foot__hang">
+      <button class="hanger" type="button" data-hanger aria-pressed="false" aria-label={t.footer.hangerHint}>
+        <span class="hanger__in">
+          <span class="hanger__face hanger__face--front"><span>{t.footer.hangerFront}</span></span>
+          <span class="hanger__face hanger__face--back"><span>{t.footer.hangerBack}</span></span>
+        </span>
+      </button>
+    </div>
+
+    <div class="foot__main">
+      <ul class="foot__names">
+        {names.map((l) => <li lang={l}>{site.brand[l]}</li>)}
+      </ul>
+      <p class="foot__addr">
+        {site.address.street}, {site.address.postalCode}, {site.city[lang]}<br />
+        <a href={`tel:${site.phone.e164}`}>{site.phone.display}</a>
+      </p>
+      <nav class="foot__langs" aria-label={t.ui.languageNav}>
+        {
+          LANGS.map((l) => (
+            <a href={href(`/${l}/`)} lang={l} hreflang={l} aria-current={l === lang ? 'page' : undefined}>
+              {copy[l].langName}
+            </a>
+          ))
+        }
+      </nav>
+      <p class="foot__legal">
+        <span>&copy; {year} {site.brand[lang]}. {t.footer.rights}</span>
+        {!SITE_INDEXABLE && <span class="foot__preview">{t.ui.preview}</span>}
+        <a href="#top">{t.footer.top}</a>
+      </p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .foot {
+    position: relative;
+    padding: 0 0 120px;
+    border-top: 1px solid var(--line);
+  }
+  .foot__grid {
+    display: grid;
+    gap: 40px;
+  }
+  .foot__hang {
+    height: 250px;
+    display: grid;
+    justify-items: start;
+    padding-left: 12px;
+  }
+  /* Door hanger: hangs from the top rule of the footer, flips on click. */
+  .hanger {
+    width: 132px;
+    height: 250px;
+    padding: 0;
+    border: 0;
+    background: none;
+    perspective: 700px;
+    transform: rotate(3deg);
+    transform-origin: 50% 0;
+  }
+  .hanger__in {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.8s cubic-bezier(0.3, 0.8, 0.2, 1);
+  }
+  .hanger[aria-pressed='true'] .hanger__in {
+    transform: rotateY(180deg);
+  }
+  .hanger__face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    align-items: end;
+    padding: 0 12px 22px;
+    border-radius: 62px 62px 6px 6px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    /* the hole that goes over the door handle */
+    -webkit-mask: radial-gradient(circle at 50% 56px, transparent 29px, #000 30px);
+    mask: radial-gradient(circle at 50% 56px, transparent 29px, #000 30px);
+    font-family: var(--serif);
+    font-weight: 900;
+    font-size: 0.9rem;
+    line-height: 1.08;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .hanger__face--front {
+    background: var(--neon);
+    color: var(--ink);
+  }
+  .hanger__face--back {
+    background: var(--bone);
+    color: var(--stamp);
+    transform: rotateY(180deg);
+  }
+  .hanger__face span {
+    padding-top: 12px;
+    border-top: 2px solid currentColor;
+  }
+  .hanger:focus-visible {
+    outline-offset: 8px;
+  }
+
+  .foot__main {
+    display: grid;
+    gap: 24px;
+  }
+  .foot__names {
+    display: grid;
+    gap: 2px;
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: clamp(1.5rem, 6.4vw, 2.4rem);
+    line-height: 1.12;
+  }
+  .foot__names li:not(:first-child) {
+    color: var(--ash);
+    font-weight: 500;
+    font-style: italic;
+  }
+  .foot__addr {
+    color: var(--ash);
+  }
+  .foot__addr a {
+    display: inline-block;
+    padding-block: 10px;
+    color: var(--bone);
+    text-underline-offset: 5px;
+  }
+  .foot__langs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 22px;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .foot__langs a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--ash);
+    text-decoration: none;
+  }
+  .foot__langs a[aria-current='page'] {
+    color: var(--bone);
+    text-decoration: underline;
+    text-decoration-color: var(--neon);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+  }
+  .foot__legal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 24px;
+    align-items: center;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 11px;
+    color: var(--ash);
+  }
+  .foot__legal a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--brass-hi);
+    text-underline-offset: 4px;
+  }
+  .foot__preview {
+    padding: 2px 8px;
+    border: 1px solid var(--brass-lo);
+    color: var(--brass-hi);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 10px;
+  }
+  @media (min-width: 900px) {
+    .foot {
+      padding-bottom: 56px;
+    }
+    .foot__grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 24px;
+    }
+    .foot__hang {
+      grid-column: 1 / span 3;
+      height: 300px;
+    }
+    .hanger {
+      width: 150px;
+      height: 290px;
+    }
+    .hanger__face {
+      font-size: 1.05rem;
+    }
+    .foot__main {
+      grid-column: 5 / -1;
+      padding-top: 72px;
+    }
+  }
+</style>
