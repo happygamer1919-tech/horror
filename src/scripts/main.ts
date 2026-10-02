@@ -30,5 +30,17 @@ const idle = (fn: () => void) =>
 
 idle(() => {
   import('./cctv').then((m) => m.initCctv()).catch(() => {});
-  import('./fog').then((m) => m.initFog()).catch(() => {});
 });
+
+// The WebGL fog rolls in on the first sign of life (or after 6 seconds). Until then the
+// CSS halo stands in, so the first paint never waits for a GPU context.
+let fogStarted = false;
+const startFog = () => {
+  if (fogStarted) return;
+  fogStarted = true;
+  fogEvents.forEach((ev) => window.removeEventListener(ev, startFog));
+  import('./fog').then((m) => m.initFog()).catch(() => {});
+};
+const fogEvents = ['pointermove', 'pointerdown', 'touchstart', 'keydown', 'scroll'];
+fogEvents.forEach((ev) => window.addEventListener(ev, startFog, { passive: true, once: true }));
+window.setTimeout(startFog, 6000);

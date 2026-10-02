@@ -125,7 +125,7 @@ for (const lang of LANGS) {
         }) as typeof window.open;
       });
       const form = page.locator('[data-checkin]');
-      await form.scrollIntoViewIfNeeded();
+      await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
       await form.locator('input[name="date"]').fill('2031-03-14');
       await form.locator('input[name="time"]').fill('19:30');
       await form.locator('input[name="team"]').fill('5');
@@ -197,7 +197,10 @@ for (const lang of LANGS) {
       await expect(visible).toHaveCount(1);
       const before = await visible.textContent();
       const tintBefore = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--tint-a').trim());
-      await page.locator('#keys input[value="hardcore"]').check({ force: true });
+      // Centre the control: at the bottom edge of a phone the sticky Book bar would cover it.
+      const pick = page.locator('#keys input[value="hardcore"]');
+      await pick.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      await pick.check({ force: true });
       await expect(page.locator('html')).toHaveAttribute('data-level', 'hardcore');
       await expect(visible).toHaveCount(1);
       expect(await visible.textContent()).not.toBe(before);

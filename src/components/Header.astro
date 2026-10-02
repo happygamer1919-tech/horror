@@ -18,7 +18,7 @@ const t = copy[lang];
     <nav class="langs" aria-label={t.ui.languageNav}>
       {
         LANGS.map((l) => (
-          <a href={href(`/${l}/`)} lang={l} hreflang={l} aria-current={l === lang ? 'page' : undefined} aria-label={copy[l].langName}>
+          <a href={href(`/${l}/`)} lang={l} hreflang={l} aria-current={l === lang ? 'page' : undefined} title={copy[l].langName}>
             {l.toUpperCase()}
           </a>
         ))

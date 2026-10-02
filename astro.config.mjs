@@ -6,6 +6,6 @@ export default defineConfig({
   base: '/horror',
   trailingSlash: 'always',
   output: 'static',
-  build: { inlineStylesheets: 'auto' },
+  build: { inlineStylesheets: 'always' },
   devToolbar: { enabled: false },
 });

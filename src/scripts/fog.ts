@@ -1,6 +1,7 @@
 // The one WebGL scene: fog lit by the neon sign, drawn with OGL.
 // It renders at a small fixed internal size (fog is soft, so nobody can tell) which keeps
 // it cheap on phones. If WebGL is missing, the CSS halo in Hero.astro stays in place.
+import { Renderer, Program, Mesh, Triangle } from 'ogl';
 import { still } from './env';
 import { neonState } from './neon';
 
@@ -55,23 +56,27 @@ void main() {
   gl_FragColor = vec4(uColor * light, 1.0);
 }`;
 
-export async function initFog() {
+export function initFog() {
   const canvas = document.querySelector<HTMLCanvasElement>('[data-fog]');
   const hero = document.getElementById('lobby');
   const facade = document.querySelector<HTMLElement>('[data-facade]');
   if (!canvas || !hero || !facade || still) return;
 
-  let ogl: typeof import('ogl');
-  try {
-    ogl = await import('ogl');
-  } catch {
-    return;
-  }
-  const { Renderer, Program, Mesh, Triangle } = ogl;
+  // Ask for a hardware context first. On software renderers (no GPU) the shader would be
+  // compiled and run on the CPU and block the page, so there the CSS halo is the right answer.
+  const probe = canvas.getContext('webgl', {
+    failIfMajorPerformanceCaveat: true,
+    alpha: false,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    powerPreference: 'low-power',
+  });
+  if (!probe) return;
 
   let renderer: InstanceType<typeof Renderer>;
   try {
-    renderer = new Renderer({ canvas, dpr: 1, alpha: false, antialias: false, powerPreference: 'low-power' });
+    renderer = new Renderer({ canvas, dpr: 1, alpha: false, antialias: false, depth: false, webgl: 1, powerPreference: 'low-power' });
   } catch {
     return;
   }

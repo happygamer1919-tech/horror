@@ -60,6 +60,8 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   scroll-padding-top: var(--header-h);
+  /* room for the sticky Book bar on phones, so focused controls never sit under it */
+  scroll-padding-bottom: 84px;
 }
 
 body {
@@ -78,6 +80,9 @@ body {
   :root {
     --gutter: 40px;
     --header-h: 64px;
+  }
+  html {
+    scroll-padding-bottom: 0;
   }
   body {
     font-size: 16px;
@@ -184,12 +189,6 @@ canvas {
   position: relative;
   padding-block: 96px;
 }
-@media (min-width: 900px) {
-  .sec {
-    padding-block: 160px;
-  }
-}
-
 /* Section head: the hotel directory line plus a large serif title. */
 
 .sec-head {
