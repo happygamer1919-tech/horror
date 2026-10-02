@@ -1,0 +1,316 @@
+---
+import type { Lang } from '../config';
+import type { Level } from '../content/types';
+import { copy, site } from '../content';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = copy[lang];
+const k = t.keys;
+const ask = t.ui.askDesk;
+
+// null in site.ts means "not confirmed yet": the fob shows a neutral placeholder.
+const fobs = [
+  { no: '01', label: k.labels.players, value: site.players, known: Boolean(site.players) },
+  { no: '02', label: k.labels.duration, value: k.duration(site.durationMinutes), known: true },
+  { no: '03', label: k.labels.age, value: site.ageLimit, known: Boolean(site.ageLimit) },
+  { no: '04', label: k.labels.price, value: site.price, known: Boolean(site.price) },
+];
+const levels: Level[] = ['light', 'standard', 'hardcore'];
+---
+
+<section class="sec keys" id="keys" data-dark="0.45" aria-labelledby="keys-title">
+  <div class="wrap">
+    <SectionHead no="04" place={t.places.reception} title={k.title} id="keys-title">
+      <p class="lead" data-reveal style="--d:.14s">{k.intro}</p>
+    </SectionHead>
+
+    <ul class="board">
+      {
+        fobs.map((f, i) => (
+          <li class="hook" data-reveal style={`--d:${i * 0.09}s`}>
+            <div class="fob">
+              <span class="fob__no" aria-hidden="true">
+                {f.no}
+              </span>
+              <span class="fob__label">{f.label}</span>
+              <span class:list={['fob__value', { 'is-todo': !f.known }]}>{f.known ? f.value : ask}</span>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+
+    <fieldset class="lvl" data-reveal>
+      <legend class="lvl__legend">{k.level.legend}</legend>
+      <div class="lvl__opts">
+        {
+          levels.map((l) => (
+            <label class="lvl__opt">
+              <input type="radio" name="level-pick" value={l} checked={l === 'standard'} data-level-input />
+              <span>{k.level.options[l].name}</span>
+            </label>
+          ))
+        }
+      </div>
+      <div class="lvl__copy" aria-live="polite">
+        {
+          levels.map((l) => (
+            <p class="lvl__text" data-level-text={l}>
+              {k.level.options[l].text}
+            </p>
+          ))
+        }
+      </div>
+      {!site.contactRulesConfirmed && <p class="lvl__note">{k.level.note}</p>}
+    </fieldset>
+  </div>
+</section>
+
+<style>
+  /* Key board: a rail with four hooks. */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 34px 16px;
+    padding-top: 14px;
+    border-top: 6px solid #1c1714;
+    box-shadow: 0 -1px 0 var(--brass-lo);
+  }
+  .hook {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    padding-top: 30px;
+  }
+  /* hook and ring */
+  .hook::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: var(--brass-hi);
+    box-shadow: 0 2px 4px #000;
+    z-index: 1;
+  }
+  .hook::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    width: 26px;
+    height: 44px;
+    margin-left: -13px;
+    border: 2px solid var(--brass);
+    border-radius: 50%;
+  }
+  .fob {
+    position: relative;
+    width: min(100%, 168px);
+    min-height: 214px;
+    display: grid;
+    align-content: start;
+    justify-items: center;
+    gap: 8px;
+    padding: 46px 12px 34px;
+    text-align: center;
+    color: #23190a;
+    border-radius: 16px 16px 84px 84px / 16px 16px 60px 60px;
+    background:
+      repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+      linear-gradient(160deg, #6f5628 0%, #bb9c5e 24%, #8f7038 50%, #c4a667 72%, #6a5226 100%);
+    box-shadow:
+      inset 0 0 0 2px rgba(60, 42, 12, 0.55),
+      inset 0 0 0 5px rgba(255, 236, 180, 0.16),
+      0 18px 30px rgba(0, 0, 0, 0.6);
+    transform-origin: 50% -24px;
+  }
+  /* the hole the ring passes through */
+  .fob::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin-left: -8px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: inset 0 2px 3px #000, 0 1px 0 rgba(255, 236, 180, 0.5);
+  }
+  :global(html.motion) .hook.is-in .fob {
+    animation: swing 2.4s cubic-bezier(0.3, 0, 0.3, 1) var(--d, 0s) 1 both;
+  }
+  @keyframes swing {
+    0% {
+      transform: rotate(-7deg);
+    }
+    30% {
+      transform: rotate(4.5deg);
+    }
+    55% {
+      transform: rotate(-2.4deg);
+    }
+    78% {
+      transform: rotate(1deg);
+    }
+    100% {
+      transform: rotate(0);
+    }
+  }
+  .fob__no {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    opacity: 0.8;
+  }
+  .fob__label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(35, 25, 10, 0.5);
+  }
+  .fob__value {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 1.7rem;
+    line-height: 1.05;
+    text-shadow: 0 1px 0 rgba(255, 236, 180, 0.45);
+    overflow-wrap: anywhere;
+  }
+  .fob__value.is-todo {
+    font-style: italic;
+    font-weight: 600;
+    font-size: 1.02rem;
+    line-height: 1.2;
+  }
+
+  /* Contact level */
+  .lvl {
+    margin-top: 80px;
+    display: grid;
+    gap: 22px;
+  }
+  .lvl__legend {
+    padding: 0;
+    margin-bottom: 18px;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  .lvl__opts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border: 1px solid var(--line);
+  }
+  .lvl__opt {
+    position: relative;
+    display: grid;
+    cursor: pointer;
+  }
+  .lvl__opt + .lvl__opt {
+    border-left: 1px solid var(--line);
+  }
+  .lvl__opt input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .lvl__opt span {
+    display: grid;
+    place-items: center;
+    min-height: 56px;
+    padding: 8px 4px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ash);
+    transition:
+      background-color 0.3s,
+      color 0.3s;
+  }
+  .lvl__opt input:checked + span {
+    background: var(--neon);
+    color: var(--ink);
+  }
+  .lvl__opt input:focus-visible + span {
+    outline: 2px solid var(--brass-hi);
+    outline-offset: 3px;
+  }
+  .lvl__text {
+    display: none;
+    max-width: 24ch;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(1.5rem, 6.4vw, 2.6rem);
+    line-height: 1.14;
+    text-wrap: balance;
+  }
+  :global(html[data-level='light']) .lvl__text[data-level-text='light'],
+  :global(html[data-level='standard']) .lvl__text[data-level-text='standard'],
+  :global(html[data-level='hardcore']) .lvl__text[data-level-text='hardcore'] {
+    display: block;
+  }
+  .lvl__copy {
+    min-height: 5.2em;
+  }
+  .lvl__note {
+    max-width: 52ch;
+    font-size: 13px;
+    color: var(--ash);
+  }
+
+  @media (min-width: 900px) {
+    .board {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .fob {
+      width: min(100%, 210px);
+      min-height: 270px;
+      padding-top: 56px;
+    }
+    .fob__value {
+      font-size: 2.3rem;
+    }
+    .fob__value.is-todo {
+      font-size: 1.25rem;
+    }
+    .lvl {
+      margin-top: 120px;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 24px;
+    }
+    .lvl__legend {
+      float: left;
+      width: 100%;
+      grid-column: 1 / -1;
+    }
+    .lvl__opts {
+      grid-column: 1 / span 5;
+      align-self: start;
+    }
+    .lvl__copy {
+      grid-column: 7 / -1;
+      grid-row: span 2;
+      min-height: 0;
+    }
+    .lvl__note {
+      grid-column: 1 / span 5;
+    }
+  }
+</style>
