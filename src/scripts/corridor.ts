@@ -274,6 +274,8 @@ export function initCorridor() {
   // Small, still, backlit by the last lamp. No face, no detail.
   const drawSilhouette = () => {
     const z = SIL_Z;
+    // Already walked past where it stood: nothing to draw.
+    if (z - cam < 0.6) return;
     const s = f / (z - cam);
     const bx = px(0.12, z);
     const by = py(0, z);

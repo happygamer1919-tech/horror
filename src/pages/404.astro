@@ -1,0 +1,55 @@
+---
+import Base from '../layouts/Base.astro';
+import { DEFAULT_LANG, LANGS, href } from '../config';
+import { copy } from '../content';
+---
+
+<Base lang={DEFAULT_LANG} title="404" path="/404.html" alternates={false}>
+  <main class="nf" id="main">
+    <p class="nf__no" aria-hidden="true">404</p>
+    {
+      LANGS.map((l) => (
+        <div lang={l}>
+          <h1>{copy[l].notFound.title}</h1>
+          <p>{copy[l].notFound.text}</p>
+          <a class="link" href={href(`/${l}/`)}>
+            {copy[l].notFound.back}
+          </a>
+        </div>
+      ))
+    }
+  </main>
+</Base>
+
+<style>
+  .nf {
+    position: relative;
+    z-index: 45;
+    min-height: 100vh;
+    display: grid;
+    align-content: center;
+    gap: 34px;
+    padding: 80px var(--gutter);
+    max-width: 720px;
+    margin-inline: auto;
+  }
+  .nf__no {
+    font-family: var(--serif);
+    font-weight: 900;
+    font-size: clamp(5rem, 28vw, 11rem);
+    line-height: 0.8;
+    color: var(--neon);
+  }
+  .nf h1 {
+    font-family: var(--serif);
+    font-size: clamp(1.5rem, 6vw, 2.2rem);
+    line-height: 1.1;
+  }
+  .nf p {
+    color: var(--ash);
+  }
+  .nf .link {
+    display: inline-block;
+    padding-block: 10px;
+  }
+</style>
