@@ -17,8 +17,12 @@ const names = [lang, ...LANGS.filter((l) => l !== lang)];
     <div class="foot__hang">
       <button class="hanger" type="button" data-hanger aria-pressed="false" title={t.footer.hangerHint}>
         <span class="hanger__in">
-          <span class="hanger__face hanger__face--front"><span>{t.footer.hangerFront}</span></span>
-          <span class="hanger__face hanger__face--back"><span>{t.footer.hangerBack}</span></span>
+          <span class="hanger__face hanger__face--front">
+            <span>{t.footer.hangerFront.split(' ').map((w) => <b>{w} </b>)}</span>
+          </span>
+          <span class="hanger__face hanger__face--back">
+            <span>{t.footer.hangerBack.split(' ').map((w) => <b>{w} </b>)}</span>
+          </span>
         </span>
       </button>
     </div>
@@ -67,7 +71,7 @@ const names = [lang, ...LANGS.filter((l) => l !== lang)];
   }
   /* Door hanger: hangs from the top rule of the footer, flips on click. */
   .hanger {
-    width: 132px;
+    width: 140px;
     height: 250px;
     padding: 0;
     border: 0;
@@ -101,7 +105,7 @@ const names = [lang, ...LANGS.filter((l) => l !== lang)];
     mask: radial-gradient(circle at 50% 56px, transparent 29px, #000 30px);
     font-family: var(--serif);
     font-weight: 900;
-    font-size: 0.9rem;
+    font-size: 1rem;
     line-height: 1.08;
     text-transform: uppercase;
     text-align: center;
@@ -115,9 +119,13 @@ const names = [lang, ...LANGS.filter((l) => l !== lang)];
     color: var(--stamp);
     transform: rotateY(180deg);
   }
-  .hanger__face span {
+  .hanger__face > span {
     padding-top: 12px;
     border-top: 2px solid currentColor;
+  }
+  .hanger__face b {
+    display: block;
+    font-weight: inherit;
   }
   .hanger:focus-visible {
     outline-offset: 8px;
@@ -209,11 +217,11 @@ const names = [lang, ...LANGS.filter((l) => l !== lang)];
       height: 300px;
     }
     .hanger {
-      width: 150px;
+      width: 158px;
       height: 290px;
     }
     .hanger__face {
-      font-size: 1.05rem;
+      font-size: 1.14rem;
     }
     .foot__main {
       grid-column: 5 / -1;

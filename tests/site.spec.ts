@@ -295,3 +295,49 @@ test('the neon sign never changes state faster than 3 times per second', async (
   // A flash is an on-off pair, so 3 flashes per second would be 6 transitions.
   expect(worst).toBeLessThanOrEqual(3);
 });
+
+test('the Check in button brings the registration card on screen', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('hotel:lift', '1'));
+  await page.goto(`${BASE}/ro/`);
+  await page.locator('[data-cta]').click();
+  await expect(page.locator('#checkin-title')).toBeInViewport({ timeout: 8000 });
+});
+
+test('lights dim after 20 seconds without input and come back on input', async ({ page }) => {
+  await page.clock.install();
+  await page.addInitScript(() => sessionStorage.setItem('hotel:lift', '1'));
+  await page.goto(`${BASE}/ro/`);
+  const html = page.locator('html');
+  await expect(html).not.toHaveClass(/idle/);
+  await page.clock.fastForward(21000);
+  await expect(html).toHaveClass(/idle/);
+  await page.keyboard.press('Shift');
+  await expect(html).not.toHaveClass(/idle/);
+});
+
+test('sound is off by default and the toggle is a real button', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('hotel:lift', '1'));
+  await page.goto(`${BASE}/ro/`);
+  const btn = page.locator('[data-sound]');
+  await expect(btn).toHaveAttribute('aria-pressed', 'false');
+  await btn.click();
+  await expect(btn).toHaveAttribute('aria-pressed', 'true');
+  await btn.click();
+  await expect(btn).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('the tab title changes while the tab is hidden', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('hotel:lift', '1'));
+  await page.goto(`${BASE}/ro/`);
+  const title = await page.title();
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(await page.title()).toBe('Cheia vă așteaptă');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(await page.title()).toBe(title);
+});

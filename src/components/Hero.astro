@@ -354,6 +354,32 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     background: linear-gradient(var(--ash), transparent);
   }
 
+  /* Short phones: tighten the copy so the sign and the top floors stay clear. */
+  @media (max-height: 700px) and (max-width: 899px) {
+    .hero {
+      padding-bottom: 54px;
+    }
+    .hero::after {
+      inset: 24% 0 0 0;
+    }
+    .hero__body {
+      gap: 9px;
+    }
+    .hero__title {
+      font-size: 12.4vw;
+    }
+    .hero__line {
+      font-size: 1.35rem;
+    }
+    .hero__sub {
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+    .hero__cta {
+      margin-top: 6px;
+    }
+  }
+
   @media (min-width: 900px) {
     .hero {
       padding-bottom: 96px;

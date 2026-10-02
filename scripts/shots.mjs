@@ -1,6 +1,6 @@
 // Screenshot helper for the build loop.
 // Usage: node scripts/shots.mjs <name> [selector] [lang] [--lift] [--full] [--y=0.5] [--wait=800] [--still]
-// Needs `npm run preview` running on port 4321. Writes docs/screenshots/<name>-<width>.png
+// Needs `node scripts/serve.mjs` running on port 4321 (after `npm run build`). Writes docs/screenshots/<name>-<width>.jpg
 import { chromium } from '@playwright/test';
 
 const args = process.argv.slice(2);
@@ -41,7 +41,7 @@ for (const s of sizes) {
     const [mx, my] = String(flags.mouse).split(',').map(Number);
     await page.mouse.move(mx, my);
   }
-  const path = `docs/screenshots/${name}-${s.w}.png`;
+  const path = `docs/screenshots/${name}-${s.w}.jpg`;
   if (flags.el && selector) {
     // Whole element: walk through it first so scroll reveals fire, and hide the fixed overlays.
     await page.addStyleTag({ content: '.torch,.bar,.sticky,.skip-link,.grain,.tint{display:none!important}' });
@@ -51,10 +51,10 @@ for (const s of sizes) {
       await page.waitForTimeout(250);
     }
     await page.waitForTimeout(Number(flags.wait ?? 1200));
-    await page.locator(selector).screenshot({ path });
+    await page.locator(selector).screenshot({ path, type: 'jpeg', quality: 80 });
   } else {
     await page.waitForTimeout(Number(flags.wait ?? 1200));
-    await page.screenshot({ path, fullPage: Boolean(flags.full) });
+    await page.screenshot({ path, fullPage: Boolean(flags.full), type: 'jpeg', quality: 80 });
   }
   console.log(path);
   await ctx.close();

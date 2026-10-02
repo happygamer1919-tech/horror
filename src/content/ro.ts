@@ -11,8 +11,8 @@ export const ro: Copy = {
     hiddenTitle: 'Cheia vă așteaptă',
   },
   ui: {
-    skipToContent: 'Sari la conținut',
-    skip: 'Omite',
+    skipToContent: 'Salt la conținut',
+    skip: 'Omiteți',
     sound: 'Sunet',
     soundOn: 'pornit',
     soundOff: 'oprit',
