@@ -1,0 +1,52 @@
+{
+  "textures": {
+    "dirty_carpet": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "decrepit_wallpaper": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "dark_wood": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "wood_cabinet_worn_long": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "wood_floor_worn": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "painted_plaster_wall": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "worn_plaster_wall": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "rough_wood": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "oak_veneer_01": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ]
+  },
+  "models": {
+    "korean_fire_extinguisher_01": "1k"
+  }
+}
