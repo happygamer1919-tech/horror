@@ -1,0 +1,130 @@
+---
+import type { Lang } from '../config';
+import { copy } from '../content';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  lang: Lang;
+}
+const t = copy[Astro.props.lang];
+---
+
+<section class="sec cctv" id="cctv" data-dark="0.55" aria-labelledby="cctv-title">
+  <div class="wrap">
+    <SectionHead no="05" place={t.places.security} title={t.cctv.title} id="cctv-title">
+      <p class="lead" data-reveal style="--d:.14s">{t.cctv.sub}</p>
+    </SectionHead>
+    <ul class="feeds" data-cctv>
+      {
+        t.cctv.cams.map((name, i) => (
+          <li class="feed" data-reveal style={`--d:${i * 0.07}s`}>
+            <canvas width="160" height="120" data-feed={i} role="img" aria-label={`${t.cctv.alt}: ${name}`} />
+            <span class="feed__cam">
+              CAM 0{i + 1} / {name}
+            </span>
+            <span class="feed__rec">
+              <i aria-hidden="true" />
+              {t.cctv.rec}
+            </span>
+            <span class="feed__time" data-clock aria-hidden="true">
+              --:--:--
+            </span>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .feeds {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .feed {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    background: #0a0a0a;
+    border: 1px solid var(--line);
+    overflow: hidden;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #dcdcd2;
+    text-shadow: 0 0 4px #000, 0 1px 0 #000;
+  }
+  .feed canvas {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    image-rendering: pixelated;
+  }
+  /* scanlines and tube vignette */
+  .feed::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(rgba(0, 0, 0, 0.26) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.6) 100%);
+    pointer-events: none;
+  }
+  .feed span {
+    position: absolute;
+    z-index: 1;
+  }
+  .feed__cam {
+    left: 8px;
+    top: 7px;
+    right: 44px;
+  }
+  .feed__rec {
+    right: 8px;
+    top: 7px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .feed__rec i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ff2d2d;
+  }
+  /* 1 blink per second: far below the 3 per second limit */
+  :global(html.motion) .feed__rec i {
+    animation: rec 2s steps(1) infinite;
+  }
+  @keyframes rec {
+    50% {
+      opacity: 0.4;
+    }
+  }
+  .feed__time {
+    left: 8px;
+    bottom: 7px;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (min-width: 900px) {
+    .feeds {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .feed {
+      font-size: 11px;
+    }
+    .feed__cam {
+      left: 12px;
+      top: 10px;
+    }
+    .feed__rec {
+      right: 12px;
+      top: 10px;
+    }
+    .feed__time {
+      left: 12px;
+      bottom: 10px;
+    }
+  }
+</style>
