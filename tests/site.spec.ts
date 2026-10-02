@@ -20,11 +20,13 @@ const LEVEL_NAMES = {
 const FACTS = {
   ro: {
     age: 'Fără limită',
+    ageNote: 'Acord la sosire. Minori: semnează un părinte',
     ageQ: 'Există o vârstă minimă?',
     ageA: ['nu există limită de vârstă', 'semnează un acord la sosire', 'Minorii intră doar dacă acordul este semnat de un părinte'],
     payQ: 'Cum pot plăti?',
     payA: 'Doar în numerar, la fața locului.',
     voucherQ: 'Cum cumpăr un voucher cadou?',
+    messageUs: 'Scrieți-ne',
     cash: 'în numerar',
     venue: 'la fața locului',
     langQ: 'În ce limbi se joacă?',
@@ -32,11 +34,13 @@ const FACTS = {
   },
   ru: {
     age: 'Без ограничений',
+    ageNote: 'Соглашение на месте. Несовершеннолетним: подпись родителя',
     ageQ: 'Есть ли минимальный возраст?',
     ageA: ['ограничений по возрасту нет', 'подписывают соглашение на месте', 'Несовершеннолетние допускаются, только если соглашение подпишет родитель'],
     payQ: 'Как можно оплатить?',
     payA: 'Только наличными, на месте.',
     voucherQ: 'Как купить подарочный сертификат?',
+    messageUs: 'Напишите нам',
     cash: 'за наличные',
     venue: 'на месте',
     langQ: 'На каких языках проходит игра?',
@@ -44,11 +48,13 @@ const FACTS = {
   },
   en: {
     age: 'No age limit',
+    ageNote: 'Agreement on arrival. Minors: a parent signs',
     ageQ: 'Is there a minimum age?',
     ageA: ['there is no age limit', 'Everyone signs an agreement on arrival', 'Minors enter only if a parent signs it'],
     payQ: 'How can I pay?',
     payA: 'Cash only, at the venue.',
     voucherQ: 'How do I buy a gift voucher?',
+    messageUs: 'Message us',
     cash: 'in cash',
     venue: 'at the venue',
     langQ: 'What languages is the game played in?',
@@ -221,7 +227,7 @@ for (const lang of LANGS) {
       }
     });
 
-    test('gift voucher: bought at the venue in cash, no form, no price, one "message us" button', async ({ page }) => {
+    test('gift voucher: bought at the venue in cash, no form, no price, "message us" with WhatsApp and Telegram', async ({ page }) => {
       await open(page, lang);
       const block = page.locator('#voucher');
       await expect(block.locator('form, input, select, textarea')).toHaveCount(0);
@@ -231,6 +237,14 @@ for (const lang of LANGS) {
       expect(text, 'no price in the voucher block').not.toMatch(/\d{3,}\s*MDL|MDL/);
       const wa = block.locator('[data-voucher-wa]');
       await expect(wa).toBeVisible();
+      // "Message us" names the pair; each button says which channel it opens.
+      const group = block.locator('[role="group"]');
+      await expect(group).toHaveAccessibleName(FACTS[lang].messageUs);
+      await expect(wa).toHaveText('WhatsApp');
+      await expect(block.locator('[data-voucher-tg]')).toHaveText('Telegram');
+      const [a, b] = [(await wa.boundingBox())!, (await block.locator('[data-voucher-tg]').boundingBox())!];
+      expect(Math.abs(a.width - b.width), 'equal buttons').toBeLessThanOrEqual(1);
+      expect(Math.abs(a.height - b.height)).toBeLessThanOrEqual(1);
       const message = messageOf((await wa.getAttribute('href'))!);
       expect(message).toContain(BRAND);
       expect(message.split('\n')).toHaveLength(1);
@@ -249,9 +263,25 @@ for (const lang of LANGS) {
       await expect(fob('01')).toHaveText('2-11');
       await expect(fob('02')).toContainText('60');
       await expect(fob('04')).toContainText('1000 MDL');
-      // Age: no limit, with the short note about the agreement.
+      // Age on the key tag: no limit, the agreement on arrival, and a parent signs for a minor.
       await expect(fob('03')).toHaveText(FACTS[lang].age);
-      expect(((await page.locator('[data-fob="03"] .fob__note').textContent()) ?? '').trim().length).toBeGreaterThan(10);
+      const note = page.locator('[data-fob="03"] .fob__note');
+      await expect(note).toHaveText(FACTS[lang].ageNote);
+      await expect(note).toBeVisible();
+      // The note stays inside the tag: above its rounded bottom and between its sides.
+      await page.locator('[data-fob="03"]').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      await expect
+        .poll(() =>
+          page.locator('[data-fob="03"] .fob').evaluate((f) => {
+            if (f.getAnimations().some((a) => a.playState !== 'finished')) return 'swinging';
+            const n = f.querySelector('.fob__note')!;
+            const fr = f.getBoundingClientRect();
+            const nr = n.getBoundingClientRect();
+            const inside = nr.left >= fr.left + 10 && nr.right <= fr.right - 10 && fr.bottom - nr.bottom >= 24 && n.scrollWidth <= n.clientWidth;
+            return inside ? 'inside' : `out ${Math.round(fr.bottom - nr.bottom)}`;
+          }),
+        )
+        .toBe('inside');
       // FAQ: the age answer states all three facts, payment is cash only, languages are named.
       const answer = (q: string) => page.locator('.faq__item', { hasText: q }).locator('p');
       for (const fact of FACTS[lang].ageA) await expect(answer(FACTS[lang].ageQ)).toContainText(fact);
@@ -342,6 +372,13 @@ for (const lang of LANGS) {
       const body = (await page.locator('body').textContent()) ?? '';
       expect(body).not.toMatch(/Standard|Contact level|Nivel de contact|Уровень контакта/);
       for (const sel of ['#keys', '#checkin']) expect((await page.locator(sel).textContent()) ?? '').not.toMatch(/Light|Standard/);
+      // No level name of the old scheme is left in the page as code either, and nothing
+      // in the stylesheets can tint the page by level.
+      const html = await page.content();
+      expect(html).not.toMatch(/data-level=|data-level\]/);
+      await expect(page.locator('html')).not.toHaveAttribute('data-level', /.*/);
+      const rules = await page.evaluate(() => [...document.styleSheets].flatMap((s) => [...s.cssRules].map((r) => r.cssText)).filter((t) => t.includes('data-level')));
+      expect(rules).toEqual([]);
       // The old copy that described the levels is gone.
       expect(body).not.toMatch(/keeps its distance|stops being polite|păstrează distanța|nu mai este politicos|держит дистанцию|перестаёт быть вежливым/);
     });

@@ -13,7 +13,7 @@ const SLOTS_URL = 'https://widget.easyweek.io/horror-quest-moldova/team/34544/62
 const PRICES: Record<number, number> = { 2: 1000, 3: 1000, 4: 1200, 5: 1500, 6: 1800, 7: 2100, 8: 2400, 9: 2700, 10: 3000, 11: 3300 };
 
 const LABELS: Record<L, { team: string; level: string; language: string; total: string }> = {
-  ro: { team: 'Echipă', level: 'Nivel', language: 'Limba', total: 'Total' },
+  ro: { team: 'Echipă', level: 'Nivel', language: 'Limbă', total: 'Total' },
   ru: { team: 'Команда', level: 'Уровень', language: 'Язык', total: 'Итого' },
   en: { team: 'Team', level: 'Level', language: 'Language', total: 'Total' },
 };
@@ -325,11 +325,14 @@ for (const lang of LANGS) {
       await seal(context);
       await open(page, lang);
       await expect(page.locator('[data-sticky] a.btn--primary')).toHaveAttribute('href', '#checkin');
-      // Only the dialog itself (new-tab fallback) may point at the widget. The hero is
-      // owned by another stream, which removes its slots link.
-      const outside = await page.locator(`a[href="${SLOTS_URL}"]`).evaluateAll((as) => as.filter((a) => !a.closest('[data-booking], #lobby')).length);
+      // Only the dialog itself (new-tab fallback) may point at the widget: a link anywhere
+      // else, the hero included, would book a slot without the summary line.
+      const outside = await page.locator('a[href*="easyweek"]').evaluateAll((as) => as.filter((a) => !a.closest('[data-booking]')).length);
       expect(outside).toBe(0);
-      await expect(page.locator('#checkin a[data-slots]')).toHaveCount(0);
+      await expect(page.locator('[data-booking] a[href*="easyweek"]')).toHaveCount(2);
+      await expect(page.locator('a[data-slots]')).toHaveCount(0);
+      // The hero keeps its two approved actions: the card and the phone.
+      expect(await page.locator('#lobby .hero__cta a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))).toEqual(['#checkin', 'tel:+37368232596']);
     });
   });
 }
@@ -351,6 +354,61 @@ test('the booking dialog puts the new-tab fallback forward when the widget does 
   await expect(slow.locator('a')).toHaveAttribute('href', SLOTS_URL);
   await expect(slow.locator('a')).toHaveAttribute('target', '_blank');
   await context.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('without dialog support "Book a time slot" copies the line and opens the widget in a new tab', async ({ page, context }) => {
+  const hits = await seal(context);
+  await page.addInitScript(() => {
+    // A browser without <dialog>.showModal.
+    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value: undefined });
+  });
+  for (const lang of LANGS) {
+    await open(page, lang);
+    const form = await fill(page, lang, CASES[3]);
+    const [tab] = await Promise.all([context.waitForEvent('page'), form.locator('[data-book]').click()]);
+    await tab.waitForLoadState();
+    expect(tab.url()).toBe(SLOTS_URL);
+    expect(hits).toContain(SLOTS_URL);
+    await tab.close();
+    await page.bringToFront();
+    await expect.poll(() => clipboard(page)).toBe(line(lang, CASES[3]));
+    await expect(page.locator('[data-booking]')).toHaveJSProperty('open', false);
+    await expect(page.locator('[data-booking-frame]')).not.toHaveAttribute('src', /.*/);
+    hits.length = 0;
+  }
+});
+
+test('on phones the floating control steps aside while FAQ rows pass under it, and comes back after', async ({ page, context }) => {
+  await seal(context);
+  await open(page, 'ru');
+  const float = page.locator('[data-float]');
+  const phone = page.viewportSize()!.width < 900;
+  await expect(float).toBeVisible();
+  const rows = page.locator('.faq__item');
+  const n = await rows.count();
+  for (let i = 0; i < n; i++) {
+    // Put each row where the control sits.
+    await rows.nth(i).evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      window.scrollBy(0, r.top + r.height / 2 - (window.innerHeight - 110));
+    });
+    // Let the observers report the new position before looking: an assertion made at
+    // once would still see the state of the previous row.
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 450)))));
+    if (phone) await expect(float, `row ${i + 1}`).toBeHidden();
+    else await expect(float).toBeVisible();
+    // The plus sign of the row is never under the control.
+    const hit = await rows.nth(i).locator('summary i').evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return Boolean(top && top.closest('[data-float]'));
+    });
+    expect(hit, `row ${i + 1} toggle covered`).toBe(false);
+  }
+  await page.locator('#location').evaluate((el) => el.scrollIntoView({ block: 'end' }));
+  await page.evaluate(() => window.scrollBy(0, 400));
+  await page.locator('#voucher').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await expect(float).toBeVisible();
 });
 
 test('on phones the floating control steps aside while the card is on screen', async ({ page, context }) => {
