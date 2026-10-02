@@ -192,7 +192,7 @@ export function initTorch() {
     window.clearTimeout(idleTimer);
     idleTimer = window.setTimeout(() => root.classList.add('idle'), IDLE_MS);
   };
-  ['pointermove', 'pointerdown', 'keydown', 'scroll', 'touchstart', 'wheel'].forEach((ev) =>
+  ['pointermove', 'pointerdown', 'keydown', 'scroll', 'touchstart', 'touchmove', 'wheel'].forEach((ev) =>
     window.addEventListener(ev, wake, { passive: true }),
   );
   wake();
