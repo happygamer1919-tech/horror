@@ -1,0 +1,317 @@
+---
+import type { Lang } from '../config';
+import { copy, site } from '../content';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = copy[lang];
+const f = t.file;
+const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+---
+
+<section class="sec file" id="file" data-dark="0.5" aria-labelledby="file-title">
+  <div class="wrap">
+    <SectionHead no="03" place={t.places.archive} title={f.title} id="file-title" />
+
+    <div class="grid file__grid">
+      <div class="file__legend">
+        {
+          f.legend.map((p, i) => (
+            <p class="file__p" data-reveal>
+              <span class="file__n" aria-hidden="true">
+                {roman[i]}
+              </span>
+              {p}
+            </p>
+          ))
+        }
+      </div>
+
+      <div class="file__docs">
+        <figure class="registry" data-reveal>
+          <div class="registry__head">
+            <span class="registry__brand">{site.brand[lang]}</span>
+            <span class="registry__page">p. 47</span>
+          </div>
+          <table>
+            <caption>{f.registry.caption}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{f.registry.cols.date}</th>
+                <th scope="col">{f.registry.cols.guest}</th>
+                <th scope="col">{f.registry.cols.room}</th>
+                <th scope="col">{f.registry.cols.out}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                f.registry.rows.map((r, i) => (
+                  <tr class="is-struck" style={`--i:${i}`}>
+                    <td>{r.date}</td>
+                    <td class="hand">
+                      <s>{r.guest}</s>
+                    </td>
+                    <td>{r.room}</td>
+                    <td />
+                  </tr>
+                ))
+              }
+              <tr class="is-you">
+                <td data-today>&nbsp;</td>
+                <td class="hand">{f.registry.you}</td>
+                <td>313</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+          <figcaption>{f.registry.note}</figcaption>
+        </figure>
+
+        <figure class="clip" data-reveal style="--d:.15s">
+          <div class="clip__paper">
+            <p class="clip__rubric"><span>{f.clipping.rubric}</span><span>{f.clipping.year}</span></p>
+            <h3 class="clip__head">{f.clipping.headline}</h3>
+            {f.clipping.body.map((p) => <p class="clip__body">{p}</p>)}
+          </div>
+          <figcaption class="clip__cap">{f.clipping.caption}</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .file__grid {
+    row-gap: 56px;
+  }
+  .file__legend,
+  .file__docs {
+    grid-column: 1 / -1;
+  }
+  .file__legend {
+    display: grid;
+    gap: 30px;
+    align-content: start;
+  }
+  .file__p {
+    position: relative;
+    padding-left: 44px;
+    font-family: var(--serif);
+    font-size: clamp(1.22rem, 4.9vw, 1.62rem);
+    line-height: 1.42;
+    text-wrap: pretty;
+  }
+  .file__n {
+    position: absolute;
+    left: 0;
+    top: 0.5em;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--brass);
+  }
+  .file__p:last-child {
+    color: var(--brass-hi);
+    font-style: italic;
+  }
+
+  .file__docs {
+    display: grid;
+    gap: 0;
+  }
+
+  /* Registry sheet */
+  .registry {
+    position: relative;
+    padding: 20px 16px 18px 26px;
+    background:
+      linear-gradient(90deg, transparent 17px, rgba(143, 29, 24, 0.5) 17px, rgba(143, 29, 24, 0.5) 18px, transparent 18px),
+      var(--paper);
+    color: var(--paper-ink);
+    box-shadow:
+      inset 0 0 60px rgba(84, 62, 30, 0.35),
+      0 24px 60px rgba(0, 0, 0, 0.6);
+  }
+  .registry__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--paper-ink);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .registry__brand {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+  }
+  .registry table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .registry caption {
+    padding: 12px 0 10px;
+    text-align: left;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 1.25rem;
+  }
+  .registry th {
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--paper-ink);
+    text-align: left;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--paper-ash);
+    overflow-wrap: anywhere;
+  }
+  .registry th:nth-child(1) {
+    width: 26%;
+  }
+  .registry th:nth-child(3) {
+    width: 15%;
+  }
+  .registry th:nth-child(4) {
+    width: 17%;
+  }
+  .registry td {
+    height: 46px;
+    padding: 4px;
+    border-bottom: 1px solid rgba(28, 22, 17, 0.28);
+    font-size: 12px;
+    vertical-align: middle;
+  }
+  .registry td + td,
+  .registry th + th {
+    border-left: 1px solid rgba(28, 22, 17, 0.16);
+    padding-left: 8px;
+  }
+  .registry .hand {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 15px;
+    line-height: 1.15;
+  }
+  /* The strike is drawn when the sheet scrolls into view. */
+  .registry s {
+    text-decoration: none;
+    background: linear-gradient(var(--stamp), var(--stamp)) no-repeat 0 55% / 100% 2px;
+  }
+  :global(html.motion) .registry s {
+    background-size: 0 2px;
+    transition: background-size 0.7s ease calc(0.5s + var(--i) * 0.28s);
+  }
+  :global(html.motion) .registry.is-in s {
+    background-size: 100% 2px;
+  }
+  .registry .is-you td {
+    border-bottom: 2px solid var(--paper-ink);
+    font-weight: 500;
+  }
+  .registry .is-you .hand {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+    font-weight: 800;
+    color: var(--stamp);
+  }
+  .registry figcaption {
+    padding-top: 12px;
+    font-size: 11px;
+    color: var(--paper-ash);
+  }
+
+  /* Newspaper clipping, laid over the corner of the registry */
+  .clip {
+    position: relative;
+    z-index: 1;
+    width: min(86%, 340px);
+    margin: -18px 0 0 auto;
+  }
+  .clip__paper {
+    padding: 22px 18px 26px;
+    background: var(--paper-2);
+    color: var(--paper-ink);
+    transform: rotate(-2.2deg);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65);
+    clip-path: polygon(0 1.2%, 6% 0, 14% 1.5%, 23% 0.2%, 35% 1.6%, 47% 0, 58% 1.4%, 71% 0.3%, 83% 1.7%, 93% 0.2%, 100% 1.3%, 99.2% 98.6%, 91% 100%, 80% 98.7%, 68% 99.8%, 55% 98.5%, 41% 100%, 29% 98.8%, 17% 99.9%, 7% 98.6%, 0.6% 100%);
+  }
+  .clip__rubric {
+    display: flex;
+    justify-content: space-between;
+    padding-block: 5px;
+    border-block: 1px solid var(--paper-ink);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .clip__head {
+    margin: 12px 0 10px;
+    font-family: var(--serif);
+    font-weight: 900;
+    font-size: 1.32rem;
+    line-height: 1.08;
+    text-wrap: balance;
+  }
+  .clip__body {
+    font-family: var(--serif);
+    font-size: 13.5px;
+    line-height: 1.42;
+    hyphens: auto;
+  }
+  .clip__body + .clip__body {
+    text-indent: 1.2em;
+  }
+  .clip__cap {
+    margin-top: 14px;
+    text-align: right;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--ash);
+  }
+
+  @media (min-width: 900px) {
+    .file__legend {
+      grid-column: 1 / span 6;
+      gap: 44px;
+    }
+    .file__docs {
+      grid-column: 8 / -1;
+      align-content: start;
+    }
+    .file__p {
+      padding-left: 64px;
+      font-size: 1.62rem;
+    }
+    .registry {
+      padding: 30px 26px 24px 44px;
+      background:
+        linear-gradient(90deg, transparent 30px, rgba(143, 29, 24, 0.5) 30px, rgba(143, 29, 24, 0.5) 31px, transparent 31px),
+        var(--paper);
+      transform: rotate(0.6deg);
+    }
+    .registry td {
+      height: 52px;
+      font-size: 13px;
+    }
+    .registry .hand,
+    .registry .is-you .hand {
+      font-size: 17px;
+    }
+    .registry th {
+      font-size: 10px;
+    }
+    .clip {
+      margin: -30px -10px 0 auto;
+    }
+  }
+</style>

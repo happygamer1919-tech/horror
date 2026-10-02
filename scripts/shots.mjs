@@ -41,9 +41,21 @@ for (const s of sizes) {
     const [mx, my] = String(flags.mouse).split(',').map(Number);
     await page.mouse.move(mx, my);
   }
-  await page.waitForTimeout(Number(flags.wait ?? 1200));
   const path = `docs/screenshots/${name}-${s.w}.png`;
-  await page.screenshot({ path, fullPage: Boolean(flags.full) });
+  if (flags.el && selector) {
+    // Whole element: walk through it first so scroll reveals fire, and hide the fixed overlays.
+    await page.addStyleTag({ content: '.torch,.bar,.sticky,.skip-link,.grain,.tint{display:none!important}' });
+    const box = await page.locator(selector).boundingBox();
+    for (let y = 0; y <= box.height; y += s.h * 0.6) {
+      await page.evaluate((dy) => window.scrollBy(0, dy), s.h * 0.6);
+      await page.waitForTimeout(250);
+    }
+    await page.waitForTimeout(Number(flags.wait ?? 1200));
+    await page.locator(selector).screenshot({ path });
+  } else {
+    await page.waitForTimeout(Number(flags.wait ?? 1200));
+    await page.screenshot({ path, fullPage: Boolean(flags.full) });
+  }
   console.log(path);
   await ctx.close();
 }

@@ -5,6 +5,7 @@ import { initTorch } from './torch';
 import { initNeon } from './neon';
 import { initScroll } from './scroll';
 import { initCorridor } from './corridor';
+import { initToday, initTitle } from './misc';
 
 initLift();
 initScroll();
@@ -12,6 +13,8 @@ initReveal();
 initTorch();
 initNeon();
 initCorridor();
+initToday();
+initTitle();
 
 // Heavy or optional parts wait until the browser is idle.
 const idle = (fn: () => void) =>
