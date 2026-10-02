@@ -1,87 +1,172 @@
-// Flashlight: the page is revealed by a soft light.
-// Pointer devices: it follows the cursor. Touch devices: it drifts slowly and leans with the scroll.
+// Flashlight: the page is revealed by a soft light, and the visitor holds it.
+// Mouse: it follows the cursor (and drifts slowly until the cursor first moves).
+// Touch: it appears where the screen is touched, follows the finger through a touch and
+// through a scroll drag, and comes to rest at the last touch point. Before the first touch
+// it rests on the HOTEL sign and the top floors, so the first paint is never black.
+//
+// Only `transform` is written, and only while the light is actually moving. No layout is
+// read per frame: the viewport size and the rest point are cached and refreshed on resize.
 import { still, touch } from './env';
+import { hooks } from './hero-hooks';
 
 const IDLE_MS = 20000;
 
+// Viewport position of the light, shared with the facade (the room that is being watched).
+export const torchState = { x: 0, y: 0, r: 0, touched: false };
+
 export function initTorch() {
   const root = document.documentElement;
-  const beam = document.querySelector<HTMLElement>('.torch__beam');
-  if (!beam || still) return;
+  const beams = Array.from(document.querySelectorAll<HTMLElement>('.torch__beam'));
+  hooks.torch = torchState;
+  if (!beams.length || still) return;
 
   let vw = window.innerWidth;
   let vh = window.innerHeight;
   let x = vw * 0.5;
-  let y = vh * 0.38;
+  let y = vh * (touch ? 0.26 : 0.38);
   let tx = x;
   let ty = y;
-  let manualUntil = 0;
+  let scrollY = window.scrollY;
   let lean = 0;
-  let lastScroll = window.scrollY;
   let running = true;
+  let finger = false; // a touch is down right now
+  let manual = false; // the visitor has taken the light
+  let manualUntil = 0; // mouse: forever. Pen or touch on a hover device: for good as well.
+  // Rest point for touch devices, in page coordinates: centre of the upper facade.
+  let restX = x;
+  let restPageY = y;
 
-  const onResize = () => {
+  const measure = () => {
     vw = window.innerWidth;
     vh = window.innerHeight;
+    torchState.r = Math.max(vw, vh) * (touch ? 0.21 : 0.165);
+    const facade = document.querySelector<HTMLElement>('[data-facade]');
+    if (facade) {
+      const f = facade.getBoundingClientRect();
+      const u = Math.max(f.width / 600, f.height / 900);
+      restX = f.left + f.width / 2;
+      restPageY = f.top + window.scrollY + 236 * u;
+    } else {
+      restX = vw * 0.5;
+      restPageY = vh * 0.26;
+    }
+    kick();
   };
-  window.addEventListener('resize', onResize, { passive: true });
+
+  const take = (px: number, py: number) => {
+    tx = px;
+    ty = py;
+    manual = true;
+    torchState.touched = true;
+    kick();
+  };
 
   window.addEventListener(
     'pointermove',
     (e) => {
-      tx = e.clientX;
-      ty = e.clientY;
-      manualUntil = performance.now() + (e.pointerType === 'mouse' ? 1e9 : 2500);
+      if (e.pointerType === 'touch') return; // touch events below do this, also during scroll
+      take(e.clientX, e.clientY);
+      manualUntil = Infinity;
     },
     { passive: true },
   );
   window.addEventListener(
     'pointerdown',
     (e) => {
-      tx = e.clientX;
-      ty = e.clientY;
-      manualUntil = performance.now() + (e.pointerType === 'mouse' ? 1e9 : 2500);
+      if (e.pointerType === 'touch') return;
+      take(e.clientX, e.clientY);
+      manualUntil = Infinity;
     },
     { passive: true },
   );
+
+  // Touch events keep coming while the browser scrolls natively (pointer events are
+  // cancelled the moment a scroll starts), so the light stays under the finger.
+  const onTouch = (e: TouchEvent) => {
+    const t = e.touches[0];
+    if (!t) return;
+    finger = true;
+    manualUntil = Infinity;
+    take(t.clientX, t.clientY);
+  };
+  const onTouchEnd = (e: TouchEvent) => {
+    if (e.touches.length === 0) finger = false;
+    kick();
+  };
+  window.addEventListener('touchstart', onTouch, { passive: true });
+  window.addEventListener('touchmove', onTouch, { passive: true });
+  window.addEventListener('touchend', onTouchEnd, { passive: true });
+  window.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
   window.addEventListener(
     'scroll',
     () => {
       const s = window.scrollY;
-      lean = Math.max(-1, Math.min(1, lean + (s - lastScroll) / 240));
-      lastScroll = s;
+      lean = Math.max(-1, Math.min(1, lean + (s - scrollY) / 240));
+      scrollY = s;
+      if (!manual) kick();
     },
     { passive: true },
   );
 
   let raf = 0;
+  let last = 0;
   const kick = () => {
-    if (!raf) raf = requestAnimationFrame(frame);
+    if (!raf && running) raf = requestAnimationFrame(frame);
   };
   const frame = (now: number) => {
     raf = 0;
     if (!running) return;
-    if (now > manualUntil) {
-      // Slow drift. Two unrelated periods so the path never visibly repeats.
+    const dt = Math.min(64, last ? now - last : 16.7);
+    last = now;
+    const drifting = !touch && now > manualUntil;
+    if (drifting) {
+      // Slow drift until the cursor arrives. Two unrelated periods so the path never
+      // visibly repeats.
       const t = now / 1000;
       tx = vw * (0.5 + 0.26 * Math.sin(t * 0.21) + 0.06 * Math.sin(t * 0.53 + 1.3));
       ty = vh * (0.42 + 0.14 * Math.sin(t * 0.17 + 2.1) + lean * 0.2);
+      lean *= 0.95;
+    } else if (!manual) {
+      // Touch, nobody has touched yet: rest on the sign. Once the hero has scrolled away
+      // the light waits in the upper part of the screen instead of leaving the page black.
+      tx = restX;
+      ty = Math.max(restPageY - scrollY, vh * 0.3);
     }
-    lean *= 0.95;
-    const k = touch ? 0.045 : 0.14;
+    // Follow fast under a finger or a cursor, settle slowly once the finger lifts.
+    const rate = finger ? 0.26 : touch ? 0.085 : 0.14;
+    const k = 1 - Math.pow(1 - rate, dt / 16.7);
     x += (tx - x) * k;
     y += (ty - y) * k;
-    beam.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-    kick();
+    const moving = Math.abs(tx - x) > 0.05 || Math.abs(ty - y) > 0.05;
+    if (!moving) {
+      x = tx;
+      y = ty;
+    }
+    torchState.x = x;
+    torchState.y = y;
+    const tf = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+    for (const b of beams) b.style.transform = tf;
+    if (moving || drifting) kick();
+    else last = 0;
   };
+
+  measure();
+  if (touch) {
+    x = tx = restX;
+    y = ty = Math.max(restPageY - scrollY, vh * 0.3);
+  }
+  window.addEventListener('resize', measure, { passive: true });
   kick();
 
   document.addEventListener('visibilitychange', () => {
     running = !document.hidden;
+    last = 0;
     if (running) kick();
   });
 
-  // Each section declares how dark it is outside the beam.
+  // Each section declares how dark it is outside the beam. Touch screens get a softer
+  // darkness below the hero; a section can pin its own touch value with data-dark-touch.
   const zones = document.querySelectorAll<HTMLElement>('[data-dark]');
   const scale = touch ? 0.8 : 1;
   if ('IntersectionObserver' in window) {
@@ -89,7 +174,8 @@ export function initTorch() {
       (entries) => {
         for (const e of entries) {
           if (e.isIntersecting) {
-            const v = Number((e.target as HTMLElement).dataset.dark ?? 0.5) * scale;
+            const d = (e.target as HTMLElement).dataset;
+            const v = touch && d.darkTouch ? Number(d.darkTouch) : Number(d.dark ?? 0.5) * scale;
             root.style.setProperty('--torch-dark', v.toFixed(2));
           }
         }
