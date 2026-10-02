@@ -1,24 +1,30 @@
 // Single source of business facts. Copy lives in ro.ts / ru.ts / en.ts.
 //
 // Values marked TODO(owner) are NOT known yet. Keep them `null` (or empty) until the
-// owner confirms them: the site renders a neutral placeholder for every null.
+// owner confirms them: the site hides the matching block for every one of them.
 // Every TODO here is also listed in HANDOFF.md.
 
 import type { Lang } from '../config';
 
 // --- Feature flags -------------------------------------------------------------------
 
-// Light / Standard / Hardcore selector. The levels are NOT confirmed by the owner, so the
-// selector, its copy and the form field stay off. While false the site shows one line
-// instead: live actors, tell us your limits when you book.
-export const CONTACT_LEVELS_ENABLED = false;
+// Level selector: no electroshock / weak electroshock / hardcore. The team chooses. The site
+// shows the three names only and never describes what a level contains.
+export const CONTACT_LEVELS_ENABLED = true;
+export const LEVELS = ['none', 'weak', 'hardcore'] as const;
 
-// Gift voucher block (WhatsApp request). Also controls the voucher FAQ answer.
+// Gift voucher block (bought at the venue, in cash). Also controls the voucher FAQ answer.
 export const VOUCHERS_ENABLED = true;
 
-// Optional link to a live schedule. When set, a secondary "See free slots" link appears
-// next to the booking buttons. Leave empty to hide it.
-export const SLOTS_URL = '';
+// The EasyWeek booking widget: the primary booking action. It collects the slot, name,
+// phone and a comment. The check-in card opens it in a dialog and copies the team size,
+// level, language and total for the comment field. Leave empty to hide the booking button.
+// Components read it as BOOKING_URL (see index.ts).
+export const SLOTS_URL = 'https://widget.easyweek.io/horror-quest-moldova/team/34544/62497';
+
+// Telegram, the second "ask a question" channel next to WhatsApp. A phone link cannot be
+// prefilled reliably, so the site copies the message to the clipboard and says so.
+export const TELEGRAM_URL = 'https://t.me/+37368232596';
 
 // --- Facts ---------------------------------------------------------------------------
 
@@ -66,8 +72,8 @@ export const site = {
     { from: 11, to: 11, total: 3300 },
   ],
 
-  // Opening hours. The owner may correct these. `days` keys are labelled in the language
-  // files; `schema` is the same range for search engines (JSON-LD).
+  // Opening hours, confirmed by the owner. `days` keys are labelled in the language files;
+  // `schema` is the same range for search engines (JSON-LD).
   hours: [
     { days: 'mon-thu', open: '16:00', close: '03:00', allDay: false, schema: ['Monday', 'Tuesday', 'Wednesday', 'Thursday'] },
     { days: 'fri', open: '16:00', close: '00:00', allDay: false, schema: ['Friday'] },
@@ -85,15 +91,15 @@ export const site = {
     directionsUrl: `https://www.google.com/maps/dir/?api=1&destination=Strada+Onisifor+Ghibu+10%2C+Chi%C8%99in%C4%83u+MD-2071&destination_place_id=${PLACE_ID}`,
   },
 
-  // TODO(owner): age limit, for example "16+". null = placeholder.
-  ageLimit: null as string | null,
+  // Minimum age in years. null = no age limit (confirmed). Everyone signs an agreement on
+  // arrival; a minor enters only if a parent signs it. The wording is in the language files.
+  ageLimit: null as number | null,
 
-  // TODO(owner): languages the game is actually played in, for example ['ro', 'ru'].
-  // null = the form offers all three as a preference and promises nothing.
-  gameLanguages: null as Lang[] | null,
+  // Languages the game is played in. The "Language" field on the card offers exactly these.
+  gameLanguages: ['ro', 'ru', 'en'] as Lang[],
 
-  // TODO(owner): payment methods, one short line per language. null = placeholder in the FAQ.
-  paymentMethods: null as Record<Lang, string> | null,
+  // Cash only, at the venue. Gift vouchers too. The wording is in the language files.
+  payment: 'cash' as const,
 
   // TODO(owner): Instagram handle without the @. null = no link in the footer.
   instagram: null as string | null,
@@ -101,10 +107,6 @@ export const site = {
   // TODO(owner): real review quotes, with permission. The block stays hidden while empty.
   // Shape: { author: 'Name', text: { ru: '...', ro: '...', en: '...' } }
   reviews: [] as { author: string; text: Record<Lang, string> }[],
-
-  // TODO(owner): the real rules for each contact level. Only used when
-  // CONTACT_LEVELS_ENABLED is true.
-  contactRulesConfirmed: false,
 };
 
 export type Site = typeof site;

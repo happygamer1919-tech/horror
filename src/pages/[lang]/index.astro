@@ -28,8 +28,7 @@ const faq = t.faq.items({
   minutes: site.durationMinutes,
   players: site.players,
   priceFrom: t.keys.priceFrom(priceFrom, site.currency),
-  age: site.ageLimit,
-  payment: site.paymentMethods ? site.paymentMethods[lang] : null,
+  minAge: site.ageLimit,
   phone: site.phone.display,
   address,
   levels: CONTACT_LEVELS_ENABLED,
@@ -37,7 +36,6 @@ const faq = t.faq.items({
 });
 
 // Structured data. Base.astro only prints it when SITE_INDEXABLE=true.
-// Placeholder answers (TODO values) are never published as FAQ data.
 const jsonLd = [
   {
     '@context': 'https://schema.org',

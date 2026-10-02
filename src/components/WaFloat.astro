@@ -1,77 +1,194 @@
 ---
+// The floating "ask a question" control (WhatsApp and Telegram) and the page's one toast.
+// It is part of the base layout, so it is on every page, the 404 page included.
 import type { Lang } from '../config';
-import { copy, site } from '../content';
+import { copy, site, TELEGRAM_URL } from '../content';
 
 interface Props {
   lang: Lang;
 }
 const t = copy[Astro.props.lang];
-const url = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(t.ui.waHello(site.brand))}`;
+const hello = t.ui.waHello(site.brand);
+const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(hello)}`;
 ---
 
-<a class="wa" href={url} target="_blank" rel="noopener noreferrer" data-wa-float aria-label={t.ui.whatsapp}>
-  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-    <path d="M4 4h16v12H10l-4.5 4v-4H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter"></path>
-    <path d="M8 9h8M8 12h5" stroke="currentColor" stroke-width="2"></path>
-  </svg>
-  <span>WhatsApp</span>
-</a>
+<div class="ask" data-wa-float data-float>
+  <ul class="ask__menu" id="ask-menu" data-float-menu>
+    <li>
+      <a href={waUrl} target="_blank" rel="noopener noreferrer" data-float-wa aria-label={t.ui.whatsapp}>
+        <span>WhatsApp</span>
+      </a>
+    </li>
+    <li>
+      <a href={TELEGRAM_URL} target="_blank" rel="noopener noreferrer" data-float-tg data-tg data-message={hello} aria-label={t.ui.telegram}>
+        <span>Telegram</span>
+      </a>
+    </li>
+  </ul>
+  <button class="ask__btn" type="button" data-float-toggle aria-expanded="false" aria-controls="ask-menu" aria-label={t.ui.ask}>
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path d="M4 4h16v12H10l-4.5 4v-4H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter"></path>
+      <path d="M8 9h8M8 12h5" stroke="currentColor" stroke-width="2"></path>
+    </svg>
+    <span>{t.ui.ask}</span>
+  </button>
+</div>
+
+<p class="toast" role="status" aria-live="polite" data-toast data-telegram={t.ui.toastTelegram} data-fail={t.ui.toastCopyFailed}></p>
+
+<script>
+  import { initFloat } from '../scripts/float';
+  initFloat();
+</script>
 
 <style>
-  /* The chat replacement: a square button fixed to the corner, above the flashlight. */
-  .wa {
+  /* The chat replacement: a square brass button fixed to the corner, above the flashlight.
+     It opens a two-line menu: WhatsApp, Telegram. */
+  .ask {
     position: fixed;
     right: var(--gutter);
     bottom: calc(84px + env(safe-area-inset-bottom));
     z-index: 61;
+    display: grid;
+    justify-items: end;
+    gap: 8px;
+    transition:
+      bottom 0.4s cubic-bezier(0.3, 0.8, 0.2, 1),
+      opacity 0.3s,
+      visibility 0.3s;
+  }
+  .ask__btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 10px;
     min-width: 52px;
     height: 52px;
     padding: 0 15px;
     border: 1px solid var(--brass);
+    border-radius: 0;
     background: var(--ink);
     color: var(--brass-hi);
+    font-family: var(--mono);
     font-size: 11px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    text-decoration: none;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
     transition:
-      bottom 0.4s cubic-bezier(0.3, 0.8, 0.2, 1),
-      opacity 0.3s,
-      visibility 0.3s,
       background-color 0.25s,
       color 0.25s;
   }
-  .wa:hover {
+  .ask__btn:hover,
+  .ask.is-open .ask__btn {
     background: var(--brass-hi);
     color: var(--ink);
   }
-  .wa span {
+  .ask__btn span {
     display: none;
   }
+  .ask__menu {
+    display: grid;
+    min-width: 172px;
+    border: 1px solid var(--brass);
+    background: var(--ink);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  }
+  /* Without JS the two links are simply there. With JS they wait for the button. */
+  :global(html.js) .ask:not(.is-open) .ask__menu {
+    display: none;
+  }
+  .ask__menu li + li {
+    border-top: 1px solid var(--brass-lo);
+  }
+  .ask__menu a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    min-height: 48px;
+    padding: 0 16px;
+    color: var(--brass-hi);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+  /* a plain arrow drawn with two borders: "this leaves the page" */
+  .ask__menu a::after {
+    content: '';
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-top: 1px solid currentColor;
+    border-right: 1px solid currentColor;
+    transform: rotate(45deg);
+  }
+  .ask__menu a:hover,
+  .ask__menu a:focus-visible {
+    background: var(--brass-hi);
+    color: var(--ink);
+  }
+  .ask__menu a:focus-visible {
+    outline-offset: -4px;
+    outline-color: var(--ink);
+  }
   /* While the Book bar is away (over the hero) the button drops into the corner. */
-  :global(body:has(.sticky.is-away)) .wa,
-  :global(body:not(:has(.sticky))) .wa {
+  :global(body:has(.sticky.is-away)) .ask,
+  :global(body:not(:has(.sticky))) .ask {
     bottom: calc(12px + env(safe-area-inset-bottom));
   }
-  /* On phones it steps aside while a form is on screen, so it never covers a field. */
-  .wa.is-away {
+  /* On phones it steps aside while the check-in card is on screen. */
+  .ask.is-away {
     opacity: 0;
     visibility: hidden;
   }
+
+  /* Toast: one short line under the header, far from every button at the bottom. */
+  .toast {
+    position: fixed;
+    top: calc(var(--header-h) + 12px + env(safe-area-inset-top));
+    left: 50%;
+    z-index: 95;
+    width: max-content;
+    max-width: calc(100vw - 2 * var(--gutter));
+    margin: 0;
+    padding: 11px 16px;
+    border: 1px solid var(--brass);
+    background: var(--ink);
+    color: var(--brass-hi);
+    font-size: 12px;
+    line-height: 1.4;
+    letter-spacing: 0.06em;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate3d(-50%, -8px, 0);
+    transition:
+      opacity 0.25s,
+      transform 0.25s,
+      visibility 0s 0.25s;
+  }
+  .toast.is-on {
+    opacity: 1;
+    visibility: visible;
+    transform: translate3d(-50%, 0, 0);
+    transition:
+      opacity 0.25s,
+      transform 0.25s;
+  }
+
   @media (min-width: 900px) {
-    .wa,
-    :global(body:has(.sticky.is-away)) .wa,
-    :global(body:not(:has(.sticky))) .wa {
+    .ask,
+    :global(body:has(.sticky.is-away)) .ask,
+    :global(body:not(:has(.sticky))) .ask {
       bottom: 28px;
     }
-    .wa span {
+    .ask__btn span {
       display: inline;
     }
-    .wa.is-away {
+    .ask.is-away {
       opacity: 1;
       visibility: visible;
     }

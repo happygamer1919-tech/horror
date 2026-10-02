@@ -28,25 +28,11 @@
   --max: 1320px;
   --header-h: 56px;
 
-  /* Contact-level tint, see html[data-level] below. */
+  /* Edge tint of the whole page (.tint). Off: nothing on the page follows the chosen level. */
   --tint-rgb: 0, 0, 0;
   --tint-a: 0;
 
   color-scheme: dark;
-}
-
-/* Contact level changes the accent temperature and the edge tint of the whole page. */
-html[data-level='light'] {
-  --neon: #f2705a;
-  --neon-rgb: 242, 112, 90;
-  --tint-rgb: 185, 151, 91;
-  --tint-a: 0.1;
-}
-html[data-level='hardcore'] {
-  --neon: #ff1a1a;
-  --neon-rgb: 255, 26, 26;
-  --tint-rgb: 200, 0, 0;
-  --tint-a: 0.22;
 }
 
 *,
