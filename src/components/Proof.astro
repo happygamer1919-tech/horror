@@ -1,0 +1,144 @@
+---
+import type { Lang } from '../config';
+import { copy, site } from '../content';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = copy[lang];
+const value = site.rating.value.toLocaleString(t.locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fill = `${(site.rating.value / 5) * 100}%`;
+const quotes = site.reviews;
+---
+
+<section class="sec proof" id="proof" data-dark="0.5" aria-labelledby="proof-title">
+  <div class="wrap">
+    <SectionHead no="06" place={t.places.guestbook} title={t.proof.title} id="proof-title" />
+    <div class="grid">
+      <div class="score" data-reveal>
+        <p class="score__num">
+          <span class="score__val">{value}</span>
+          <span class="score__of">{t.proof.outOf}</span>
+        </p>
+        <div class="score__bar" aria-hidden="true"><i style={`width:${fill}`}></i></div>
+      </div>
+      <div class="score__meta" data-reveal style="--d:.12s">
+        <p class="score__src">{t.proof.source}</p>
+        <p class="score__count">{t.proof.reviews(site.rating.count)}</p>
+        <a class="btn btn--ghost" href={site.maps.profileUrl} target="_blank" rel="noopener noreferrer">{t.proof.link}</a>
+      </div>
+    </div>
+
+    {
+      quotes.length > 0 && (
+        <div class="quotes" id="quotes">
+          <h3 class="quotes__title">{t.proof.quotesTitle}</h3>
+          <ul>
+            {quotes.map((q) => (
+              <li>
+                <blockquote>{q.text[lang]}</blockquote>
+                <cite>{q.author}</cite>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )
+    }
+  </div>
+</section>
+
+<style>
+  .score,
+  .score__meta {
+    grid-column: 1 / -1;
+  }
+  .score__num {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    font-family: var(--serif);
+    line-height: 0.8;
+  }
+  .score__val {
+    font-weight: 900;
+    font-size: clamp(7.5rem, 40vw, 17rem);
+    letter-spacing: -0.04em;
+    color: var(--brass-hi);
+  }
+  .score__of {
+    font-style: italic;
+    font-size: clamp(1.3rem, 5vw, 2.2rem);
+    color: var(--ash);
+  }
+  .score__bar {
+    height: 3px;
+    margin-top: 34px;
+    background: var(--line);
+  }
+  .score__bar i {
+    display: block;
+    height: 100%;
+    background: var(--brass);
+  }
+  .score__meta {
+    display: grid;
+    gap: 6px;
+    justify-items: start;
+    margin-top: 32px;
+  }
+  .score__src {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  .score__count {
+    font-family: var(--serif);
+    font-size: clamp(1.6rem, 6vw, 2.4rem);
+    margin-bottom: 20px;
+  }
+  .quotes {
+    margin-top: 80px;
+    padding-top: 32px;
+    border-top: 1px solid var(--line);
+  }
+  .quotes__title {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-bottom: 28px;
+  }
+  .quotes ul {
+    display: grid;
+    gap: 36px;
+  }
+  .quotes blockquote {
+    margin: 0 0 10px;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 1.3rem;
+    line-height: 1.4;
+  }
+  .quotes cite {
+    font-style: normal;
+    font-size: 12px;
+    color: var(--ash);
+  }
+  @media (min-width: 900px) {
+    .score {
+      grid-column: 1 / span 7;
+    }
+    .score__meta {
+      grid-column: 9 / -1;
+      align-self: end;
+      margin-top: 0;
+    }
+    .quotes ul {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>
