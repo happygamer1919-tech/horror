@@ -233,7 +233,9 @@ export function initNeon() {
       signBuzz(0, false);
       return;
     }
-    const dt = Math.min(0.1, last ? (now - last) / 1000 : 0.016);
+    // About 30 updates a second: plenty for a flicker, and half the style work of 60.
+    if (last && now - last < 28) return kick();
+    const dt = Math.min(0.1, last ? (now - last) / 1000 : 0.033);
     last = now;
     const t = now / 1000 + seed;
 
@@ -321,7 +323,7 @@ export function initNeon() {
       if (q >= 1) arcStart = -1;
       else {
         arc = rnd(0.55, 1);
-        if (Math.random() < 0.3) spawn();
+        if (Math.random() < 0.5) spawn();
       }
     }
 

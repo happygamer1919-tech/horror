@@ -40,6 +40,12 @@ const letters = ['H', 'O', 'T', 'E', 'L'].map((ch, i) => ({ ch, x: 112 + i * 94 
 const fixed = letters.filter((l) => l.ch !== 'E');
 const E = { x: 394, y: 128, box: { x: 326, y: 22, s: 136 }, pivot: { x: 364, y: 56 } };
 const eView = `${E.box.x} ${E.box.y} ${E.box.s} ${E.box.s}`;
+// The E is HTML text, not SVG text: SVG text under a moving transform is laid out and painted
+// again on the main thread, HTML text is not. Lengths are in facade units (--u).
+const u = (n: number) => `calc(${n} * var(--u))`;
+const eBaseline = E.y - E.box.y;
+const eClip = (c: { x: number; y: number; w: number; h: number }) =>
+  `clip-path:inset(${u(c.y - E.box.y)} ${u(E.box.x + E.box.s - c.x - c.w)} ${u(E.box.y + E.box.s - c.y - c.h)} ${u(c.x - E.box.x)})`;
 const eOrigin = `${(((E.pivot.x - E.box.x) / E.box.s) * 100).toFixed(2)}% ${(((E.pivot.y - E.box.y) / E.box.s) * 100).toFixed(2)}%`;
 // Tube sections of the E. Each one has its own brightness. Rest levels are what the
 // page shows without motion (reduced motion, no script): an uneven, partly lit letter.
@@ -229,7 +235,6 @@ const watchers = windows
           <stop offset="0" stop-color="#d9b46c" stop-opacity="0.3"></stop>
           <stop offset="1" stop-color="#f1d59a" stop-opacity="0.95"></stop>
         </linearGradient>
-        {eSegs.map((s) => <clipPath id={`eseg-${s.id}`}><rect x={s.clip.x} y={s.clip.y} width={s.clip.w} height={s.clip.h} /></clipPath>)}
       </defs>
 
       <!-- red light spilling from the sign onto the scaffold and the top floors -->
@@ -279,28 +284,18 @@ const watchers = windows
     </div>
 
     <!-- the E: one fixing left, a static lean plus a slow sway, and a bad feed -->
-    <div class="fx sign-e" data-dying style={`--x:${E.box.x};--y:${E.box.y};--w:${E.box.s};--h:${E.box.s};transform-origin:${eOrigin}`}>
-      <svg viewBox={eView}>
-        <text class="tubes tubes--dead" x={E.x} y={E.y}>E</text>
-      </svg>
+    <div class="fx sign-e" data-dying style={`--x:${E.box.x};--y:${E.box.y};--w:${E.box.s};--h:${E.box.s};--eb:${eBaseline};transform-origin:${eOrigin}`}>
+      <div class="e-ink e-ink--dead"><i></i><b></b></div>
       {
         eSegs.map((s) => (
           <>
-            <svg viewBox={eView} class="sign-e__seg" data-seg={s.id} style={`opacity:${Math.pow(s.rest, 0.6).toFixed(3)}`}>
-              <g filter="url(#neonblur)">
-                <text class="tubes tubes--glow" x={E.x} y={E.y} clip-path={`url(#eseg-${s.id})`}>
-                  E
-                </text>
-              </g>
-              <g clip-path={`url(#eseg-${s.id})`}>
-                <text class="tubes tubes--red" x={E.x} y={E.y}>E</text>
-              </g>
-            </svg>
-            <svg viewBox={eView} class="sign-e__seg" data-core={s.id} style={`opacity:${Math.pow(s.rest, 1.8).toFixed(3)}`}>
-              <g clip-path={`url(#eseg-${s.id})`}>
-                <text class="tubes tubes--live" x={E.x} y={E.y}>E</text>
-              </g>
-            </svg>
+            <div class="sign-e__seg" data-seg={s.id} style={`opacity:${Math.pow(s.rest, 0.6).toFixed(3)}`}>
+              <div class="e-blur"><div class="e-ink e-ink--glow" style={eClip(s.clip)}><i></i><b></b></div></div>
+              <div class="e-ink e-ink--red" style={eClip(s.clip)}><i></i><b></b></div>
+            </div>
+            <div class="sign-e__seg" data-core={s.id} style={`opacity:${Math.pow(s.rest, 1.8).toFixed(3)}`}>
+              <div class="e-ink e-ink--live" style={eClip(s.clip)}><i></i><b></b></div>
+            </div>
           </>
         ))
       }
@@ -455,13 +450,6 @@ const watchers = windows
     stroke-width: 9;
     opacity: 0.85;
   }
-  /* A dim tube is deep red, not pale: the red body and the hot core fade apart (neon.ts). */
-  .tubes--red {
-    stroke: var(--neon);
-    stroke-width: 5;
-    fill: #1d0606;
-    paint-order: stroke fill;
-  }
   .tubes--live {
     stroke: #ffd9d2;
     stroke-width: 5;
@@ -476,8 +464,64 @@ const watchers = windows
     transform: rotate(9deg);
     will-change: transform;
   }
+  .sign-e__seg,
+  .e-blur,
+  .e-ink {
+    position: absolute;
+    inset: 0;
+  }
   .sign-e__seg {
     will-change: opacity;
+  }
+  /* One letter per layer. The strut <i> puts the baseline at --eb facade units from the top
+     whatever the font metrics are; the letter itself comes from CSS, so the DOM holds no
+     stray text. Stroke first, fill over it: same tube look as the SVG letters. */
+  .e-ink {
+    line-height: 0;
+    text-align: center;
+    white-space: nowrap;
+    user-select: none;
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: calc(104 * var(--u));
+    paint-order: stroke fill;
+    -webkit-text-stroke: calc(5 * var(--u)) currentColor;
+  }
+  .e-ink i {
+    display: inline-block;
+    width: 0;
+    height: calc(var(--eb) * var(--u));
+  }
+  .e-ink b {
+    font-weight: inherit;
+    line-height: 0;
+  }
+  .e-ink b::before {
+    content: 'E';
+  }
+  .e-ink--dead {
+    -webkit-text-stroke-color: #3a1a18;
+    color: #100909;
+  }
+  .e-blur {
+    filter: blur(calc(7 * var(--u)));
+    opacity: 0.85;
+  }
+  .e-ink--glow {
+    -webkit-text-stroke: calc(9 * var(--u)) var(--neon);
+    color: transparent;
+  }
+  /* A dim tube is deep red, not pale: the red body and the hot core fade apart (neon.ts). */
+  .e-ink--red {
+    -webkit-text-stroke-color: var(--neon);
+    color: #1d0606;
+  }
+  .e-ink--live {
+    -webkit-text-stroke-color: #ffd9d2;
+    color: #1d0606;
+  }
+  .e-ink--live b {
+    filter: drop-shadow(0 0 calc(3 * var(--u)) var(--neon));
   }
   :global(html.motion) .sign-e {
     animation: e-sway 3.1s ease-in-out infinite alternate;
