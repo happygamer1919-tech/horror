@@ -1,0 +1,119 @@
+---
+import type { Lang } from '../config';
+import { copy, site } from '../content';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  lang: Lang;
+}
+const t = copy[Astro.props.lang];
+const p = t.prices;
+---
+
+<section class="sec prices" id="prices" data-dark="0.3" aria-labelledby="prices-title">
+  <div class="wrap">
+    <SectionHead no="05" place={t.places.cashier} title={p.title} id="prices-title" />
+    <div class="grid">
+      <table class="tariff" data-reveal>
+        <thead>
+          <tr>
+            <th scope="col">{p.colTeam}</th>
+            <th scope="col">{p.colPrice}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            site.prices.map((row) => (
+              <tr data-price-row={`${row.from}-${row.to}`}>
+                <th scope="row">
+                  <span>{p.players(row.from, row.to)}</span>
+                </th>
+                <td>
+                  <span>
+                    {row.total} {site.currency}
+                  </span>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+      <p class="tariff__note" data-reveal style="--d:.12s">{p.note}</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* A reception rate board: names left, prices right, dot leaders between. */
+  .tariff {
+    grid-column: 1 / -1;
+    width: 100%;
+    border-collapse: collapse;
+    border-top: 1px solid var(--brass-lo);
+  }
+  .tariff thead th {
+    padding: 14px 0;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--brass);
+  }
+  .tariff thead th:last-child,
+  .tariff td {
+    text-align: right;
+  }
+  .tariff tbody tr {
+    border-top: 1px solid var(--line);
+  }
+  .tariff tbody th,
+  .tariff td {
+    padding: 0;
+    height: 54px;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .tariff tbody th {
+    width: 100%;
+    text-align: left;
+    font-family: var(--serif);
+    font-size: clamp(1.15rem, 4.6vw, 1.5rem);
+    background: radial-gradient(circle, var(--brass-lo) 1px, transparent 1.4px) 0 62% / 9px 9px repeat-x;
+  }
+  .tariff tbody th span,
+  .tariff td span {
+    background: var(--ink);
+  }
+  .tariff tbody th span {
+    padding-right: 12px;
+  }
+  .tariff td span {
+    display: inline-block;
+    padding-left: 12px;
+    font-size: 1.05rem;
+    color: var(--brass-hi);
+    font-variant-numeric: tabular-nums;
+  }
+  .tariff__note {
+    grid-column: 1 / -1;
+    margin-top: 22px;
+    font-size: 13px;
+    color: var(--ash);
+  }
+  @media (min-width: 900px) {
+    .tariff {
+      grid-column: 1 / span 7;
+    }
+    .tariff tbody th,
+    .tariff td {
+      height: 60px;
+    }
+    .tariff__note {
+      grid-column: 9 / -1;
+      grid-row: 1;
+      align-self: end;
+      margin: 0 0 20px;
+    }
+  }
+</style>

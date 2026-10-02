@@ -1,7 +1,7 @@
 ---
 import type { Lang } from '../config';
 import type { Level } from '../content/types';
-import { copy, site } from '../content';
+import { copy, site, priceFrom, CONTACT_LEVELS_ENABLED } from '../content';
 import SectionHead from './SectionHead.astro';
 
 interface Props {
@@ -14,10 +14,10 @@ const ask = t.ui.askDesk;
 
 // null in site.ts means "not confirmed yet": the fob shows a neutral placeholder.
 const fobs = [
-  { no: '01', label: k.labels.players, value: site.players, known: Boolean(site.players) },
-  { no: '02', label: k.labels.duration, value: k.duration(site.durationMinutes), known: true },
-  { no: '03', label: k.labels.age, value: site.ageLimit, known: Boolean(site.ageLimit) },
-  { no: '04', label: k.labels.price, value: site.price, known: Boolean(site.price) },
+  { no: '01', label: k.labels.players, value: `${site.players.min}-${site.players.max}`, known: true, small: false },
+  { no: '02', label: k.labels.duration, value: k.duration(site.durationMinutes), known: true, small: false },
+  { no: '03', label: k.labels.age, value: site.ageLimit, known: Boolean(site.ageLimit), small: false },
+  { no: '04', label: k.labels.price, value: k.priceFrom(priceFrom, site.currency), known: true, small: true },
 ];
 const levels: Level[] = ['light', 'standard', 'hardcore'];
 ---
@@ -31,42 +31,46 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
     <ul class="board">
       {
         fobs.map((f, i) => (
-          <li class="hook" data-reveal style={`--d:${i * 0.09}s`}>
+          <li class="hook" data-reveal style={`--d:${i * 0.09}s`} data-fob={f.no}>
             <div class="fob">
               <span class="fob__no" aria-hidden="true">
                 {f.no}
               </span>
               <span class="fob__label">{f.label}</span>
-              <span class:list={['fob__value', { 'is-todo': !f.known }]}>{f.known ? f.value : ask}</span>
+              <span class:list={['fob__value', { 'is-todo': !f.known, 'is-small': f.small }]}>{f.known ? f.value : ask}</span>
             </div>
           </li>
         ))
       }
     </ul>
 
-    <fieldset class="lvl" data-reveal>
-      <legend class="lvl__legend">{k.level.legend}</legend>
-      <div class="lvl__opts">
-        {
-          levels.map((l) => (
-            <label class="lvl__opt">
-              <input type="radio" name="level-pick" value={l} checked={l === 'standard'} data-level-input />
-              <span>{k.level.options[l].name}</span>
-            </label>
-          ))
-        }
-      </div>
-      <div class="lvl__copy" aria-live="polite">
-        {
-          levels.map((l) => (
-            <p class="lvl__text" data-level-text={l}>
-              {k.level.options[l].text}
-            </p>
-          ))
-        }
-      </div>
-      {!site.contactRulesConfirmed && <p class="lvl__note">{k.level.note}</p>}
-    </fieldset>
+    {
+      CONTACT_LEVELS_ENABLED ? (
+        <fieldset class="lvl" data-reveal>
+          <legend class="lvl__legend">{k.level.legend}</legend>
+          <div class="lvl__opts">
+            {levels.map((l) => (
+              <label class="lvl__opt">
+                <input type="radio" name="level-pick" value={l} checked={l === 'standard'} data-level-input />
+                <span>{k.level.options[l].name}</span>
+              </label>
+            ))}
+          </div>
+          <div class="lvl__copy" aria-live="polite">
+            {levels.map((l) => (
+              <p class="lvl__text" data-level-text={l}>
+                {k.level.options[l].text}
+              </p>
+            ))}
+          </div>
+          {!site.contactRulesConfirmed && <p class="lvl__note">{k.level.note}</p>}
+        </fieldset>
+      ) : (
+        <p class="limits" data-limits data-reveal>
+          {k.limits}
+        </p>
+      )
+    }
   </div>
 </section>
 
@@ -193,6 +197,20 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
     line-height: 1.2;
   }
 
+  .fob__value.is-small {
+    font-size: 1.22rem;
+    line-height: 1.12;
+  }
+  .limits {
+    margin-top: 72px;
+    max-width: 22ch;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(1.5rem, 6.4vw, 2.6rem);
+    line-height: 1.14;
+    text-wrap: balance;
+  }
+
   /* Contact level */
   .lvl {
     margin-top: 80px;
@@ -289,6 +307,12 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
     }
     .fob__value.is-todo {
       font-size: 1.25rem;
+    }
+    .fob__value.is-small {
+      font-size: 1.6rem;
+    }
+    .limits {
+      margin-top: 110px;
     }
     .lvl {
       margin-top: 120px;

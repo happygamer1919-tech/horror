@@ -1,13 +1,14 @@
 ---
 import type { Lang } from '../config';
-import { copy, site } from '../content';
+import { copy, site, SLOTS_URL } from '../content';
 
 interface Props {
   lang: Lang;
 }
 const { lang } = Astro.props;
 const t = copy[lang];
-const brand = site.brand[lang];
+const brand = site.brand;
+const subtitle = site.brandSubtitle[lang];
 const cut = brand.lastIndexOf(' ');
 const brandLines = cut > 0 ? [brand.slice(0, cut), brand.slice(cut + 1)] : [brand];
 
@@ -158,13 +159,15 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     <p class="hero__kicker">
       {t.hero.kicker.map((k, i) => <span>{i > 0 && <i aria-hidden="true">/</i>}{k}</span>)}
     </p>
-    <h1 class="hero__title" id="hero-title">
+    <h1 class="hero__title" id="hero-title" lang={site.brandLang}>
       {brandLines.map((l) => <span>{l}</span>)}
     </h1>
+    {subtitle && <p class="hero__alt">{subtitle}</p>}
     <p class="hero__line">{t.hero.line}</p>
     <p class="hero__sub">{t.hero.sub}</p>
     <div class="hero__cta">
       <a class="btn btn--primary" href="#checkin" data-cta>{t.hero.cta}</a>
+      {SLOTS_URL && <a class="link hero__tel" href={SLOTS_URL} target="_blank" rel="noopener noreferrer" data-slots>{t.ui.slots}</a>}
       <a class="link hero__tel" href={`tel:${site.phone.e164}`}>{t.hero.tel}</a>
     </div>
   </div>
@@ -308,6 +311,15 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
   .hero__title span {
     display: block;
   }
+  /* The name in the page language, under the wordmark (RO and EN only). */
+  .hero__alt {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(1.15rem, 4.8vw, 1.9rem);
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    color: var(--brass-hi);
+  }
   .hero__line {
     font-family: var(--serif);
     font-style: italic;
@@ -401,6 +413,7 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
       gap: 18px;
     }
     .hero__title,
+    .hero__alt,
     .hero__line,
     .hero__sub,
     .hero__kicker {

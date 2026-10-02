@@ -1,7 +1,7 @@
 ---
 import { LANGS, type Lang } from '../config';
 import type { Level } from '../content/types';
-import { copy, site } from '../content';
+import { copy, site, priceFor, CONTACT_LEVELS_ENABLED, SLOTS_URL } from '../content';
 import SectionHead from './SectionHead.astro';
 
 interface Props {
@@ -11,29 +11,49 @@ const { lang } = Astro.props;
 const t = copy[lang];
 const c = t.checkin;
 const levels: Level[] = ['light', 'standard', 'hardcore'];
+const DEFAULT_TEAM = 4;
 
 // The message is written in the page language. Tokens are filled in by the browser.
 const template = c.message({
-  brand: site.brand[lang],
+  brand: site.brand,
   date: '{date}',
   time: '{time}',
   team: '{team}',
+  total: '{total}',
   language: '{language}',
-  level: '{level}',
+  level: CONTACT_LEVELS_ENABLED ? '{level}' : null,
   name: '{name}',
   phone: '{phone}',
+  comment: '{comment}',
 });
+
+// Team size to total price, for the live total on the card.
+const priceMap: Record<string, number> = {};
+for (let n = site.players.min; n <= site.players.max; n++) {
+  const total = priceFor(n);
+  if (total !== null) priceMap[n] = total;
+}
+// When the owner confirms the game languages, only those are offered.
+const languages = site.gameLanguages ?? LANGS;
 ---
 
 <section class="sec checkin" id="checkin" data-dark="0.18" aria-labelledby="checkin-title">
   <div class="wrap">
-    <SectionHead no="07" place={t.places.registration} title={c.title} id="checkin-title">
+    <SectionHead no="09" place={t.places.registration} title={c.title} id="checkin-title">
       <p class="lead" data-reveal style="--d:.14s">{c.intro}</p>
     </SectionHead>
 
-    <form class="card" data-checkin data-wa={site.phone.whatsapp} data-template={template} novalidate={false} data-reveal>
+    <form
+      class="card"
+      data-checkin
+      data-wa={site.phone.whatsapp}
+      data-template={template}
+      data-prices={JSON.stringify(priceMap)}
+      data-currency={site.currency}
+      data-reveal
+    >
       <div class="card__head">
-        <span class="card__brand">{site.brand[lang]}</span>
+        <span class="card__brand" lang={site.brandLang}>{site.brand}</span>
         <span class="card__no">{c.cardNo} 0313</span>
       </div>
 
@@ -48,28 +68,30 @@ const template = c.message({
         </label>
         <label class="f f--half">
           <span>{c.fields.team}</span>
-          <input type="number" name="team" inputmode="numeric" min={site.teamSizeInput.min} max={site.teamSizeInput.max} value={site.teamSizeInput.default} required />
+          <input type="number" name="team" inputmode="numeric" min={site.players.min} max={site.players.max} value={DEFAULT_TEAM} required />
         </label>
         <label class="f f--half">
           <span>{c.fields.language}</span>
           <select name="language" required>
-            {LANGS.map((l) => <option value={c.languages[l]} selected={l === lang}>{c.languages[l]}</option>)}
+            {languages.map((l) => <option value={c.languages[l]} selected={l === lang}>{c.languages[l]}</option>)}
           </select>
         </label>
 
-        <fieldset class="f f--full card__lvl">
-          <legend>{c.fields.level}</legend>
-          <div>
-            {
-              levels.map((l) => (
-                <label>
-                  <input type="radio" name="level" value={l} data-name={t.keys.level.options[l].name} checked={l === 'standard'} data-level-input />
-                  <span>{t.keys.level.options[l].name}</span>
-                </label>
-              ))
-            }
-          </div>
-        </fieldset>
+        {
+          CONTACT_LEVELS_ENABLED && (
+            <fieldset class="f f--full card__lvl">
+              <legend>{c.fields.level}</legend>
+              <div>
+                {levels.map((l) => (
+                  <label>
+                    <input type="radio" name="level" value={l} data-name={t.keys.level.options[l].name} checked={l === 'standard'} data-level-input />
+                    <span>{t.keys.level.options[l].name}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )
+        }
 
         <label class="f f--full">
           <span>{c.fields.name}</span>
@@ -79,12 +101,23 @@ const template = c.message({
           <span>{c.fields.phone}</span>
           <input type="tel" name="phone" autocomplete="tel" inputmode="tel" required maxlength="24" pattern="[0-9+() \-]{6,24}" />
         </label>
+        <label class="f f--full">
+          <span>{c.fields.comment}</span>
+          <textarea name="comment" rows="2" maxlength="400"></textarea>
+        </label>
       </div>
+
+      <p class="card__total" aria-live="polite">
+        <span>{c.total}</span>
+        <output name="total" data-total>{priceMap[DEFAULT_TEAM]} {site.currency}</output>
+      </p>
 
       <div class="card__foot">
         <button class="btn btn--primary card__submit" type="submit">{c.submit}</button>
+        <p class="card__request" data-request>{c.request}</p>
         <p class="card__tel">
           {c.tel}: <a href={`tel:${site.phone.e164}`}>{site.phone.display}</a>
+          {SLOTS_URL && <a class="card__slots" href={SLOTS_URL} target="_blank" rel="noopener noreferrer" data-slots>{t.ui.slots}</a>}
         </p>
         <p class="card__note">{c.note}</p>
       </div>
@@ -150,6 +183,52 @@ const template = c.message({
   .card__lvl legend {
     padding: 0;
     margin-bottom: 8px;
+  }
+  .f textarea {
+    width: 100%;
+    min-height: 68px;
+    padding: 8px 2px;
+    border: 0;
+    border-bottom: 1px solid var(--paper-ink);
+    border-radius: 0;
+    background: transparent;
+    color: var(--paper-ink);
+    font-family: var(--mono);
+    font-size: 16px;
+    line-height: 1.4;
+    resize: vertical;
+  }
+  .f textarea:focus-visible {
+    outline: 2px solid var(--stamp);
+    outline-offset: 2px;
+  }
+  .card__total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    margin-top: 26px;
+    padding: 12px 0;
+    border-block: 1px solid var(--paper-ink);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--paper-ash);
+  }
+  .card__total output {
+    font-family: var(--serif);
+    font-weight: 900;
+    font-size: 1.7rem;
+    letter-spacing: 0;
+    color: var(--stamp);
+    font-variant-numeric: tabular-nums;
+  }
+  .card__request {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .card__slots {
+    margin-left: 18px;
   }
   .f input:not([type='radio']),
   .f select {
@@ -223,7 +302,7 @@ const template = c.message({
   .card__foot {
     display: grid;
     gap: 12px;
-    margin-top: 28px;
+    margin-top: 22px;
   }
   .card__submit {
     width: 100%;
@@ -282,7 +361,8 @@ const template = c.message({
     .card__submit {
       width: auto;
     }
-    .card__note {
+    .card__note,
+    .card__tel {
       grid-column: 1 / -1;
     }
   }

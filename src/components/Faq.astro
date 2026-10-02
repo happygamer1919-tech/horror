@@ -10,12 +10,12 @@ interface Props {
 }
 const { lang, items } = Astro.props;
 const t = copy[lang];
-const hours = site.hours ? site.hours[lang] : null;
+
 ---
 
 <section class="sec info" id="info" data-dark="0.3" aria-labelledby="info-title">
   <div class="wrap">
-    <SectionHead no="08" place={t.places.info} title={t.faq.title} id="info-title" />
+    <SectionHead no="10" place={t.places.info} title={t.faq.title} id="info-title" />
     <div class="grid">
       <div class="faq">
         {
@@ -43,7 +43,16 @@ const hours = site.hours ? site.hours[lang] : null;
           </div>
           <div>
             <dt>{t.location.hours}</dt>
-            <dd class:list={[{ 'is-todo': !hours }]}>{hours ?? t.location.hoursPlaceholder}</dd>
+            <dd>
+              <ul class="loc__hours" data-hours>
+                {site.hours.map((h) => (
+                  <li>
+                    <span>{t.location.days[h.days]}</span>
+                    <span>{h.allDay ? t.location.allDay : `${h.open}-${h.close}`}</span>
+                  </li>
+                ))}
+              </ul>
+            </dd>
           </div>
           <div>
             <dt>{t.location.phone}</dt>
@@ -141,7 +150,17 @@ const hours = site.hours ? site.hours[lang] : null;
     text-transform: uppercase;
     color: var(--brass);
   }
-  .loc dd.is-todo {
+  .loc__hours {
+    display: grid;
+    gap: 4px;
+  }
+  .loc__hours li {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+  .loc__hours li span:first-child {
     color: var(--ash);
   }
   .loc__tel {

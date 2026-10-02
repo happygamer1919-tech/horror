@@ -25,8 +25,14 @@ export function initSticky() {
   const hero = document.getElementById('lobby');
   const card = document.getElementById('checkin');
   if (!bar || !hero || !card || !('IntersectionObserver' in window)) return;
-  const state = { hero: true, card: false };
-  const update = () => bar.classList.toggle('is-away', state.hero || state.card);
+  // The floating WhatsApp button steps aside whenever a form is on screen.
+  const float = document.querySelector<HTMLElement>('[data-wa-float]');
+  const voucher = document.getElementById('voucher');
+  const state = { hero: true, card: false, voucher: false };
+  const update = () => {
+    bar.classList.toggle('is-away', state.hero || state.card);
+    float?.classList.toggle('is-away', state.card || state.voucher);
+  };
   update();
   new IntersectionObserver((e) => {
     state.hero = e[0].isIntersecting;
@@ -36,6 +42,12 @@ export function initSticky() {
     state.card = e[0].isIntersecting;
     update();
   }, { threshold: 0.12 }).observe(card);
+  if (voucher) {
+    new IntersectionObserver((e) => {
+      state.voucher = e[0].isIntersecting;
+      update();
+    }, { threshold: 0.3 }).observe(voucher);
+  }
 }
 
 // "Do not disturb" hanger in the footer: click to turn it over.

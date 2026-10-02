@@ -15,7 +15,7 @@ const quotes = site.reviews;
 
 <section class="sec proof" id="proof" data-dark="0.42" aria-labelledby="proof-title">
   <div class="wrap">
-    <SectionHead no="06" place={t.places.guestbook} title={t.proof.title} id="proof-title" />
+    <SectionHead no="07" place={t.places.guestbook} title={t.proof.title} id="proof-title" />
     <div class="grid">
       <div class="score" data-reveal>
         <p class="score__num">
@@ -27,7 +27,10 @@ const quotes = site.reviews;
       <div class="score__meta" data-reveal style="--d:.12s">
         <p class="score__src">{t.proof.source}</p>
         <p class="score__count">{t.proof.reviews(site.rating.count)}</p>
-        <a class="btn btn--ghost" href={site.maps.profileUrl} target="_blank" rel="noopener noreferrer">{t.proof.link}</a>
+        <div class="score__links">
+          <a class="btn btn--ghost" href={site.maps.profileUrl} target="_blank" rel="noopener noreferrer">{t.proof.link}</a>
+          <a class="link score__review" href={site.maps.reviewUrl} target="_blank" rel="noopener noreferrer" data-review>{t.proof.review}</a>
+        </div>
       </div>
     </div>
 
@@ -98,6 +101,18 @@ const quotes = site.reviews;
     font-family: var(--serif);
     font-size: clamp(1.6rem, 6vw, 2.4rem);
     margin-bottom: 20px;
+  }
+  .score__links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 26px;
+  }
+  .score__review {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
   }
   .quotes {
     margin-top: 80px;

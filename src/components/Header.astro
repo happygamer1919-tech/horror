@@ -12,7 +12,7 @@ const t = copy[lang];
 <header class="bar">
   <a class="bar__brand" href="#top">
     <span class="bar__key" aria-hidden="true"></span>
-    <span class="bar__name">{site.brand[lang]}</span>
+    <span class="bar__name" lang={site.brandLang}>{site.brand}</span>
   </a>
   <div class="bar__tools">
     <nav class="langs" aria-label={t.ui.languageNav}>

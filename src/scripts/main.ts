@@ -6,7 +6,7 @@ import { initNeon } from './neon';
 import { initScroll } from './scroll';
 import { initCorridor } from './corridor';
 import { initLevel } from './level';
-import { initCheckin } from './checkin';
+import { initCheckin, initVoucher } from './checkin';
 import { initToday, initTitle, initSticky, initHanger } from './misc';
 import { initAudio } from './audio';
 
@@ -20,13 +20,14 @@ initToday();
 initTitle();
 initLevel();
 initCheckin();
+initVoucher();
 initSticky();
 initHanger();
 initAudio();
 
 // Heavy or optional parts wait until the browser is idle.
-const idle = (fn: () => void) =>
-  'requestIdleCallback' in window ? window.requestIdleCallback(fn, { timeout: 2500 }) : window.setTimeout(fn, 600);
+const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+const idle = (fn: () => void) => (ric ? ric(fn, { timeout: 2500 }) : window.setTimeout(fn, 600));
 
 idle(() => {
   import('./cctv').then((m) => m.initCctv()).catch(() => {});

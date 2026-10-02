@@ -8,8 +8,7 @@ interface Props {
 const { lang } = Astro.props;
 const t = copy[lang];
 const year = new Date().getFullYear();
-// The page language leads, the other two names follow as on a trilingual letterhead.
-const names = [lang, ...LANGS.filter((l) => l !== lang)];
+
 ---
 
 <footer class="foot" data-dark="0.5">
@@ -28,12 +27,17 @@ const names = [lang, ...LANGS.filter((l) => l !== lang)];
     </div>
 
     <div class="foot__main">
-      <ul class="foot__names">
-        {names.map((l) => <li lang={l}>{site.brand[l]}</li>)}
-      </ul>
+      <p class="foot__names" lang={site.brandLang}>{site.brand}</p>
       <p class="foot__addr">
         {site.address.street}, {site.address.postalCode}, {site.city[lang]}<br />
         <a href={`tel:${site.phone.e164}`}>{site.phone.display}</a>
+        {
+          site.instagram && (
+            <a class="foot__ig" href={`https://www.instagram.com/${site.instagram}/`} target="_blank" rel="noopener noreferrer">
+              Instagram: @{site.instagram}
+            </a>
+          )
+        }
       </p>
       <nav class="foot__langs" aria-label={t.ui.languageNav}>
         {
@@ -45,7 +49,7 @@ const names = [lang, ...LANGS.filter((l) => l !== lang)];
         }
       </nav>
       <p class="foot__legal">
-        <span>&copy; {year} {site.brand[lang]}. {t.footer.rights}</span>
+        <span>&copy; {year} <span lang={site.brandLang}>{site.brand}</span>. {t.footer.rights}</span>
         {!SITE_INDEXABLE && <span class="foot__preview">{t.ui.preview}</span>}
         <a href="#top">{t.footer.top}</a>
       </p>
@@ -56,7 +60,7 @@ const names = [lang, ...LANGS.filter((l) => l !== lang)];
 <style>
   .foot {
     position: relative;
-    padding: 0 0 120px;
+    padding: 0 0 150px;
     border-top: 1px solid var(--line);
   }
   .foot__grid {
@@ -143,13 +147,11 @@ const names = [lang, ...LANGS.filter((l) => l !== lang)];
     font-size: clamp(1.5rem, 6.4vw, 2.4rem);
     line-height: 1.12;
   }
-  .foot__names li:not(:first-child) {
-    color: var(--ash);
-    font-weight: 500;
-    font-style: italic;
-  }
   .foot__addr {
     color: var(--ash);
+  }
+  .foot__ig {
+    margin-left: 22px;
   }
   .foot__addr a {
     display: inline-block;

@@ -1,0 +1,134 @@
+---
+import type { Lang } from '../config';
+import { copy, site } from '../content';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  lang: Lang;
+}
+const t = copy[Astro.props.lang];
+const v = t.voucher;
+const template = v.message({ brand: site.brand, team: '{team}', recipient: '{recipient}' });
+const sizes = Array.from({ length: site.players.max - site.players.min + 1 }, (_, i) => site.players.min + i);
+---
+
+<section class="sec gift" id="voucher" data-dark="0.25" aria-labelledby="voucher-title">
+  <div class="wrap">
+    <SectionHead no="08" place={t.places.gift} title={v.title} id="voucher-title">
+      <p class="lead" data-reveal style="--d:.14s">{v.text}</p>
+    </SectionHead>
+
+    <form class="ticket" data-voucher data-wa={site.phone.whatsapp} data-template={template} data-reveal>
+      <div class="ticket__stub" aria-hidden="true">
+        <span lang={site.brandLang}>{site.brand}</span>
+        <b>{v.title}</b>
+      </div>
+      <div class="ticket__body">
+        <label class="tf">
+          <span>{v.team}</span>
+          <select name="team" required>
+            {sizes.map((n) => <option value={n} selected={n === 4}>{n}</option>)}
+          </select>
+        </label>
+        <label class="tf">
+          <span>{v.recipient}</span>
+          <input type="text" name="recipient" required maxlength="80" autocomplete="off" />
+        </label>
+        <button class="btn btn--primary" type="submit">{v.submit}</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<style>
+  /* A brass-edged ticket with a perforated stub. */
+  .ticket {
+    display: grid;
+    max-width: 860px;
+    border: 1px solid var(--brass);
+    background: var(--ink-2);
+  }
+  .ticket__stub {
+    display: grid;
+    gap: 6px;
+    align-content: center;
+    padding: 22px 20px;
+    border-bottom: 1px dashed var(--brass-lo);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  .ticket__stub b {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 1.5rem;
+    line-height: 1.05;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--brass-hi);
+  }
+  .ticket__body {
+    display: grid;
+    gap: 20px;
+    padding: 22px 20px 24px;
+  }
+  .tf {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+  .tf span {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  .tf input,
+  .tf select {
+    width: 100%;
+    min-width: 0;
+    height: 46px;
+    padding: 6px 2px;
+    border: 0;
+    border-bottom: 1px solid var(--brass-lo);
+    border-radius: 0;
+    background: transparent;
+    color: var(--bone);
+    font-family: var(--mono);
+    font-size: 16px;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .tf select {
+    background-image: linear-gradient(45deg, transparent 50%, var(--brass-hi) 50%), linear-gradient(135deg, var(--brass-hi) 50%, transparent 50%);
+    background-position:
+      calc(100% - 12px) 20px,
+      calc(100% - 6px) 20px;
+    background-size: 6px 6px;
+    background-repeat: no-repeat;
+  }
+  .tf select option {
+    background: var(--ink-2);
+    color: var(--bone);
+  }
+  @media (min-width: 900px) {
+    .ticket {
+      grid-template-columns: 250px 1fr;
+    }
+    .ticket__stub {
+      border-bottom: 0;
+      border-right: 1px dashed var(--brass-lo);
+      padding: 30px 26px;
+    }
+    .ticket__body {
+      grid-template-columns: 150px 1fr;
+      gap: 26px 24px;
+      padding: 30px 30px 32px;
+    }
+    .ticket__body .btn {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+  }
+</style>

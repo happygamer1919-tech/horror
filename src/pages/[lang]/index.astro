@@ -12,8 +12,10 @@ import CheckIn from '../../components/CheckIn.astro';
 import Faq from '../../components/Faq.astro';
 import Footer from '../../components/Footer.astro';
 import Sticky from '../../components/Sticky.astro';
+import Prices from '../../components/Prices.astro';
+import Voucher from '../../components/Voucher.astro';
 import { LANGS, abs, type Lang } from '../../config';
-import { copy, site } from '../../content';
+import { copy, site, priceFrom, CONTACT_LEVELS_ENABLED, VOUCHERS_ENABLED } from '../../content';
 
 export function getStaticPaths() {
   return LANGS.map((lang) => ({ params: { lang } }));
@@ -23,12 +25,15 @@ const lang = Astro.params.lang as Lang;
 const t = copy[lang];
 const address = `${site.address.street}, ${site.address.postalCode}, ${site.city[lang]}`;
 const faq = t.faq.items({
+  minutes: site.durationMinutes,
   players: site.players,
+  priceFrom: t.keys.priceFrom(priceFrom, site.currency),
   age: site.ageLimit,
-  price: site.price,
+  payment: site.paymentMethods ? site.paymentMethods[lang] : null,
   phone: site.phone.display,
   address,
-  minutes: site.durationMinutes,
+  levels: CONTACT_LEVELS_ENABLED,
+  vouchers: VOUCHERS_ENABLED,
 });
 
 // Structured data. Base.astro only prints it when SITE_INDEXABLE=true.
@@ -38,11 +43,13 @@ const jsonLd = [
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
     '@id': `${abs(`/${lang}/`)}#business`,
-    name: site.brand[lang],
-    alternateName: LANGS.filter((l) => l !== lang).map((l) => site.brand[l]),
+    name: site.brand,
+    alternateName: Object.values(site.brandSubtitle).filter(Boolean),
     description: t.meta.description,
     url: abs(`/${lang}/`),
+    image: abs(`/og/${lang}.jpg`),
     telephone: site.phone.e164,
+    priceRange: `${priceFrom}-${Math.max(...site.prices.map((p) => p.total))} ${site.currency}`,
     address: {
       '@type': 'PostalAddress',
       streetAddress: site.address.street,
@@ -50,6 +57,12 @@ const jsonLd = [
       addressLocality: site.city[lang],
       addressCountry: site.countryCode,
     },
+    openingHoursSpecification: site.hours.map((h) => ({
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: h.schema,
+      opens: h.open,
+      closes: h.close,
+    })),
     aggregateRating: {
       '@type': 'AggregateRating',
       ratingValue: site.rating.value,
@@ -78,8 +91,10 @@ const jsonLd = [
     <Corridor lang={lang} />
     <File lang={lang} />
     <Keys lang={lang} />
+    <Prices lang={lang} />
     <Cctv lang={lang} />
     <Proof lang={lang} />
+    {VOUCHERS_ENABLED && <Voucher lang={lang} />}
     <CheckIn lang={lang} />
     <Faq lang={lang} items={faq} />
   </main>
