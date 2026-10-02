@@ -429,11 +429,36 @@ html.motion .torch {
 .torch__beam > i:nth-child(4) {
   left: calc(var(--torch-h) - 1px);
 }
+/* A flat cover over the hole. Touch screens start with it up: there is no light until the
+   first touch. torch.ts then sets html.has-light and the cover fades out (opacity only),
+   which brings the light in at the finger. Shared by the copy veil in the hero. */
+.torch::after,
+.veil::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(4, 3, 3);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
 @media (hover: none) {
-  /* Touch: a wider light, resting on the sign until the first touch (torch.ts). */
+  /* Touch: a wider light. */
   .torch__beam {
     --torch-r: 21vmax;
-    transform: translate3d(50vw, 26vh, 0);
+  }
+  .torch::after,
+  .veil::after {
+    opacity: 1;
+    visibility: visible;
+  }
+  html.has-light .torch::after,
+  html.has-light .veil::after {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 0.4s ease-out,
+      visibility 0s linear 0.4s;
   }
 }
 

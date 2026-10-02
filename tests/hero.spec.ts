@@ -11,7 +11,7 @@ const STREET = 'Strada Onisifor Ghibu 10';
 const CITY = { ro: 'Chișinău', ru: 'Кишинёв', en: 'Chisinau' };
 
 interface Hooks {
-  torch: { x: number; y: number; r: number; touched: boolean };
+  torch: { x: number; y: number; r: number; touched: boolean; lit: boolean };
   e: { mode: string; level: number; slow: number; segs: number[]; force: (w: string) => void; hold: (p: string | null) => void };
   figure: { state: string; lit: boolean; set: (s: string) => void };
   storm: { count: number; active: boolean; strike: () => void; hold: (on: boolean) => void };
@@ -47,6 +47,53 @@ const beamCentres = (page: Page) =>
     }),
   );
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+// A rectangle of the facade drawing (600 x 900 units) in CSS px, for clips.
+type Box = { x: number; y: number; width: number; height: number };
+const facadeBox = (page: Page, unit: { x: number; y: number; w: number; h: number }): Promise<Box> =>
+  page.evaluate((b) => {
+    const f = document.querySelector('[data-facade]')!.getBoundingClientRect();
+    const u = Math.max(f.width / 600, f.height / 900);
+    const ox = f.left + f.width / 2 - 300 * u;
+    return { x: ox + b.x * u, y: f.top + b.y * u, width: b.w * u, height: b.h * u };
+  }, unit);
+
+// What is really on the screen: mean and brightest luminance (0 to 255) of screenshots.
+// `parts` are sub-rectangles of the shot as fractions [x, y, w, h]; one result per part.
+// The images (PNG buffers, or base64 screencast frames) are decoded in the browser, so the
+// suite needs no image library.
+async function luminance(page: Page, shots: (Buffer | string)[], parts: number[][] = [[0, 0, 1, 1]]) {
+  return page.evaluate(
+    async ({ pngs, parts }) => {
+      const out: { mean: number; max: number }[][] = [];
+      for (const b64 of pngs) {
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const bmp = await createImageBitmap(new Blob([bytes]));
+        const cv = document.createElement('canvas');
+        cv.width = bmp.width;
+        cv.height = bmp.height;
+        const cx = cv.getContext('2d', { willReadFrequently: true })!;
+        cx.drawImage(bmp, 0, 0);
+        out.push(
+          parts.map(([fx, fy, fw, fh]) => {
+            const d = cx.getImageData(Math.floor(fx * bmp.width), Math.floor(fy * bmp.height), Math.max(1, Math.floor(fw * bmp.width)), Math.max(1, Math.floor(fh * bmp.height))).data;
+            let sum = 0;
+            let max = 0;
+            for (let i = 0; i < d.length; i += 4) {
+              const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+              sum += l;
+              if (l > max) max = l;
+            }
+            return { mean: sum / (d.length / 4), max };
+          }),
+        );
+      }
+      return out;
+    },
+    { pngs: shots.map((b) => (typeof b === 'string' ? b : b.toString('base64'))), parts },
+  );
+}
+const meanOf = async (page: Page, clip: Box) => (await luminance(page, [await page.screenshot({ clip, type: 'png' })]))[0][0].mean;
 
 const touchPoint = (p: { x: number; y: number }) => [{ x: p.x, y: p.y, id: 1 }];
 const touchStart = (cdp: CDPSession, p: { x: number; y: number }) => cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: touchPoint(p) });
@@ -132,6 +179,10 @@ for (const size of [
       });
       const copyTop = (await box('.hero__kicker')).y;
       expect(copyTop, `${lang}: copy starts under the sign`).toBeGreaterThan(signBottom);
+      // And the lit room with its guest is whole: it ends above the first line of copy.
+      const room = await box('[data-figure]');
+      expect(room.y, `${lang}: lit room under the sign`).toBeGreaterThan(signBottom);
+      expect(room.y + room.height, `${lang}: lit room ends above the copy`).toBeLessThan(copyTop - 8);
       await ctx.close();
     }
   });
@@ -156,36 +207,82 @@ test('darkness: close to black outside the beam, buttons above every light layer
   expect(await page.locator('#keys').getAttribute('data-dark')).toBe('0.4');
 });
 
-test('touch: the light rests on the sign, then goes to the touch point and follows a drag', async ({ page, isMobile }) => {
+test('darkness, measured in pixels: the wall is near black without the light and clearly shown inside it', async ({ page, isMobile }) => {
+  await open(page);
+  await expect.poll(() => page.evaluate(() => Number(getComputedStyle(document.querySelector('.torch')!).opacity))).toBeGreaterThanOrEqual(0.95);
+  await expect.poll(() => page.evaluate(() => window.__hero?.rain?.running)).toBe(true);
+  await page.evaluate(() => window.__hero.storm.hold(false)); // no lightning during the measurement
+  // A stretch of wall and windows with no light source of its own: below the lit room on
+  // the desktop, the second row on a phone (the rows under it are behind the copy).
+  const wall = await facadeBox(page, isMobile ? { x: 90, y: 300, w: 420, h: 62 } : { x: 90, y: 440, w: 420, h: 280 });
+  const centre = { x: wall.x + wall.width / 2, y: wall.y + wall.height / 2 };
+  const cdp = isMobile ? await page.context().newCDPSession(page) : null;
+  // Light away: the cursor in the far corner. On a phone nobody has touched the screen yet.
+  if (!isMobile) await page.mouse.move(40, page.viewportSize()!.height - 30, { steps: 3 });
+  await page.waitForTimeout(1200);
+  const dark = await meanOf(page, wall);
+  // Light on it.
+  if (cdp) {
+    await touchStart(cdp, centre);
+    await touchEnd(cdp);
+  } else await page.mouse.move(centre.x, centre.y, { steps: 3 });
+  await page.waitForTimeout(1200);
+  const lit = await meanOf(page, wall);
+  test.info().annotations.push({ type: 'luminance', description: `wall without the light ${dark.toFixed(1)}, in the light ${lit.toFixed(1)} (of 255)` });
+  expect(dark).toBeLessThan(20);
+  expect(lit).toBeGreaterThan(dark * 1.5);
+  expect(lit).toBeGreaterThan(dark + 8);
+
+  // The buttons do not depend on the light: same pixels with the light on the wall and away.
+  const cta = (await page.locator('#lobby [data-cta]').boundingBox())!;
+  const route = (await page.locator('#lobby [data-route] .btn').boundingBox())!;
+  expect(await meanOf(page, cta)).toBeGreaterThan(60);
+  expect((await luminance(page, [await page.screenshot({ clip: route, type: 'png' })]))[0][0].max).toBeGreaterThan(150);
+});
+
+test('touch: no light before the first touch, then it appears at the touch point and follows a drag', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'touch input is the phone project');
   await open(page);
   const cdp = await page.context().newCDPSession(page);
   const vp = page.viewportSize()!;
 
-  // Before the first touch: not a centre light. It rests on the upper facade, over the sign.
-  await page.waitForTimeout(400);
-  const rest = await page.evaluate(() => ({ ...window.__hero.torch }));
-  expect(rest.touched).toBe(false);
-  const facade = await page.evaluate(() => {
-    const f = document.querySelector('[data-facade]')!.getBoundingClientRect();
-    const u = Math.max(f.width / 600, f.height / 900);
-    return { cx: f.left + f.width / 2, signY: f.top + 92 * u, rowTwoY: f.top + 392 * u };
-  });
-  expect(Math.abs(rest.x - facade.cx)).toBeLessThan(2);
-  expect(rest.y).toBeGreaterThan(facade.signY);
-  expect(rest.y).toBeLessThan(facade.rowTwoY);
-  expect(rest.y).toBeLessThan(vp.height * 0.36);
-  // And it stays there: no drift.
+  // Before the first touch there is no beam anywhere: no static centre light. The flat
+  // cover is up over the hole, on the page and on the copy veil.
+  await page.waitForTimeout(600);
+  const before = await page.evaluate(() => ({
+    lit: window.__hero.torch.lit,
+    touched: window.__hero.torch.touched,
+    hasLight: document.documentElement.classList.contains('has-light'),
+    cover: getComputedStyle(document.querySelector('.torch')!, '::after').opacity,
+    veilCover: getComputedStyle(document.querySelector('.veil')!, '::after').opacity,
+  }));
+  expect(before).toEqual({ lit: false, touched: false, hasLight: false, cover: '1', veilCover: '1' });
+  // In pixels: where the old resting light used to sit (centre of the upper facade) and
+  // the middle of the screen are both as dark as the far edge of the wall.
+  const upper = await facadeBox(page, { x: 250, y: 300, w: 100, h: 62 });
+  const edge = await facadeBox(page, { x: 90, y: 300, w: 60, h: 62 });
+  const upperDark = await meanOf(page, upper);
+  const edgeDark = await meanOf(page, edge);
+  expect(upperDark).toBeLessThan(20);
+  expect(Math.abs(upperDark - edgeDark)).toBeLessThan(6);
+  // And it stays that way without input.
   await page.waitForTimeout(900);
-  const rest2 = await page.evaluate(() => ({ ...window.__hero.torch }));
-  expect(dist(rest, rest2)).toBeLessThan(0.5);
+  expect(await page.evaluate(() => window.__hero.torch.lit)).toBe(false);
+  expect(await meanOf(page, upper)).toBeLessThan(20);
+  // What the visitor does see: the sign, the lit room and both buttons.
+  expect(await meanOf(page, (await page.locator('#lobby [data-cta]').boundingBox())!)).toBeGreaterThan(60);
+  expect((await luminance(page, [await page.screenshot({ clip: (await page.locator('#lobby [data-route] .btn').boundingBox())!, type: 'png' })]))[0][0].max).toBeGreaterThan(150);
+  const signBox = await facadeBox(page, { x: 70, y: 34, w: 250, h: 110 });
+  expect((await luminance(page, [await page.screenshot({ clip: signBox, type: 'png' })]))[0][0].max).toBeGreaterThan(150);
+  expect((await luminance(page, [await page.screenshot({ clip: (await page.locator('[data-figure]').boundingBox())!, type: 'png' })]))[0][0].max).toBeGreaterThan(110);
 
-  // Touch, lower left: both beam layers converge on the touch point.
+  // Touch, lower left: the light comes on there. Both beam layers are on the touch point.
   const a = { x: 84, y: Math.round(vp.height * 0.76) };
   await touchStart(cdp, a);
   await expect.poll(async () => Math.max(...(await beamCentres(page)).map((c) => dist(c, a))), { timeout: 3000 }).toBeLessThan(3);
   expect((await beamCentres(page)).length).toBe(2);
-  expect(await page.evaluate(() => window.__hero.torch.touched)).toBe(true);
+  expect(await page.evaluate(() => ({ t: window.__hero.torch.touched, l: window.__hero.torch.lit }))).toEqual({ t: true, l: true });
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector('.torch')!, '::after').opacity), { timeout: 3000 }).toBe('0');
 
   // Drag up and to the right. This is a scroll drag: the page scrolls, the light stays
   // under the finger.
@@ -213,6 +310,36 @@ test('touch: the light rests on the sign, then goes to the touch point and follo
   await touchStart(cdp, c);
   await touchEnd(cdp);
   await expect.poll(async () => Math.max(...(await beamCentres(page)).map((q) => dist(q, c))), { timeout: 3000 }).toBeLessThan(1.5);
+});
+
+test('touch: the lit room has its guest on phones too, above the copy, and it changes when the light leaves', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'touch input is the phone project');
+  await open(page);
+  await expect.poll(() => page.evaluate(() => window.__hero?.figure?.state)).toBe('far');
+  const cdp = await page.context().newCDPSession(page);
+  const room = (await page.locator('[data-figure]').boundingBox())!;
+  const kicker = (await page.locator('.hero__kicker').boundingBox())!;
+  expect(room.y + room.height).toBeLessThan(kicker.y - 8);
+  const at = { x: room.x + room.width / 2, y: room.y + room.height / 2 };
+  const away = { x: 30, y: 560 };
+  const tap = async (p: { x: number; y: number }) => {
+    await touchStart(cdp, p);
+    await touchEnd(cdp);
+  };
+  const state = () => page.evaluate(() => window.__hero.figure.state);
+  const lit = () => page.evaluate(() => window.__hero.figure.lit);
+  // Nobody has touched yet: the room is not being watched.
+  expect(await lit()).toBe(false);
+  const seen: string[] = [];
+  for (let pass = 0; pass < 2; pass++) {
+    await tap(at);
+    await expect.poll(lit, { timeout: 3000 }).toBe(true);
+    seen.push(await state());
+    await tap(away);
+    await expect.poll(lit, { timeout: 4000 }).toBe(false);
+    await page.waitForTimeout(1000);
+  }
+  expect(seen).toEqual(['far', 'gone']);
 });
 
 // Samples the letter on every frame for `ms`.
@@ -343,6 +470,63 @@ test('the E: an analog fault, uneven sections, never a two-state toggle and neve
   expect(errors).toEqual([]);
 });
 
+test('large-area flicker, measured in pixels: the top of the building never flashes, while the letter does flicker', async ({ page, isMobile }) => {
+  test.setTimeout(60000);
+  await open(page);
+  await expect.poll(() => page.evaluate(() => typeof window.__hero?.e?.force)).toBe('function');
+  await expect.poll(() => page.evaluate(() => typeof window.__hero?.storm?.hold)).toBe('function');
+  await page.evaluate(() => window.__hero.storm.hold(false)); // lightning has its own tests
+  // No visitor light in the frame: this measures what the sign does to its surroundings.
+  if (!isMobile) await page.mouse.move(30, page.viewportSize()!.height - 20);
+  // The fog starts on the first input (or after 6 s) and fades in over 1.6 s. Start it now
+  // with a key event, which moves no light, and measure once it is fully there.
+  await page.evaluate(() => window.dispatchEvent(new Event('keydown')));
+  await page.waitForTimeout(3000);
+  // Every frame the browser presents is recorded (a screencast), so the sampling keeps up
+  // with the page. Two parts of each frame are measured:
+  //   area:   the cornice and the whole top floor under the sign (the large lit surface),
+  //   letter: the E itself (small, and allowed to flicker).
+  const vp = page.viewportSize()!;
+  const frac = async (u: { x: number; y: number; w: number; h: number }) => {
+    const b = await facadeBox(page, u);
+    return [b.x / vp.width, b.y / vp.height, b.width / vp.width, b.height / vp.height];
+  };
+  const parts = [await frac({ x: 60, y: 150, w: 480, h: 150 }), await frac({ x: 340, y: 34, w: 110, h: 110 })];
+  const cdp = await page.context().newCDPSession(page);
+  const shots: { t: number; data: string }[] = [];
+  cdp.on('Page.screencastFrame', (f) => {
+    shots.push({ t: (f.metadata.timestamp ?? 0) * 1000, data: f.data });
+    cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {});
+  });
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, everyNthFrame: 1 });
+  // The worst case: a collapse, the ember and the restrike, forced.
+  await page.evaluate(() => window.__hero.e.force('dying'));
+  await page.waitForTimeout(6000);
+  await cdp.send('Page.stopScreencast');
+  expect(shots.length).toBeGreaterThan(20);
+  const fps = shots.length / ((shots[shots.length - 1].t - shots[0].t) / 1000);
+  const lum = await luminance(page, shots.map((r) => r.data), parts);
+  const area = shots.map((r, i) => ({ t: r.t, v: lum[i][0].mean }));
+  const letter = shots.map((r, i) => ({ t: r.t, v: lum[i][1].mean }));
+  const mean = (rows: { v: number }[]) => rows.reduce((p, q) => p + q.v, 0) / rows.length;
+  const range = (rows: { v: number }[]) => Math.max(...rows.map((r) => r.v)) - Math.min(...rows.map((r) => r.v));
+  // A flash here is a swing of 10% of the area's own mean brightness: far stricter than the
+  // general flash threshold (10% of full white), which this dark area cannot reach at all.
+  const areaSwings = swings(area, mean(area) * 0.1);
+  test.info().annotations.push({
+    type: 'flicker',
+    description: `${fps.toFixed(1)} frames a second; area mean ${mean(area).toFixed(1)}, range ${range(area).toFixed(2)}, swings ${areaSwings.length}; letter mean ${mean(letter).toFixed(1)}, range ${range(letter).toFixed(1)}`,
+  });
+  // Enough samples to see changes well above 3 a second.
+  expect(fps).toBeGreaterThan(12);
+  expect(worstPerSecond(areaSwings)).toBeLessThanOrEqual(3);
+  // In absolute terms the area barely moves: under 3% of full white, peak to peak.
+  expect(range(area)).toBeLessThan(255 * 0.03);
+  // Not blind: the same screenshots show the letter itself changing far more.
+  expect(range(letter)).toBeGreaterThan(range(area) * 3);
+  expect(range(letter)).toBeGreaterThan(10);
+});
+
 test('the E has three distinct held states for screenshots', async ({ page }) => {
   await open(page);
   await expect.poll(() => page.evaluate(() => typeof window.__hero?.e?.hold)).toBe('function');
@@ -383,7 +567,8 @@ test('lightning: the flash has a single peak and reveals the watchers', async ({
   await expect.poll(() => page.evaluate(() => typeof window.__hero?.storm?.strike)).toBe('function');
   const storm = page.locator('[data-storm]');
   expect(Number(await storm.evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
-  expect(await storm.locator('ellipse').count()).toBeGreaterThan(8);
+  // Few, not a crowd: three windows and the open door.
+  await expect(storm.locator('[data-watcher]')).toHaveCount(4);
   const curve = await page.evaluate(
     () =>
       new Promise<number[]>((resolve) => {

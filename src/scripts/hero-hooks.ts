@@ -1,7 +1,7 @@
 // One object for tests, screenshots and the curious: window.__hero.
 // The hero modules hang their state and a few "force this now" switches on it.
 export interface HeroHooks {
-  torch?: { x: number; y: number; r: number; touched: boolean };
+  torch?: { x: number; y: number; r: number; touched: boolean; lit: boolean };
   e?: {
     readonly mode: string;
     readonly level: number;

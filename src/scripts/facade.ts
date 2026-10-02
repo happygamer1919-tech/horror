@@ -85,7 +85,9 @@ export function initFacade() {
     const ox = f.left + f.width / 2 - 300 * unit;
     const oy = f.top + scrollY;
     sign = { x: ox + 300 * unit, y: oy + 92 * unit };
-    room = { x: ox + 388 * unit, y: oy + 350 * unit };
+    // The lit room is placed by CSS (one window on phones, another on wide screens).
+    const fr = figure?.getBoundingClientRect();
+    room = fr && fr.width ? { x: fr.left + fr.width / 2, y: fr.top + scrollY + fr.height / 2 } : { x: ox + 388 * unit, y: oy + 350 * unit };
     if (canvas) {
       const c = canvas.getBoundingClientRect();
       cw = c.width;
@@ -129,7 +131,7 @@ export function initFacade() {
   if (figure) {
     window.setInterval(() => {
       if (!awake() || figForced) return;
-      const d = Math.hypot(torchState.x - room.x, torchState.y + scrollY - room.y);
+      const d = torchState.lit ? Math.hypot(torchState.x - room.x, torchState.y + scrollY - room.y) : 1e9;
       const r = torchState.r || 200;
       if (!figLit && d < r * 0.6) {
         // The light is on the room. Whatever was about to change, does not.
@@ -246,7 +248,7 @@ export function initFacade() {
         d.z = Math.random();
       }
       // Light on this streak.
-      const beam = 1 - smooth(0.3, 1.35, Math.hypot(d.x - bx, d.y - by) / br);
+      const beam = torchState.lit ? 1 - smooth(0.3, 1.35, Math.hypot(d.x - bx, d.y - by) / br) : 0;
       const red = 1 - smooth(0.15, 1, Math.hypot((d.x - sx) / (300 * unit), (d.y - sy) / (150 * unit)));
       const warm = 1 - smooth(0.2, 1, Math.hypot(d.x - rx, d.y - ry) / (80 * unit));
       const cool = beam * 0.8 + flash * 0.9;

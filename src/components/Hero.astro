@@ -21,15 +21,19 @@ const WIN_H = 84;
 const winX = (c: number) => 92 + c * 88;
 const winY = (r: number) => 198 + r * 110;
 
-// The one lit room: third floor (rows count from the top, floor 6 down to 2).
+// The one lit room. Wide screens: second row, under the E. Phones: top row, left of centre,
+// where it stays clear of the copy at every phone height. One set of elements, placed by
+// CSS (.room, .figure), so there is never a second copy in the DOM.
 const LIT = { r: 1, c: 3 };
+const LIT_PHONE = { r: 0, c: 1 };
+const isLit = (r: number, c: number) => (r === LIT.r && c === LIT.c) || (r === LIT_PHONE.r && c === LIT_PHONE.c);
 // Window dressing per cell: c = curtains, b = blinds, h = half curtain, - = bare glass.
 const dressing = ['c-b-c', '-ch-b', 'b--c-', 'ch-hc', '-b-c-'];
 
 const windows = [];
 for (let r = 0; r < ROWS; r++) {
   for (let c = 0; c < COLS; c++) {
-    windows.push({ r, c, x: winX(c), y: winY(r), kind: dressing[r][c], lit: r === LIT.r && c === LIT.c });
+    windows.push({ r, c, x: winX(c), y: winY(r), kind: dressing[r][c], lit: isLit(r, c) });
   }
 }
 const mullion = `M${WIN_W / 2} 0V${WIN_H}M0 ${WIN_H * 0.42}H${WIN_W}`;
@@ -60,16 +64,23 @@ const SPARK = { x: 376, y: 84, w: 112, h: 150 };
 
 const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i === 3 || i === 8 }));
 
-// Seen only while lightning lights the building: somebody stands at every bare window.
-const watchers = windows
-  .filter((w) => !w.lit && (w.kind === '-' || w.kind === 'h'))
-  .map((w, i) => {
-    const k = (i * 37 + w.r * 11 + w.c * 5) % 10;
-    return { x: w.x, y: w.y, cx: w.kind === 'h' ? 46 : 20 + ((k * 7) % 26), s: k % 4 === 0 ? 0.66 : 0.9 + (k % 3) * 0.06 };
-  });
+// Seen only while lightning lights the building: three windows are not empty, and neither
+// is the open door. Silhouettes with a rim of light, of different heights; one is a child.
+const watchers = [
+  { r: 0, c: 3, cx: 21, s: 0.92 },
+  { r: 1, c: 0, cx: 40, s: 1.04 },
+  { r: 3, c: 2, cx: 44, s: 0.62 },
+].map((f) => ({ ...f, x: winX(f.c), y: winY(f.r) }));
 ---
 
-<section class="hero" id="lobby" data-dark="0.97" data-dark-touch="0.97" aria-labelledby="hero-title">
+<section
+  class="hero"
+  id="lobby"
+  data-dark="0.97"
+  data-dark-touch="0.97"
+  aria-labelledby="hero-title"
+  style={`--room-x:${winX(LIT.c)};--room-y:${winY(LIT.r)};--room-px:${winX(LIT_PHONE.c)};--room-py:${winY(LIT_PHONE.r)}`}
+>
   <canvas class="hero__fog" data-fog aria-hidden="true"></canvas>
   <div class="hero__sky" aria-hidden="true"></div>
 
@@ -77,17 +88,17 @@ const watchers = windows
     <svg class="facade__base" viewBox="0 0 600 900" preserveAspectRatio="xMidYMin slice" role="img" aria-label={t.hero.facadeAlt}>
       <defs>
         <pattern id="brick" width="28" height="14" patternUnits="userSpaceOnUse">
-          <path d="M0 13.5H28M14 0V7M0 7H28M0 7V14M28 7V14" stroke="#262019" stroke-width="1" fill="none"></path>
+          <path d="M0 13.5H28M14 0V7M0 7H28M0 7V14M28 7V14" stroke="#1b1614" stroke-width="1.2" fill="none"></path>
         </pattern>
         <linearGradient id="wallfade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#1e1917"></stop>
-          <stop offset="1" stop-color="#141110"></stop>
+          <stop offset="0" stop-color="#352b26"></stop>
+          <stop offset="1" stop-color="#241d1a"></stop>
         </linearGradient>
       </defs>
 
       <g id="bldg">
         <!-- sign scaffold on the roof -->
-        <g stroke="#2a2420" stroke-width="2" fill="none">
+        <g stroke="#3d342d" stroke-width="2" fill="none">
           <path d="M70 150V34M530 150V34M70 34H530M70 140H530"></path>
           <path d="M70 140L112 34M159 140L112 34M159 140L206 34M253 140L206 34M253 140L300 34M347 140L300 34M347 140L394 34M441 140L394 34M441 140L488 34M530 140L488 34" stroke-width="1" opacity="0.6"></path>
         </g>
@@ -108,20 +119,20 @@ const watchers = windows
         <!-- building -->
         <rect x="60" y="150" width="480" height="750" fill="url(#wallfade)"></rect>
         <rect x="60" y="150" width="480" height="750" fill="url(#brick)"></rect>
-        <rect x="48" y="150" width="504" height="18" fill="#2a2420"></rect>
+        <rect x="48" y="150" width="504" height="18" fill="#3d342d"></rect>
         <rect x="54" y="168" width="492" height="6" fill="#0f0d0c"></rect>
         <path d="M76 174V900" stroke="#0f0d0c" stroke-width="5"></path>
         <path d="M524 174V900" stroke="#0f0d0c" stroke-width="5"></path>
-        <rect x="60" y="742" width="480" height="8" fill="#2a2420"></rect>
+        <rect x="60" y="742" width="480" height="8" fill="#3d342d"></rect>
 
         {
           windows.map((w) => (
             <g transform={`translate(${w.x} ${w.y})`}>
-              <rect x="-5" y="-5" width={WIN_W + 10} height={WIN_H + 10} fill="#2d2622" />
+              <rect x="-5" y="-5" width={WIN_W + 10} height={WIN_H + 10} fill="#43382f" />
               <rect width={WIN_W} height={WIN_H} fill="#090808" />
-              {w.kind === 'c' && <path d={`M0 0H${WIN_W}V${WIN_H}H${WIN_W - 14}C${WIN_W - 16} 50 ${WIN_W - 24} 20 ${WIN_W / 2} 6C24 20 16 50 14 ${WIN_H}H0Z`} fill="#1b1614" />}
-              {w.kind === 'h' && <path d={`M0 0H${WIN_W * 0.62}C${WIN_W * 0.55} 30 ${WIN_W * 0.4} 60 ${WIN_W * 0.3} ${WIN_H}H0Z`} fill="#1b1614" />}
-              {w.kind === 'b' && <path d={Array.from({ length: 9 }, (_, i) => `M2 ${6 + i * 6}H${WIN_W - 2}`).join('')} stroke="#1d1815" stroke-width="3" />}
+              {w.kind === 'c' && <path d={`M0 0H${WIN_W}V${WIN_H}H${WIN_W - 14}C${WIN_W - 16} 50 ${WIN_W - 24} 20 ${WIN_W / 2} 6C24 20 16 50 14 ${WIN_H}H0Z`} fill="#2a221d" />}
+              {w.kind === 'h' && <path d={`M0 0H${WIN_W * 0.62}C${WIN_W * 0.55} 30 ${WIN_W * 0.4} 60 ${WIN_W * 0.3} ${WIN_H}H0Z`} fill="#2a221d" />}
+              {w.kind === 'b' && <path d={Array.from({ length: 9 }, (_, i) => `M2 ${6 + i * 6}H${WIN_W - 2}`).join('')} stroke="#2c241f" stroke-width="3" />}
             </g>
           ))
         }
@@ -129,8 +140,8 @@ const watchers = windows
           {
             windows.map((w) => (
               <g transform={`translate(${w.x} ${w.y})`}>
-                <path d={mullion} stroke="#2d2622" stroke-width="4" />
-                <rect x="-9" y={WIN_H + 5} width={WIN_W + 18} height="6" fill="#322b26" />
+                <path d={mullion} stroke="#43382f" stroke-width="4" />
+                <rect x="-9" y={WIN_H + 5} width={WIN_W + 18} height="6" fill="#4a3e35" />
               </g>
             ))
           }
@@ -138,20 +149,20 @@ const watchers = windows
 
         <!-- ground floor -->
         <g>
-          <rect x="92" y="772" width="88" height="106" fill="#090808" stroke="#2d2622" stroke-width="5"></rect>
-          <rect x="420" y="772" width="88" height="106" fill="#090808" stroke="#2d2622" stroke-width="5"></rect>
-          <path d="M136 772V878M464 772V878" stroke="#2d2622" stroke-width="4"></path>
+          <rect x="92" y="772" width="88" height="106" fill="#090808" stroke="#43382f" stroke-width="5"></rect>
+          <rect x="420" y="772" width="88" height="106" fill="#090808" stroke="#43382f" stroke-width="5"></rect>
+          <path d="M136 772V878M464 772V878" stroke="#43382f" stroke-width="4"></path>
           <!-- entrance: the left leaf is shut, the right one stands ajar on a black lobby -->
-          <rect x="236" y="776" width="128" height="124" fill="#0b0909" stroke="#3a312b" stroke-width="6"></rect>
+          <rect x="236" y="776" width="128" height="124" fill="#0b0909" stroke="#4b4037" stroke-width="6"></rect>
           <path d="M244 822H296" stroke="#1a1512" stroke-width="3"></path>
           <rect x="288" y="836" width="5" height="20" fill="#6b5327"></rect>
-          <path d="M299.5 776V900" stroke="#3a312b" stroke-width="5"></path>
+          <path d="M299.5 776V900" stroke="#4b4037" stroke-width="5"></path>
           <rect x="302" y="779" width="59" height="121" fill="#000"></rect>
-          <path d="M361 779L324 787V896L361 900Z" fill="#110e0d" stroke="#3a312b" stroke-width="3" stroke-linejoin="round"></path>
+          <path d="M361 779L324 787V896L361 900Z" fill="#110e0d" stroke="#4b4037" stroke-width="3" stroke-linejoin="round"></path>
           <path d="M356 789L330 794V890L356 893Z" fill="#0a0808"></path>
           <path d="M330 826L356 823" stroke="#1a1512" stroke-width="2.4"></path>
           <rect x="326" y="838" width="3.4" height="18" fill="#6b5327"></rect>
-          <path d="M184 752H416L430 774H170Z" fill="#231d1a"></path>
+          <path d="M184 752H416L430 774H170Z" fill="#332a25"></path>
           <rect x="170" y="774" width="260" height="6" fill="#0f0d0c"></rect>
         </g>
       </g>
@@ -166,9 +177,9 @@ const watchers = windows
       <defs>
         <filter id="stormlit" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
           <feComponentTransfer>
-            <feFuncR type="linear" slope="2.9" intercept="0.02"></feFuncR>
-            <feFuncG type="linear" slope="3.4" intercept="0.035"></feFuncG>
-            <feFuncB type="linear" slope="4.3" intercept="0.07"></feFuncB>
+            <feFuncR type="linear" slope="1.9" intercept="0.02"></feFuncR>
+            <feFuncG type="linear" slope="2.25" intercept="0.035"></feFuncG>
+            <feFuncB type="linear" slope="2.9" intercept="0.07"></feFuncB>
           </feComponentTransfer>
         </filter>
         <linearGradient id="stormfall" x1="0" y1="0" x2="1" y2="0.8">
@@ -182,21 +193,40 @@ const watchers = windows
       <rect x="60" y="150" width="480" height="750" fill="url(#stormfall)"></rect>
       {
         watchers.map((f) => (
-          <g transform={`translate(${f.x} ${f.y})`}>
-            <g transform={`translate(${f.cx} ${WIN_H}) scale(${f.s}) translate(${-f.cx} ${-WIN_H})`} fill="#c3ccdb" opacity="0.62">
-              <ellipse cx={f.cx} cy="31" rx="7" ry="8.6" />
-              <path d={`M${f.cx - 15} ${WIN_H}C${f.cx - 15} 54 ${f.cx - 10} 46 ${f.cx - 4} 43H${f.cx + 4}C${f.cx + 10} 46 ${f.cx + 15} 54 ${f.cx + 15} ${WIN_H}Z`} />
+          <g transform={`translate(${f.x} ${f.y})`} data-watcher>
+            <g transform={`translate(${f.cx} ${WIN_H}) scale(${f.s}) translate(${-f.cx} ${-WIN_H})`}>
+              {
+                // The rim first (pale, where the flash catches a shoulder and the side of the
+                // head), then the body over it, shifted away from the light.
+                [
+                  { dx: 0, dy: 0, fill: '#aebbd4', o: 0.78 },
+                  { dx: -1.5, dy: 1.3, fill: '#07080c', o: 1 },
+                ].map((l) => (
+                  <g transform={`translate(${l.dx} ${l.dy})`} fill={l.fill} opacity={l.o}>
+                    <ellipse cx={f.cx} cy="31" rx="7" ry="8.6" />
+                    <path d={`M${f.cx - 15} ${WIN_H}C${f.cx - 15} 54 ${f.cx - 10} 46 ${f.cx - 4} 43H${f.cx + 4}C${f.cx + 10} 46 ${f.cx + 15} 54 ${f.cx + 15} ${WIN_H}Z`} />
+                  </g>
+                ))
+              }
             </g>
           </g>
         ))
       }
       <!-- and in the open door -->
-      <g fill="#c3ccdb" opacity="0.7">
-        <ellipse cx="311" cy="812" rx="6" ry="8"></ellipse>
-        <path d="M303 900V838C303 828 306 823 311 823S319 828 320 838V900Z"></path>
-        <path d="M321 846c3-1 5-1 6 1v7c-2 2-4 2-6 1Z"></path>
+      <g data-watcher>
+        {
+          [
+            { dx: 0, dy: 0, fill: '#aebbd4', o: 0.8 },
+            { dx: -1.3, dy: 1.2, fill: '#050608', o: 1 },
+          ].map((l) => (
+            <g transform={`translate(${l.dx} ${l.dy})`} fill={l.fill} opacity={l.o}>
+              <ellipse cx="311" cy="812" rx="6" ry="8" />
+              <path d="M303 900V838C303 828 306 823 311 823S319 828 320 838V900Z" />
+            </g>
+          ))
+        }
+        <path d="M321 846c3-1 5-1 6 1v7c-2 2-4 2-6 1Z" fill="#aebbd4" opacity="0.75"></path>
       </g>
-      <ellipse cx="313.4" cy="811" rx="1.3" ry="1.6" fill="#07090d"></ellipse>
       <g filter="url(#stormlit)"><use href="#bldg-bars"></use></g>
     </svg>
 
@@ -209,19 +239,20 @@ const watchers = windows
           <feGaussianBlur stdDeviation="10"></feGaussianBlur>
         </filter>
         <linearGradient id="redwash" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#ff2d2d" stop-opacity="0.1"></stop>
+          <stop offset="0" stop-color="#ff2d2d" stop-opacity="0.07"></stop>
           <stop offset="1" stop-color="#ff2d2d" stop-opacity="0"></stop>
         </linearGradient>
         <!-- The sign as a light source: it shows the scaffold and the top floors in red. -->
         <filter id="redlit" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
-          <feColorMatrix type="matrix" values="0.95 0.95 0.95 0 0  0.15 0.15 0.15 0 0  0.14 0.14 0.14 0 0  0 0 0 1 0"></feColorMatrix>
+          <feColorMatrix type="matrix" values="0.64 0.64 0.64 0 0  0.1 0.1 0.1 0 0  0.09 0.09 0.09 0 0  0 0 0 1 0"></feColorMatrix>
         </filter>
         <linearGradient id="redfall" gradientUnits="userSpaceOnUse" x1="0" y1="20" x2="0" y2="500">
           <stop offset="0" stop-color="#fff" stop-opacity="0.6"></stop>
           <stop offset="0.2" stop-color="#fff" stop-opacity="1"></stop>
-          <stop offset="0.3" stop-color="#fff" stop-opacity="0.8"></stop>
-          <stop offset="0.5" stop-color="#fff" stop-opacity="0.34"></stop>
-          <stop offset="0.75" stop-color="#fff" stop-opacity="0.09"></stop>
+          <stop offset="0.3" stop-color="#fff" stop-opacity="0.72"></stop>
+          <stop offset="0.4" stop-color="#fff" stop-opacity="0.34"></stop>
+          <stop offset="0.52" stop-color="#fff" stop-opacity="0.13"></stop>
+          <stop offset="0.75" stop-color="#fff" stop-opacity="0.02"></stop>
           <stop offset="1" stop-color="#fff" stop-opacity="0"></stop>
         </linearGradient>
         <mask id="redmask" maskUnits="userSpaceOnUse" x="0" y="0" width="600" height="500">
@@ -241,7 +272,7 @@ const watchers = windows
       <g mask="url(#redmask)">
         <g filter="url(#redlit)"><use href="#bldg"></use></g>
       </g>
-      <rect x="60" y="150" width="480" height="300" fill="url(#redwash)"></rect>
+      <rect x="60" y="150" width="480" height="210" fill="url(#redwash)"></rect>
 
       <!-- the four letters that still hold -->
       {
@@ -258,7 +289,7 @@ const watchers = windows
       }
 
       <!-- room 3-something: someone left the lamp on -->
-      <g transform={`translate(${winX(LIT.c)} ${winY(LIT.r)})`}>
+      <g class="room">
         <rect x="-10" y="-10" width={WIN_W + 20} height={WIN_H + 20} fill="#d9b46c" opacity="0.28" filter="url(#softblur)"></rect>
         <rect width={WIN_W} height={WIN_H} fill="url(#roomlight)" opacity="0.72"></rect>
         <path d={`M0 0H${WIN_W * 0.5}C${WIN_W * 0.46} 34 ${WIN_W * 0.3} 62 ${WIN_W * 0.22} ${WIN_H}H0Z`} fill="#2a2018" opacity="0.9"></path>
@@ -273,7 +304,7 @@ const watchers = windows
     </svg>
 
     <!-- whoever is in the lit room. Present on one pass of the light, gone on the next. -->
-    <div class="fx figure" data-figure="far" style={`--x:${winX(LIT.c)};--y:${winY(LIT.r)};--w:${WIN_W};--h:${WIN_H}`}>
+    <div class="fx figure" data-figure="far" style={`--w:${WIN_W};--h:${WIN_H}`}>
       <svg viewBox={`0 0 ${WIN_W} ${WIN_H}`}>
         <g class="figure__body" fill="#120b07">
           <ellipse cx="46.4" cy="32" rx="5.8" ry="7.4" transform="rotate(7 46 40)"></ellipse>
@@ -300,7 +331,7 @@ const watchers = windows
         ))
       }
       <svg viewBox={eView}>
-        <rect x={E.pivot.x - 5} y={E.pivot.y - 4} width="10" height="8" rx="1" fill="#2a2420" stroke="#15110f" stroke-width="0.8"></rect>
+        <rect x={E.pivot.x - 5} y={E.pivot.y - 4} width="10" height="8" rx="1" fill="#3d342d" stroke="#15110f" stroke-width="0.8"></rect>
         <circle cx={E.pivot.x} cy={E.pivot.y} r="2.6" fill="#5a4f45" stroke="#15110f" stroke-width="0.8"></circle>
       </svg>
     </div>
@@ -387,6 +418,9 @@ const watchers = windows
     top: calc(var(--header-h) - 6px);
     height: 70vh;
     height: 70svh;
+    /* Portrait tablets: the building stops growing, so its top floor stays above the copy. */
+    max-width: 640px;
+    margin: 0 auto;
     /* One facade unit (the SVG viewBox is 600 x 900, "xMidYMin slice") as a length, so
        HTML layers can be placed on the drawing. facade.ts sets --u in px where container
        units are missing. */
@@ -541,8 +575,17 @@ const watchers = windows
     display: block;
   }
 
-  /* The guest in the lit room. */
+  /* The lit room and its guest: one window on wide screens, another on phones. */
+  .hero {
+    --rx: var(--room-px);
+    --ry: var(--room-py);
+  }
+  .room {
+    transform: translate(calc(var(--rx) * 1px), calc(var(--ry) * 1px));
+  }
   .figure {
+    --x: var(--rx);
+    --y: var(--ry);
     transition: opacity 0.28s linear;
     will-change: opacity;
   }
@@ -808,7 +851,14 @@ const watchers = windows
       bottom: 14px;
     }
     .hero::after {
-      inset: 24% 0 0 0;
+      inset: 27% 0 0 0;
+    }
+    /* A smaller building, so the sign and the lit room on the top floor end above the copy. */
+    .facade {
+      width: clamp(190px, calc((100svh - 536px) * 2.13), 100%);
+      height: auto;
+      aspect-ratio: 2 / 3;
+      margin: 0 auto;
     }
     .hero__body {
       gap: 9px;
@@ -831,6 +881,8 @@ const watchers = windows
   @media (min-width: 900px) {
     .hero {
       padding-bottom: 96px;
+      --rx: var(--room-x);
+      --ry: var(--room-y);
     }
     .hero::after {
       display: none;
@@ -838,7 +890,8 @@ const watchers = windows
     .facade {
       left: auto;
       right: max(4vw, calc((100vw - var(--max)) / 2 - 40px));
-      top: 0;
+      /* Dropped so the top rail of the sign scaffold clears the header row. */
+      top: 22px;
       height: 100vh;
       height: 100svh;
       width: 66.6vh;

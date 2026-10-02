@@ -2,7 +2,9 @@
 // Mouse: it follows the cursor (and drifts slowly until the cursor first moves).
 // Touch: it appears where the screen is touched, follows the finger through a touch and
 // through a scroll drag, and comes to rest at the last touch point. Before the first touch
-// it rests on the HOTEL sign and the top floors, so the first paint is never black.
+// there is no light at all: the darkness has no hole in it (a flat cover, global.css), and
+// the sign, the lit room and the buttons are what the visitor sees. The first touch brings
+// the light in at the finger.
 //
 // Only `transform` is written, and only while the light is actually moving. No layout is
 // read per frame: the viewport size and the rest point are cached and refreshed on resize.
@@ -12,7 +14,8 @@ import { hooks } from './hero-hooks';
 const IDLE_MS = 20000;
 
 // Viewport position of the light, shared with the facade (the room that is being watched).
-export const torchState = { x: 0, y: 0, r: 0, touched: false };
+// `lit` is false on a touch screen until the first touch: there is no beam yet.
+export const torchState = { x: 0, y: 0, r: 0, touched: false, lit: !touch };
 
 export function initTorch() {
   const root = document.documentElement;
@@ -32,30 +35,23 @@ export function initTorch() {
   let finger = false; // a touch is down right now
   let manual = false; // the visitor has taken the light
   let manualUntil = 0; // mouse: forever. Pen or touch on a hover device: for good as well.
-  // Rest point for touch devices, in page coordinates: centre of the upper facade.
-  let restX = x;
-  let restPageY = y;
-
   const measure = () => {
     vw = window.innerWidth;
     vh = window.innerHeight;
     torchState.r = Math.max(vw, vh) * (touch ? 0.21 : 0.165);
-    const facade = document.querySelector<HTMLElement>('[data-facade]');
-    if (facade) {
-      const f = facade.getBoundingClientRect();
-      const u = Math.max(f.width / 600, f.height / 900);
-      restX = f.left + f.width / 2;
-      restPageY = f.top + window.scrollY + 236 * u;
-    } else {
-      restX = vw * 0.5;
-      restPageY = vh * 0.26;
-    }
     kick();
   };
 
   const take = (px: number, py: number) => {
     tx = px;
     ty = py;
+    if (!torchState.lit) {
+      // First touch: the light comes on where the finger is. It does not travel there.
+      x = px;
+      y = py;
+      torchState.lit = true;
+      root.classList.add('has-light');
+    }
     manual = true;
     torchState.touched = true;
     kick();
@@ -127,11 +123,10 @@ export function initTorch() {
       tx = vw * (0.5 + 0.26 * Math.sin(t * 0.21) + 0.06 * Math.sin(t * 0.53 + 1.3));
       ty = vh * (0.42 + 0.14 * Math.sin(t * 0.17 + 2.1) + lean * 0.2);
       lean *= 0.95;
-    } else if (!manual) {
-      // Touch, nobody has touched yet: rest on the sign. Once the hero has scrolled away
-      // the light waits in the upper part of the screen instead of leaving the page black.
-      tx = restX;
-      ty = Math.max(restPageY - scrollY, vh * 0.3);
+    } else if (!torchState.lit) {
+      // Touch screen, nobody has touched yet: no light, nothing to move.
+      last = 0;
+      return;
     }
     // Follow fast under a finger or a cursor, settle slowly once the finger lifts.
     const rate = finger ? 0.26 : touch ? 0.085 : 0.14;
@@ -151,11 +146,12 @@ export function initTorch() {
     else last = 0;
   };
 
-  measure();
   if (touch) {
-    x = tx = restX;
-    y = ty = Math.max(restPageY - scrollY, vh * 0.3);
+    // Far away from anything that asks where the light is (the rain, the lit room).
+    torchState.x = x = tx = -1e5;
+    torchState.y = y = ty = -1e5;
   }
+  measure();
   window.addEventListener('resize', measure, { passive: true });
   kick();
 

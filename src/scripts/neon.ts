@@ -52,7 +52,7 @@ type Pose = 'normal' | 'arc' | 'ember' | null;
 // Per section: mean brightness when healthy, how much it wanders, how fast, how soon it
 // gives up when the supply sags (power > 1 dies first), and its weight in the mean.
 const SEGS = [
-  { id: 'spine', mean: 0.9, wander: 0.1, speed: 1.9, power: 0.7, weight: 0.38 },
+  { id: 'spine', mean: 0.9, wander: 0.1, speed: 1.9, power: 0.62, weight: 0.38 },
   { id: 'top', mean: 0.74, wander: 0.2, speed: 3.3, power: 1.0, weight: 0.24 },
   { id: 'mid', mean: 0.62, wander: 0.3, speed: 2.6, power: 1.7, weight: 0.14 },
   { id: 'bot', mean: 0.6, wander: 0.24, speed: 4.1, power: 1.25, weight: 0.24 },
@@ -60,7 +60,7 @@ const SEGS = [
 const POSES: Record<Exclude<Pose, null>, number[]> = {
   normal: [0.93, 0.74, 0.24, 0.52],
   arc: [0.6, 0.42, 0.14, 1],
-  ember: [0.12, 0.07, 0.05, 0.09],
+  ember: [0.2, 0.07, 0.05, 0.09],
 };
 
 // Spark canvas geometry, in facade units relative to the canvas box (Hero.astro, SPARK).
