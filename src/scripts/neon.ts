@@ -112,7 +112,7 @@ export function initNeon() {
   const setMode = (m: Mode, now: number) => {
     mode = m;
     modeStart = now;
-    if (m === 'run') modeDur = rnd(9000, 22000);
+    if (m === 'run') modeDur = rnd(14000, 34000);
     else if (m === 'dying') modeDur = rnd(550, 1100);
     else if (m === 'ember') {
       modeDur = rnd(1000, 3000);

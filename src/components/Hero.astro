@@ -353,7 +353,9 @@ const watchers = windows
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    padding: calc(var(--header-h) + 12px) 0 64px;
+    /* Bottom: the floating WhatsApp button owns the bottom right corner (12px + 52px, plus
+       the safe area on phones with a home indicator). The buttons end above it. */
+    padding: calc(var(--header-h) + 12px) 0 calc(70px + env(safe-area-inset-bottom, 0px));
     overflow: clip;
   }
 
@@ -758,8 +760,8 @@ const watchers = windows
 
   /* Short phones: tighten the copy so the sign and the top floors stay clear. */
   @media (max-height: 700px) and (max-width: 899px) {
-    .hero {
-      padding-bottom: 54px;
+    .hero__hint {
+      bottom: 14px;
     }
     .hero::after {
       inset: 24% 0 0 0;

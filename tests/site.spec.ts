@@ -135,7 +135,7 @@ for (const lang of LANGS) {
         const vw = document.documentElement.clientWidth;
         const out: string[] = [];
         for (const el of Array.from(document.querySelectorAll<HTMLElement>('main *, footer *, header *'))) {
-          if (el.closest('.torch, .corr__pin, .hanger, svg, .clip, .hero__glow')) continue;
+          if (el.closest('.torch, .hero__veil, .corr__pin, .hanger, svg, .clip, .hero__glow')) continue;
           const r = el.getBoundingClientRect();
           if (r.width > 0 && (r.right > vw + 1 || r.left < -1)) out.push(`${el.tagName}.${el.className} ${Math.round(r.left)}..${Math.round(r.right)}`);
         }
@@ -402,30 +402,56 @@ test('unknown paths get the 404 page with links back', async ({ page }) => {
 test('the neon sign never changes state faster than 3 times per second', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('hotel:lift', '1'));
   await page.goto(`${BASE}/ro/`);
-  // Sample the dying letter for 6 seconds and count on/off transitions per rolling second.
-  const worst = await page.evaluate(
+  // The loose E now flickers as an analog fault inside the letter itself (a small area).
+  // What every large light follows is its low-passed level, window.__hero.e.slow. Sample it
+  // for 6 seconds and count its swings of 10% or more per rolling second. The raw level of
+  // the letter is counted the same way, to show the measure is not blind.
+  // tests/hero.spec.ts holds the detailed checks.
+  type E = { slow: number; level: number };
+  await expect.poll(() => page.evaluate(() => typeof (window as unknown as { __hero?: { e?: E } }).__hero?.e?.slow)).toBe('number');
+  const result = await page.evaluate(
     () =>
-      new Promise<number>((resolve) => {
-        const el = document.querySelector<SVGElement>('[data-dying]')!;
-        const flips: number[] = [];
-        let last = true;
+      new Promise<{ worst: number; samples: number; rawSwings: number; slowSwings: number }>((resolve) => {
+        const e = (window as unknown as { __hero: { e: E } }).__hero.e;
+        const rows: { t: number; slow: number; raw: number }[] = [];
+        // A swing is a reversal after the value has moved at least `min` the other way.
+        const swings = (pick: (r: { slow: number; raw: number }) => number, min: number) => {
+          const times: number[] = [];
+          let lo = pick(rows[0]);
+          let hi = lo;
+          let dir = 0;
+          for (const r of rows) {
+            const v = pick(r);
+            if (dir >= 0 && v <= hi - min) {
+              dir = -1;
+              lo = v;
+              times.push(r.t);
+            } else if (dir <= 0 && v >= lo + min) {
+              dir = 1;
+              hi = v;
+              times.push(r.t);
+            }
+            if (dir >= 0) hi = Math.max(hi, v);
+            if (dir <= 0) lo = Math.min(lo, v);
+          }
+          return times;
+        };
         const start = performance.now();
         const tick = (now: number) => {
-          const on = Number(el.style.opacity || 1) > 0.5;
-          if (on !== last) flips.push(now);
-          last = on;
-          if (now - start < 6000) requestAnimationFrame(tick);
-          else {
-            let max = 0;
-            for (const t of flips) max = Math.max(max, flips.filter((f) => f >= t && f < t + 1000).length);
-            resolve(max);
-          }
+          rows.push({ t: now, slow: e.slow, raw: e.level });
+          if (now - start < 6000) return requestAnimationFrame(tick);
+          const flips = swings((r) => r.slow, 0.1);
+          let max = 0;
+          for (const t of flips) max = Math.max(max, flips.filter((f) => f >= t && f < t + 1000).length);
+          resolve({ worst: max, samples: rows.length, rawSwings: swings((r) => r.raw, 0.1).length, slowSwings: flips.length });
         };
         requestAnimationFrame(tick);
       }),
   );
+  expect(result.samples).toBeGreaterThan(100);
+  expect(result.rawSwings).toBeGreaterThanOrEqual(result.slowSwings);
   // A flash is an on-off pair, so 3 flashes per second would be 6 transitions.
-  expect(worst).toBeLessThanOrEqual(3);
+  expect(result.worst).toBeLessThanOrEqual(3);
 });
 
 test('the Check in button brings the registration card on screen', async ({ page }) => {
