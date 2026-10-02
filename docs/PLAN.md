@@ -93,3 +93,13 @@ screenshots at 390px and 1440px, a critique against the concept, and fixes.
 - Lighthouse mobile on the deployed URL: Performance >= 85, Accessibility >= 95.
 - `curl https://happygamer1919-tech.github.io/horror/ro/` returns 200 and
   contains the brand name.
+
+## Update 2: content and parity
+
+- Wordmark "Проклятие Отеля" on every page, translated names as subtitles on RO and EN.
+- Confirmed values: players 2 to 11, price list, hours, Maps and review links.
+- New sections: price list, gift voucher. Floating WhatsApp button on every page.
+- Check-in card: live total, comment field, booking-request wording.
+- Flags in `src/content/site.ts`: `CONTACT_LEVELS_ENABLED` (false), `VOUCHERS_ENABLED` (true), `SLOTS_URL` (empty).
+- Share images 1200 x 630 per language (`scripts/og.mjs`), `og:image` and `twitter:card`.
+- Live checks (`tests/live.spec.ts`) run as a `verify` job after each deploy.

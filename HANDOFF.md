@@ -6,60 +6,89 @@ Live: https://happygamer1919-tech.github.io/horror/
 - Russian: https://happygamer1919-tech.github.io/horror/ru/
 - English: https://happygamer1919-tech.github.io/horror/en/
 
-Status on 2026-10-02: all acceptance checks pass. The site is a preview and is hidden from search engines.
+Status on 2026-10-02 (update 2, content and parity): all acceptance checks pass.
+The site is a preview and is hidden from search engines.
 
-## What you need to send (TODO values)
+## What changed in update 2
 
-Everything below lives in `src/content/site.ts`, marked `TODO(owner)`. Until a value is
-filled in, the site shows a neutral placeholder ("Ask the desk") and states nothing as fact.
+- Wordmark "Проклятие Отеля" on all three pages. "Blestemul Hotelului" and "The Hotel's Curse"
+  appear only as a subtitle under it on RO and EN. The footer shows the wordmark once.
+- Filled in: players 2 to 11, duration 60 min, price list (1000 to 3300 MDL), opening hours,
+  Google Maps profile link, "Leave a review" link.
+- New price list section. The key tag shows "from 1000 MDL".
+- The check-in card shows the live total for the chosen team size and puts it in the WhatsApp message.
+  Team size is limited to 2 to 11.
+- The card now says it is a booking request, confirmed by a phone call. A free-text comment
+  field ("Comment, your limits") was added.
+- Contact levels (Light / Standard / Hardcore) are off behind `CONTACT_LEVELS_ENABLED`. One line
+  replaces them: live actors, tell us your limits when you book. No copy promises levels.
+- Gift voucher block (team size, recipient name, WhatsApp request) behind `VOUCHERS_ENABLED`.
+- FAQ now answers: minimum age (TODO), minimum players (2), gift voucher, what to wear,
+  where the rules are explained, payment methods (TODO).
+- Floating WhatsApp button on every page, including the 404 page.
+- `SLOTS_URL`: empty. When set, a "See free slots" link appears next to both booking buttons.
+- Share image 1200 x 630 per language, rendered from the hero. `og:image` and `twitter:card` wired.
+
+## What you still need to send (TODO values)
+
+All in `src/content/site.ts`, marked `TODO(owner)`.
 
 | # | Value | Where it shows | What is shown now |
 |---|-------|----------------|-------------------|
-| 1 | Price | Key fob 04, FAQ "How much does it cost?" | "Ask the desk" / "ask when you book" |
-| 2 | Team size (min and max players) | Key fob 01, FAQ, upper limit of the "Guests" field | "Ask the desk". The form accepts 1 to 12 as a technical bound only |
-| 3 | Age limit | Key fob 03, FAQ | "Ask the desk" |
-| 4 | Opening hours | "How to find us" block | "Ask the desk by phone or on WhatsApp" |
-| 5 | Contact-level rules (Light / Standard / Hardcore) | Level selector copy, FAQ | Mood-only copy plus the note "exact rules are confirmed when you book" |
-| 6 | Review quotes (with permission) | Hidden "From the guest book" block | Block is not rendered while the list is empty |
-| 7 | Exact Google Maps profile link | "Read the reviews" button | A Maps search for the address |
+| 1 | Age limit | Key tag 03, FAQ "Is there a minimum age?" | "Ask the desk" / "we are confirming this detail" |
+| 2 | Review quotes (with permission) | Hidden "From the guest book" block | Block is not rendered while the list is empty |
+| 3 | Game languages | "Language" field on the card | All three offered as a preference, nothing promised |
+| 4 | Payment methods | FAQ "How can I pay?" | "We are confirming this detail. Ask when you book." |
+| 5 | Instagram handle | Footer link | No link |
+| 6 | Contact-level rules | Selector, off behind the flag | One line about limits |
 
-Questions that also need an answer before launch:
+Please also confirm:
 
-- Is +373 682 32 596 registered on WhatsApp? The booking form depends on it.
-- Is the game really offered in all three languages? The form lets the guest pick Romanian, Russian or English.
-- Should the Romanian or the Russian name be the main one? Now each language shows its own, the footer shows all three.
-- The level copy for Light / Standard / Hardcore is my wording of mood, not your rules. Please read all three (in three languages) and correct them.
+- +373 682 32 596 is registered on WhatsApp. The card, the voucher and the floating button all depend on it.
+- The opening hours as I read them: Mon-Thu 16:00-03:00, Fri 16:00-00:00, Sat-Sun 24 hours.
+  The Friday closing time (midnight) before a 24-hour Saturday looks unusual. It is shown as given.
+- Whether a gift voucher costs the same as the price list. The voucher block shows no price.
 
-## How to change things
+## Flags and config
 
-- Business facts: `src/content/site.ts` (brand name is one value there).
-- Text: `src/content/ro.ts`, `ru.ts`, `en.ts`.
-- Go public for search engines: set `SITE_INDEXABLE: 'true'` in `.github/workflows/deploy.yml`.
-  That one flag switches meta robots to index, robots.txt to allow, and turns on the
-  LocalBusiness and FAQPage JSON-LD. FAQ answers that are still placeholders are left out of JSON-LD.
-- Custom domain: change `site` and `base` in `astro.config.mjs` and `SITE_ORIGIN` / `BASE` in `src/config.ts`.
-- Every push to `main` runs the tests and deploys. A failing test blocks the deploy.
+In `src/content/site.ts`:
+
+- `CONTACT_LEVELS_ENABLED` (false): the level selector, its copy and the form field.
+- `VOUCHERS_ENABLED` (true): the gift voucher block and its FAQ answer.
+- `SLOTS_URL` (empty): the "See free slots" link.
+- `site.prices`, `site.players`, `site.hours`, `site.maps`: the values from this update.
+
+In `.github/workflows/deploy.yml`:
+
+- `SITE_INDEXABLE` ('false'): one switch for meta robots, robots.txt and JSON-LD. The JSON-LD now
+  also carries the price range, the opening hours and the share image.
+
+After changing the wordmark, the hero or the subtitles, regenerate the share images:
+`npm run build && npm run og && npm run build`, then commit `public/og/`.
 
 ## Acceptance results
 
 | Check | Result |
 |-------|--------|
 | `npm run build` | exit 0 |
-| `npm test` (Playwright, 390px and 1440px) | exit 0, 70 of 70 passed |
-| Lighthouse mobile, live `/ro/` | Performance 94, Accessibility 100 |
-| Lighthouse mobile, live `/ru/` | Performance 95, Accessibility 100 |
-| Lighthouse mobile, live `/en/` | Performance 97, Accessibility 100 |
-| `curl` live `/ro/` | 200, contains "Blestemul Hotelului" and "Проклятие Отеля" |
-| Internal links under `/horror` | checked by the test suite for all three languages |
+| `npm test` (Playwright, 390px and 1440px) | exit 0, 100 of 100 passed |
+| `npm run test:live` (deployed site) | exit 0, 3 of 3 passed: `og:image` returns 200 for ro, ru, en |
+| Lighthouse mobile, live `/ro/` | Performance 100, Accessibility 100 |
+| Lighthouse mobile, live `/ru/` | Performance 98, Accessibility 100 |
+| Lighthouse mobile, live `/en/` | Performance 98, Accessibility 100 |
+| CI on the last site commit | build, deploy and verify jobs all green |
 
-What the test suite proves, in all three languages and at both widths:
-every section renders, no console errors, no failed requests, no request leaves the site
-(no CDNs, no trackers), no horizontal overflow, the form builds the right `wa.me` link and
-refuses an empty submit, the level selector changes tint and copy, the quotes block stays
-hidden, the reduced-motion version is static and readable, the preloader clears in under
-1.5 seconds and can be skipped, the neon sign stays under the flash limit, the lights dim
-after 20 idle seconds, the tab title changes when hidden, root redirects to `/ro/`,
-robots.txt blocks crawlers, unknown paths get a 404 page.
+New tests in this update, in all three languages and at both widths:
+
+- The total is correct for every team size from 2 to 11, on the card and in the price list.
+- The `wa.me` message contains the team size and the total for each of those sizes.
+- Team sizes 0, 1 and 12 are refused.
+- The gift voucher opens WhatsApp with team size and recipient, and refuses an empty recipient.
+- No "Ask the desk" placeholder remains for players, duration, price or hours. Age keeps it.
+- `og:image` points at a real 1200 x 630 picture and `twitter:card` is set.
+- Contact levels are off: no selector, no "Hardcore" or "Standard" anywhere on the page.
+- The floating WhatsApp button is present, also on the 404 page. No slots link while `SLOTS_URL` is empty.
+- The footer shows the wordmark once and none of the translated names.
 
 Lighthouse SEO shows 63. That is expected: the preview is deliberately `noindex`.
 
@@ -67,49 +96,50 @@ Lighthouse SEO shows 63. That is expected: the preview is deliberately `noindex`
 
 In `docs/screenshots/`, each at 390px (`-390.jpg`) and 1440px (`-1440.jpg`):
 
-- `01-preloader`: lift dial
-- `02-hero-ro`, `02-hero-ru`, `02-hero-en`: arrival, three languages
+- `01-preloader`
+- `02-hero-ro`, `02-hero-ru`, `02-hero-en`: wordmark and subtitles
 - `03-corridor-a-start`, `03-corridor-b-lamps-failing`, `03-corridor-c-silhouette`, `03-corridor-d-last-door`
-- `04-file`: legend, registry, 1989 clipping
-- `05-keys`: brass fobs and contact level
-- `06-cctv`: camera strip
-- `07-proof`: Google rating
-- `08-checkin`: registration card (Russian)
-- `09-info`: FAQ and location (English)
-- `10-footer`: door hanger and language switch (Russian)
-- `11-reduced-motion`: static corridor with all captions
-- `12-flashlight`: the beam over the CCTV section
+- `04-file`
+- `05-keys`: filled key tags and the limits line
+- `05b-prices`: price list (Russian)
+- `06-cctv`
+- `07-proof`: rating, reviews link, "Leave a review" (English)
+- `07b-voucher`: gift voucher
+- `08-checkin`: registration card with comment field and live total (Russian)
+- `09-info`: FAQ and opening hours (English)
+- `10-footer`
+- `11-reduced-motion`
+- `12-flashlight`
 
-## Deviations from the brief, with reasons
+Share images: `public/og/ro.jpg`, `ru.jpg`, `en.jpg`.
 
-1. **Commits went straight to `main`.** The brief asks for it, and Pages deploys from `main`.
-   This is against your global rule (feature branches only), so I am flagging it: the brief was
-   treated as the specific instruction for this new repo.
-2. **Corridor is a 2D canvas, not WebGL.** The brief allows at most one WebGL scene and
-   demands a CSS fallback. The corridor must work for everyone, so it is drawn on a plain
-   canvas. The one WebGL scene (OGL) is the fog around the neon sign in the hero.
-3. **WebGL fog starts on first input or after 6 seconds, and only on a real GPU.** Starting
-   it at load cost 2.8 seconds of blocked main thread in Lighthouse (Performance 52). Until
-   it starts, the CSS halo is in place, so nothing looks missing.
-4. **Corridor pin uses CSS `position: sticky`, with ScrollTrigger reading progress.** GSAP's own
-   pinning jumps when the mobile address bar resizes. Sticky does not.
-5. **Flashlight is softer outside the hero.** Full darkness everywhere made the legend and the
-   form hard to read on phones. Each section sets its own darkness; the hero is darkest.
-6. **Lamps fade, they never strobe.** The dying letter changes state at most every 400ms
-   (about 1.25 flashes per second, limit is 3). A test enforces it.
-7. **Mono weight 500 was dropped.** One mono weight saves three font files on first load.
-8. **The sign reads HOTEL in every language.** It is a physical sign on the building.
-9. **Fictional details added for atmosphere only:** room numbers, registry entries with
-   initials, "p. 47", "Card No. 0313", camera names. No real person or fact is implied.
-   Remove any of them in the language files if you prefer.
-10. **Extra pages:** a 404 page ("There is no such room") and a root page that redirects to `/ro/`.
-11. **Tests run in CI before deploy.** Not requested, added because you do not read code.
-12. **No social share image.** Open Graph title and description are set, but there is no
-    `og:image` yet because no artwork exists. Say the word and I will generate one from the hero.
+## Deviations in update 2, with reasons
+
+1. **The live `og:image` check is a separate suite (`npm run test:live`), not part of `npm test`.**
+   CI runs `npm test` before deploying. A test that needs the new image to be live already would
+   block the very deploy that publishes it. The live suite runs as a `verify` job after each
+   deploy, and I ran it by hand as well.
+2. **Share images are committed files, generated by a script from the real hero.** GitHub Pages
+   is static, so they cannot be rendered on request. They must be regenerated after a hero change.
+3. **The voucher block shows no price.** You did not say a voucher costs the same as a game.
+4. **Game languages are a TODO, so the "Language" field stays as a preference** with all three
+   options. Removing it would drop a field the first brief asked for.
+5. **Price list wording says "for the whole team".** This is my reading of "price by team size".
+   Correct me if the numbers are per person.
+6. **Voucher FAQ answer appears only while `VOUCHERS_ENABLED` is true.** One flag, no dead answer.
+7. **The WhatsApp button hides on phones while a form is on screen** (check-in card, voucher),
+   so it never covers a field. On desktop it is always visible.
+
+Ratified earlier and unchanged: commits to `main`, corridor on a 2D canvas, WebGL fog gated on
+first input and a real GPU, sticky pin, softer flashlight outside the hero, fade-only lamps,
+one mono weight, HOTEL sign in every language, fictional atmosphere details. Registry entries
+are initials only and nothing in them reads as a fact about the business.
 
 ## Not verified
 
 - Real phones. Everything was checked in Chromium at 390px, 360px and 1440px. iOS Safari and
   Android Chrome on real devices were not tested.
-- The ambient sound by ear. The toggle and audio graph are tested, the mix is not.
-- WhatsApp delivery. The link format is tested; whether the number receives it is yours to confirm.
+- How the share image looks inside WhatsApp, Telegram or Facebook previews. The tags and the
+  picture are tested; the apps' own rendering is not. The preview is `noindex`, which does not stop previews.
+- The ambient sound by ear.
+- WhatsApp delivery to the number.
