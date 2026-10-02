@@ -1,7 +1,6 @@
 ---
-import { LANGS, type Lang } from '../config';
-import type { Level } from '../content/types';
-import { copy, site, priceFor, CONTACT_LEVELS_ENABLED, SLOTS_URL } from '../content';
+import type { Lang } from '../config';
+import { copy, site, priceFor, CONTACT_LEVELS_ENABLED, LEVELS, SLOTS_URL, TELEGRAM_URL } from '../content';
 import SectionHead from './SectionHead.astro';
 
 interface Props {
@@ -10,22 +9,8 @@ interface Props {
 const { lang } = Astro.props;
 const t = copy[lang];
 const c = t.checkin;
-const levels: Level[] = ['light', 'standard', 'hardcore'];
+const b = t.booking;
 const DEFAULT_TEAM = 4;
-
-// The message is written in the page language. Tokens are filled in by the browser.
-const template = c.message({
-  brand: site.brand,
-  date: '{date}',
-  time: '{time}',
-  team: '{team}',
-  total: '{total}',
-  language: '{language}',
-  level: CONTACT_LEVELS_ENABLED ? '{level}' : null,
-  name: '{name}',
-  phone: '{phone}',
-  comment: '{comment}',
-});
 
 // Team size to total price, for the live total on the card.
 const priceMap: Record<string, number> = {};
@@ -33,8 +18,18 @@ for (let n = site.players.min; n <= site.players.max; n++) {
   const total = priceFor(n);
   if (total !== null) priceMap[n] = total;
 }
-// When the owner confirms the game languages, only those are offered.
-const languages = site.gameLanguages ?? LANGS;
+
+// The booking widget asks only for name, phone and a comment. The card keeps the rest and
+// turns it into one line (scripts/checkin.ts). This is the server-rendered starting state
+// of the "ask a question" links: default team, page language, no level chosen yet.
+const hello = c.hello(site.brand);
+const startLine = [
+  `${c.summary.team}: ${DEFAULT_TEAM}`,
+  `${c.summary.language}: ${c.languages[lang]}`,
+  `${c.summary.total}: ${priceMap[DEFAULT_TEAM]} ${site.currency}`,
+].join(' - ');
+const startMessage = `${hello}\n${startLine}`;
+const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(startMessage)}`;
 ---
 
 <section class="sec checkin" id="checkin" data-dark="0.18" aria-labelledby="checkin-title">
@@ -47,9 +42,11 @@ const languages = site.gameLanguages ?? LANGS;
       class="card"
       data-checkin
       data-wa={site.phone.whatsapp}
-      data-template={template}
+      data-hello={hello}
+      data-labels={JSON.stringify(c.summary)}
       data-prices={JSON.stringify(priceMap)}
       data-currency={site.currency}
+      data-slots={SLOTS_URL}
       data-reveal
     >
       <div class="card__head">
@@ -59,21 +56,13 @@ const languages = site.gameLanguages ?? LANGS;
 
       <div class="card__grid">
         <label class="f f--half">
-          <span>{c.fields.date}</span>
-          <input type="date" name="date" required data-min-today />
-        </label>
-        <label class="f f--half">
-          <span>{c.fields.time}</span>
-          <input type="time" name="time" required />
-        </label>
-        <label class="f f--half">
           <span>{c.fields.team}</span>
           <input type="number" name="team" inputmode="numeric" min={site.players.min} max={site.players.max} value={DEFAULT_TEAM} required />
         </label>
         <label class="f f--half">
           <span>{c.fields.language}</span>
           <select name="language" required>
-            {languages.map((l) => <option value={c.languages[l]} selected={l === lang}>{c.languages[l]}</option>)}
+            {site.gameLanguages.map((l) => <option value={c.languages[l]} selected={l === lang}>{c.languages[l]}</option>)}
           </select>
         </label>
 
@@ -82,29 +71,17 @@ const languages = site.gameLanguages ?? LANGS;
             <fieldset class="f f--full card__lvl">
               <legend>{c.fields.level}</legend>
               <div>
-                {levels.map((l) => (
+                {LEVELS.map((l) => (
                   <label>
-                    <input type="radio" name="level" value={l} data-name={t.keys.level.options[l].name} checked={l === 'standard'} data-level-input />
-                    <span>{t.keys.level.options[l].name}</span>
+                    {/* No default: the team chooses. */}
+                    <input type="radio" name="level" value={l} data-name={t.keys.level.options[l]} required data-level-input />
+                    <span>{t.keys.level.options[l]}</span>
                   </label>
                 ))}
               </div>
             </fieldset>
           )
         }
-
-        <label class="f f--full">
-          <span>{c.fields.name}</span>
-          <input type="text" name="name" autocomplete="name" required maxlength="80" />
-        </label>
-        <label class="f f--full">
-          <span>{c.fields.phone}</span>
-          <input type="tel" name="phone" autocomplete="tel" inputmode="tel" required maxlength="24" pattern="[0-9+() \-]{6,24}" />
-        </label>
-        <label class="f f--full">
-          <span>{c.fields.comment}</span>
-          <textarea name="comment" rows="2" maxlength="400"></textarea>
-        </label>
       </div>
 
       <p class="card__total" aria-live="polite">
@@ -113,16 +90,77 @@ const languages = site.gameLanguages ?? LANGS;
       </p>
 
       <div class="card__foot">
-        <button class="btn btn--primary card__submit" type="submit">{c.submit}</button>
-        <p class="card__request" data-request>{c.request}</p>
+        {
+          SLOTS_URL && (
+            <>
+              <button class="btn btn--primary card__submit" type="submit" data-book>
+                {c.submit}
+              </button>
+              <p class="card__request" data-request>
+                {c.request}
+              </p>
+            </>
+          )
+        }
+        <div class="card__ask" role="group" aria-labelledby="card-ask">
+          <span class="card__ask-label" id="card-ask">
+            {t.ui.ask}
+          </span>
+          <a class="card__ch" href={waUrl} target="_blank" rel="noopener noreferrer" data-ask-wa>
+            WhatsApp
+          </a>
+          <a class="card__ch" href={TELEGRAM_URL} target="_blank" rel="noopener noreferrer" data-ask-tg data-tg data-message={startMessage}>
+            Telegram
+          </a>
+        </div>
         <p class="card__tel">
           {c.tel}: <a href={`tel:${site.phone.e164}`}>{site.phone.display}</a>
-          {SLOTS_URL && <a class="card__slots" href={SLOTS_URL} target="_blank" rel="noopener noreferrer" data-slots>{t.ui.slots}</a>}
         </p>
         <p class="card__note">{c.note}</p>
       </div>
       <p class="card__sign" aria-hidden="true"><span>{c.signature}</span></p>
     </form>
+
+    {
+      SLOTS_URL && (
+        <dialog class="bk" data-booking data-lenis-prevent aria-labelledby="bk-title" data-url={SLOTS_URL} data-copied={b.copied} data-not-copied={b.notCopied}>
+          <div class="bk__bar">
+            <div class="bk__top">
+              <p class="bk__title" id="bk-title">
+                <span lang={site.brandLang}>{site.brand}</span>
+                <b>{b.title}</b>
+              </p>
+              <button class="bk__close" type="button" data-booking-close>
+                <span>{b.close}</span>
+                <i aria-hidden="true" />
+              </button>
+            </div>
+            <div class="bk__sum">
+              <p class="bk__state" role="status" aria-live="polite" data-booking-state />
+              <p class="bk__line" data-booking-line />
+              <button class="bk__copy" type="button" data-booking-copy>
+                {b.copyAgain}
+              </button>
+            </div>
+            <p class="bk__hint">
+              <span>{b.instruction}</span>
+              <a href={SLOTS_URL} target="_blank" rel="noopener noreferrer" data-booking-tab>
+                {b.newTab}
+              </a>
+            </p>
+          </div>
+          <div class="bk__body">
+            <p class="bk__slow" data-booking-slow>
+              <span>{b.slow}</span>
+              <a class="btn btn--primary" href={SLOTS_URL} target="_blank" rel="noopener noreferrer">
+                {b.newTab}
+              </a>
+            </p>
+            <iframe class="bk__frame" title={b.frameTitle} data-booking-frame />
+          </div>
+        </dialog>
+      )
+    }
   </div>
 </section>
 
@@ -184,24 +222,6 @@ const languages = site.gameLanguages ?? LANGS;
     padding: 0;
     margin-bottom: 8px;
   }
-  .f textarea {
-    width: 100%;
-    min-height: 68px;
-    padding: 8px 2px;
-    border: 0;
-    border-bottom: 1px solid var(--paper-ink);
-    border-radius: 0;
-    background: transparent;
-    color: var(--paper-ink);
-    font-family: var(--mono);
-    font-size: 16px;
-    line-height: 1.4;
-    resize: vertical;
-  }
-  .f textarea:focus-visible {
-    outline: 2px solid var(--stamp);
-    outline-offset: 2px;
-  }
   .card__total {
     display: flex;
     justify-content: space-between;
@@ -226,9 +246,6 @@ const languages = site.gameLanguages ?? LANGS;
   .card__request {
     font-size: 14px;
     font-weight: 500;
-  }
-  .card__slots {
-    margin-left: 18px;
   }
   .f input:not([type='radio']),
   .f select {
@@ -285,10 +302,14 @@ const languages = site.gameLanguages ?? LANGS;
   .card__lvl label span {
     display: grid;
     place-items: center;
-    min-height: 46px;
-    font-size: 12px;
+    height: 100%;
+    min-height: 52px;
+    padding: 6px 4px;
+    font-size: 11px;
     font-weight: 500;
-    letter-spacing: 0.1em;
+    line-height: 1.3;
+    letter-spacing: 0.06em;
+    text-align: center;
     text-transform: uppercase;
   }
   .card__lvl input:checked + span {
@@ -314,6 +335,47 @@ const languages = site.gameLanguages ?? LANGS;
   .card__submit:hover {
     background: #6f1410;
     box-shadow: none;
+  }
+  /* Second channel: ask a question on WhatsApp or Telegram. */
+  .card__ask {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 10px;
+    margin-top: 6px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(28, 22, 17, 0.35);
+  }
+  .card__ask-label {
+    grid-column: 1 / -1;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--paper-ash);
+  }
+  .card__ch {
+    display: grid;
+    place-items: center;
+    min-height: 46px;
+    padding: 6px 10px;
+    border: 1px solid var(--paper-ink);
+    color: var(--paper-ink);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition:
+      background-color 0.25s,
+      color 0.25s;
+  }
+  .card__ch:hover {
+    background: var(--paper-ink);
+    color: var(--paper);
+  }
+  .card__ch:focus-visible {
+    outline: 2px solid var(--stamp);
+    outline-offset: 2px;
   }
   .card__tel {
     font-size: 14px;
@@ -362,8 +424,280 @@ const languages = site.gameLanguages ?? LANGS;
       width: auto;
     }
     .card__note,
-    .card__tel {
+    .card__tel,
+    .card__ask {
       grid-column: 1 / -1;
+    }
+    .f--half {
+      grid-column: span 2;
+    }
+    .card__lvl label span {
+      font-size: 12px;
+      letter-spacing: 0.1em;
+    }
+    .card__ask {
+      grid-template-columns: auto 190px 190px;
+      align-items: center;
+      column-gap: 14px;
+    }
+    .card__ask-label {
+      grid-column: auto;
+      margin-right: 10px;
+    }
+  }
+
+  /* Booking dialog: the hotel's frame around the booking widget. Dark, hairline brass
+     rules, mono labels. On phones it fills the screen and the bar stays compact, so the
+     widget keeps the height. */
+  .bk {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: var(--ink);
+    color: var(--bone);
+    overflow: hidden;
+  }
+  .bk[open] {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .bk::backdrop {
+    background: rgba(3, 2, 2, 0.86);
+  }
+  .bk__bar {
+    display: grid;
+    gap: 10px;
+    padding: 10px 14px 12px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    border-bottom: 1px solid var(--brass);
+  }
+  .bk__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .bk__title {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  .bk__title b {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 1.25rem;
+    line-height: 1.1;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--bone);
+  }
+  .bk__close {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--brass-lo);
+    border-radius: 0;
+    background: transparent;
+    color: var(--brass-hi);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .bk__close:hover {
+    border-color: var(--brass-hi);
+  }
+  /* the cross: two hairlines */
+  .bk__close i {
+    position: relative;
+    width: 14px;
+    height: 14px;
+  }
+  .bk__close i::before,
+  .bk__close i::after {
+    content: '';
+    position: absolute;
+    left: -2px;
+    top: 6px;
+    width: 18px;
+    height: 1px;
+    background: currentColor;
+    transform: rotate(45deg);
+  }
+  .bk__close i::after {
+    transform: rotate(-45deg);
+  }
+  .bk__sum {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px 12px;
+    padding: 8px 0 8px 12px;
+    border-left: 2px solid var(--brass);
+  }
+  .bk__state {
+    grid-column: 1;
+    min-height: 1.5em;
+    font-size: 9px;
+    line-height: 1.5;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  .bk__line {
+    grid-column: 1;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--bone);
+    overflow-wrap: anywhere;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .bk__copy {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-height: 44px;
+    max-width: 124px;
+    padding: 6px 12px;
+    border: 1px solid var(--brass);
+    border-radius: 0;
+    background: transparent;
+    color: var(--brass-hi);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.3;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .bk__copy:hover {
+    background: var(--brass-hi);
+    color: var(--ink);
+  }
+  /* The clipboard refused: the line is the thing to take, so it is marked and selectable in one tap. */
+  .bk.is-manual .bk__sum {
+    border-left-color: var(--neon);
+  }
+  .bk.is-manual .bk__state {
+    letter-spacing: 0.04em;
+    font-size: 12px;
+    text-transform: none;
+    color: var(--bone);
+  }
+  .bk.is-manual .bk__line {
+    padding: 6px 8px;
+    margin-top: 4px;
+    border: 1px dashed var(--brass);
+    user-select: all;
+    -webkit-user-select: all;
+  }
+  .bk__hint {
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ash);
+  }
+  .bk__hint span {
+    margin-right: 8px;
+  }
+  .bk__hint a {
+    display: inline-block;
+    padding-block: 4px;
+    color: var(--brass-hi);
+    text-underline-offset: 4px;
+    text-decoration-color: var(--brass-lo);
+    white-space: nowrap;
+  }
+  .bk__body {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    /* the widget paints its own page black: no seam while it loads */
+    background: #000;
+  }
+  .bk__frame {
+    grid-row: 2;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #000;
+    color-scheme: normal;
+  }
+  .bk__slow {
+    grid-row: 1;
+    display: none;
+    gap: 12px;
+    justify-items: start;
+    padding: 14px;
+    border-bottom: 1px solid var(--brass-lo);
+    background: var(--ink-2);
+    font-size: 13px;
+    color: var(--bone);
+  }
+  .bk.is-slow .bk__slow {
+    display: grid;
+  }
+  .bk__slow .btn {
+    min-height: 46px;
+    padding-block: 10px;
+    box-shadow: none;
+  }
+
+  @media (min-width: 900px) {
+    .bk {
+      width: min(1040px, calc(100vw - 80px));
+      height: min(860px, calc(100vh - 56px));
+      margin: auto;
+      border: 1px solid var(--brass);
+      box-shadow: 0 40px 120px rgba(0, 0, 0, 0.8);
+    }
+    .bk__bar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px 28px;
+      padding: 18px 22px 16px;
+    }
+    .bk__top {
+      grid-column: 1 / -1;
+    }
+    .bk__title b {
+      font-size: 1.6rem;
+    }
+    .bk__sum {
+      grid-column: 1;
+      gap: 2px 18px;
+      padding-left: 16px;
+    }
+    .bk__line {
+      font-size: 15px;
+    }
+    .bk__copy {
+      max-width: none;
+    }
+    .bk__hint {
+      grid-column: 2;
+      align-self: center;
+      max-width: 34ch;
+      font-size: 13px;
+    }
+    .bk__hint a {
+      display: block;
+      width: max-content;
+    }
+    .bk__slow {
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      padding: 14px 22px;
     }
   }
 </style>
