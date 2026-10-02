@@ -19,7 +19,7 @@
 // 2% at 3 Hz or faster. A general flash needs a 10% swing. The slow part that remains (the
 // letter dying and coming back) happens a few times a minute.
 import { still } from './env';
-import { hooks } from './hero-hooks';
+import { hooks, ticker } from './hero-hooks';
 import { signBuzz } from './audio';
 
 // Smooth 1D value noise.
@@ -221,20 +221,16 @@ export function initNeon() {
     }).observe(hero);
   }
 
-  let raf = 0;
-  const kick = () => {
-    if (!raf) raf = requestAnimationFrame(frame);
-  };
+  // About 30 updates a second, on the shared hero clock: plenty for a flicker.
+  const kick = () => ticker.add(frame);
+  const park = () => ticker.remove(frame);
 
   function frame(now: number) {
-    raf = 0;
     if (!visible || document.hidden) {
       last = 0;
       signBuzz(0, false);
-      return;
+      return park();
     }
-    // About 30 updates a second: plenty for a flicker, and half the style work of 60.
-    if (last && now - last < 28) return kick();
     const dt = Math.min(0.1, last ? (now - last) / 1000 : 0.033);
     last = now;
     const t = now / 1000 + seed;
@@ -264,7 +260,7 @@ export function initNeon() {
           parts.length = 0;
         }
       }
-      return; // stays frozen until hold(null)
+      return park(); // stays frozen until hold(null)
     }
 
     // 1. Supply envelope.
@@ -373,7 +369,6 @@ export function initNeon() {
       lastBuzz = now;
       signBuzz(level, arc > 0);
     }
-    kick();
   }
 
   hooks.e = {

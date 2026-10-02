@@ -2,7 +2,7 @@
 // Nothing here reads layout per frame. Positions are measured on load and on resize, and
 // everything stops while the hero is off screen or the tab is hidden.
 import { still } from './env';
-import { hooks } from './hero-hooks';
+import { hooks, ticker } from './hero-hooks';
 import { torchState } from './torch';
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -206,23 +206,20 @@ export function initFacade() {
   // Thin slanted streaks. A streak is drawn only where something lights it: the visitor's
   // beam, the red of the sign, the lit room, or lightning (which shows all of it).
   const SLANT = 0.2;
-  let raf = 0;
   let last = 0;
   let running = false;
-  const kick = () => {
-    if (!raf && ctx) raf = requestAnimationFrame(frame);
-  };
+  // About 30 frames a second, on the shared hero clock: plenty for streaks.
+  function kick() {
+    if (ctx) ticker.add(frame);
+  }
   function frame(now: number) {
-    raf = 0;
-    if (!ctx || !canvas) return;
+    if (!ctx || !canvas) return ticker.remove(frame);
     if (!awake()) {
       running = false;
       last = 0;
-      return;
+      return ticker.remove(frame);
     }
     running = true;
-    // 30 fps is plenty for streaks.
-    if (last && now - last < 30) return kick();
     const dt = Math.min(0.08, last ? (now - last) / 1000 : 0.033);
     last = now;
 
@@ -267,7 +264,6 @@ export function initFacade() {
       ctx.lineTo(d.x - len * SLANT, d.y - len);
       ctx.stroke();
     }
-    kick();
   }
   hooks.rain = {
     get running() {

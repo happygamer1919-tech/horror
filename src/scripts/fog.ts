@@ -4,6 +4,7 @@
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
 import { still } from './env';
 import { neonState } from './neon';
+import { ticker } from './hero-hooks';
 
 const VERT = /* glsl */ `
 attribute vec2 uv;
@@ -125,26 +126,17 @@ export function initFog() {
   document.addEventListener('hotel:level', readColor);
 
   let visible = true;
-  let raf = 0;
-  let last = 0;
   let glow = 1;
-  const kick = () => {
-    if (!raf) raf = requestAnimationFrame(frame);
-  };
+  // 30 fps is plenty for drifting fog. It shares the hero clock with the letter and the rain.
+  const kick = () => ticker.add(frame);
   function frame(now: number) {
-    raf = 0;
-    if (!visible || document.hidden) return;
-    // 30 fps is plenty for drifting fog.
-    if (now - last > 32) {
-      last = now;
-      uniforms.uTime.value = now / 1000;
-      // The fog answers the failing letter, but only a little: one letter of five. It reads
-      // the low-passed level, never the raw flicker (see the safety note in neon.ts).
-      glow += (0.82 + 0.18 * neonState.level - glow) * 0.3;
-      uniforms.uGlow.value = glow;
-      renderer.render({ scene: mesh });
-    }
-    kick();
+    if (!visible || document.hidden) return ticker.remove(frame);
+    uniforms.uTime.value = now / 1000;
+    // The fog answers the failing letter, but only a little: one letter of five. It reads
+    // the low-passed level, never the raw flicker (see the safety note in neon.ts).
+    glow += (0.82 + 0.18 * neonState.level - glow) * 0.3;
+    uniforms.uGlow.value = glow;
+    renderer.render({ scene: mesh });
   }
   new IntersectionObserver((e) => {
     visible = e[0].isIntersecting;
