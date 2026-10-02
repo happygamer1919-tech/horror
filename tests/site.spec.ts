@@ -2,9 +2,31 @@ import { test, expect, type Page } from '@playwright/test';
 
 const BASE = '/horror';
 const LANGS = ['ro', 'ru', 'en'] as const;
-const BRAND = { ro: 'Blestemul Hotelului', ru: 'Проклятие Отеля', en: "The Hotel's Curse" };
-const SECTIONS = ['#lobby', '#corridor', '#file', '#keys', '#cctv', '#proof', '#checkin', '#info', 'footer.foot'];
+// The wordmark is the same on every language page. RO and EN add a subtitle under it.
+const BRAND = 'Проклятие Отеля';
+const SUBTITLE: Record<string, string | null> = { ro: 'Blestemul Hotelului', ru: null, en: "The Hotel's Curse" };
+const SECTIONS = ['#lobby', '#corridor', '#file', '#keys', '#prices', '#cctv', '#proof', '#voucher', '#checkin', '#info', 'footer.foot'];
 const WA = '37368232596';
+const ASK = { ro: 'Întrebați recepția', ru: 'Уточните на стойке', en: 'Ask the desk' };
+// Price for the whole team, MDL. The source of truth the site must agree with.
+const PRICES: Record<number, number> = { 2: 1000, 3: 1000, 4: 1200, 5: 1500, 6: 1800, 7: 2100, 8: 2400, 9: 2700, 10: 3000, 11: 3300 };
+
+// Replace window.open so a submit can be inspected instead of leaving the page.
+async function captureOpen(page: Page) {
+  await page.evaluate(() => {
+    (window as unknown as { __opened: string[] }).__opened = [];
+    window.open = ((url: string) => {
+      (window as unknown as { __opened: string[] }).__opened.push(String(url));
+      return {} as Window;
+    }) as typeof window.open;
+  });
+}
+const opened = (page: Page) => page.evaluate(() => (window as unknown as { __opened: string[] }).__opened);
+const messageOf = (url: string) => {
+  const u = new URL(url);
+  expect(u.origin + u.pathname).toBe(`https://wa.me/${WA}`);
+  return u.searchParams.get('text') ?? '';
+};
 
 // Console errors and failed or external requests, collected for the whole page life.
 function watch(page: Page) {
@@ -49,7 +71,14 @@ for (const lang of LANGS) {
       await expect(page.locator('html')).toHaveAttribute('lang', lang);
       // The h1 is the brand name, split into lines: compare without whitespace.
       const h1 = (await page.locator('h1').textContent()) ?? '';
-      expect(h1.replace(/\s+/g, '')).toBe(BRAND[lang].replace(/\s+/g, ''));
+      expect(h1.replace(/\s+/g, '')).toBe(BRAND.replace(/\s+/g, ''));
+      // The name in the page language is only a subtitle, and only on RO and EN.
+      if (SUBTITLE[lang]) await expect(page.locator('.hero__alt')).toHaveText(SUBTITLE[lang]!);
+      else await expect(page.locator('.hero__alt')).toHaveCount(0);
+      // The footer shows the wordmark once and no translated names.
+      await expect(page.locator('.foot__names')).toHaveCount(1);
+      await expect(page.locator('.foot__names')).toHaveText(BRAND);
+      for (const sub of Object.values(SUBTITLE)) if (sub) await expect(page.locator('footer.foot')).not.toContainText(sub);
       await walk(page);
       for (const sel of SECTIONS) {
         const el = page.locator(sel);
@@ -63,7 +92,7 @@ for (const lang of LANGS) {
       }
       // All section headings exist and are not empty.
       const h2 = await page.locator('main h2').allTextContents();
-      expect(h2.length).toBe(7);
+      expect(h2.length).toBe(9);
       for (const h of h2) expect(h.trim().length).toBeGreaterThan(2);
       // Canvases actually drew something.
       const painted = await page.evaluate(() => {
@@ -88,7 +117,7 @@ for (const lang of LANGS) {
       }
       await expect(page.locator(`link[rel="alternate"][hreflang="${lang}"]`)).toHaveAttribute('href', new RegExp(`${BASE}/${lang}/$`));
       await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
-      await expect(page).toHaveTitle(new RegExp(BRAND[lang].split(' ')[0]));
+      await expect(page).toHaveTitle(new RegExp(BRAND));
     });
 
     test('no horizontal overflow', async ({ page }) => {
@@ -115,51 +144,161 @@ for (const lang of LANGS) {
       expect(wide).toEqual([]);
     });
 
-    test('check-in card builds a correct wa.me link', async ({ page }) => {
+    test('check-in card: booking request with team size and total in the wa.me message', async ({ page }) => {
       await open(page, lang);
-      await page.evaluate(() => {
-        (window as unknown as { __opened: string[] }).__opened = [];
-        window.open = ((url: string) => {
-          (window as unknown as { __opened: string[] }).__opened.push(String(url));
-          return {} as Window;
-        }) as typeof window.open;
-      });
+      await captureOpen(page);
       const form = page.locator('[data-checkin]');
       await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
       await form.locator('input[name="date"]').fill('2031-03-14');
       await form.locator('input[name="time"]').fill('19:30');
       await form.locator('input[name="team"]').fill('5');
-      await form.locator('input[name="level"][value="hardcore"]').check({ force: true });
       await form.locator('input[name="name"]').fill('Ana Țurcanu');
       await form.locator('input[name="phone"]').fill('+373 600 00 000');
+      await form.locator('textarea[name="comment"]').fill('no touching\nplease');
+      await expect(form.locator('[data-total]')).toHaveText('1500 MDL');
       await form.locator('button[type="submit"]').click();
 
-      const opened = await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened);
-      expect(opened).toHaveLength(1);
-      const url = new URL(opened[0]);
-      expect(url.origin + url.pathname).toBe(`https://wa.me/${WA}`);
-      const text = url.searchParams.get('text') ?? '';
-      expect(text).toContain(BRAND[lang]);
-      for (const part of ['14.03.2031', '19:30', ': 5', 'Hardcore', 'Ana Țurcanu', '+373 600 00 000']) {
-        expect(text, part).toContain(part);
-      }
+      const urls = await opened(page);
+      expect(urls).toHaveLength(1);
+      const text = messageOf(urls[0]);
+      expect(text).toContain(BRAND);
+      const lines = text.split('\n');
+      // hello, date, time, guests, total, language, name, phone, comment. No level line.
+      expect(lines).toHaveLength(9);
+      expect(lines[1]).toContain('14.03.2031');
+      expect(lines[2]).toContain('19:30');
+      expect(lines[3]).toMatch(/: 5$/);
+      expect(lines[4]).toMatch(/: 1500 MDL$/);
+      expect(lines[6]).toContain('Ana Țurcanu');
+      expect(lines[7]).toContain('+373 600 00 000');
+      expect(lines[8]).toMatch(/: no touching please$/);
       expect(text).not.toMatch(/\{\w+\}/);
-      expect(text.split('\n')).toHaveLength(8);
-      // The level chosen on the card is the level of the whole page.
-      await expect(page.locator('html')).toHaveAttribute('data-level', 'hardcore');
+      expect(text).not.toMatch(/Light|Standard|Hardcore/);
+      // The wording next to the button says what this is.
+      await expect(form.locator('[data-request]')).toBeVisible();
+      expect(((await form.locator('[data-request]').textContent()) ?? '').length).toBeGreaterThan(30);
     });
 
-    test('check-in card refuses an empty submit', async ({ page }) => {
+    test('price total is correct for every team size from 2 to 11', async ({ page }) => {
       await open(page, lang);
-      await page.evaluate(() => {
-        (window as unknown as { __opened: string[] }).__opened = [];
-        window.open = ((url: string) => {
-          (window as unknown as { __opened: string[] }).__opened.push(String(url));
-          return {} as Window;
-        }) as typeof window.open;
-      });
-      await page.locator('[data-checkin] button[type="submit"]').click();
-      expect(await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened)).toHaveLength(0);
+      const form = page.locator('[data-checkin]');
+      await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await form.locator('input[name="date"]').fill('2031-03-14');
+      await form.locator('input[name="time"]').fill('19:30');
+      await form.locator('input[name="name"]').fill('Test');
+      await form.locator('input[name="phone"]').fill('+373 600 00 000');
+      const team = form.locator('input[name="team"]');
+      await expect(team).toHaveAttribute('min', '2');
+      await expect(team).toHaveAttribute('max', '11');
+      for (const [n, total] of Object.entries(PRICES)) {
+        await captureOpen(page);
+        await team.fill(n);
+        await expect(form.locator('[data-total]'), `total for ${n}`).toHaveText(`${total} MDL`);
+        await form.locator('button[type="submit"]').click();
+        const urls = await opened(page);
+        expect(urls, `submit for ${n}`).toHaveLength(1);
+        const lines = messageOf(urls[0]).split('\n');
+        // No comment this time, so the optional line is dropped.
+        expect(lines).toHaveLength(8);
+        expect(lines[3], `team line for ${n}`).toMatch(new RegExp(`: ${n}$`));
+        expect(lines[4], `total line for ${n}`).toMatch(new RegExp(`: ${total} MDL$`));
+      }
+      // The price list on the page says the same thing.
+      const rows = await page.locator('[data-price-row]').evaluateAll((trs) => trs.map((tr) => [tr.getAttribute('data-price-row')!, tr.querySelector('td')!.textContent!.replace(/\s+/g, ' ').trim()]));
+      expect(rows).toHaveLength(9);
+      for (const [range, shown] of rows) {
+        const [from, to] = range.split('-').map(Number);
+        for (let n = from; n <= to; n++) expect(shown, `price list row ${range}`).toBe(`${PRICES[n]} MDL`);
+      }
+    });
+
+    test('check-in card refuses an empty submit and team sizes outside 2 to 11', async ({ page }) => {
+      await open(page, lang);
+      await captureOpen(page);
+      const form = page.locator('[data-checkin]');
+      await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await form.locator('button[type="submit"]').click();
+      expect(await opened(page)).toHaveLength(0);
+      await form.locator('input[name="date"]').fill('2031-03-14');
+      await form.locator('input[name="time"]').fill('19:30');
+      await form.locator('input[name="name"]').fill('Test');
+      await form.locator('input[name="phone"]').fill('+373 600 00 000');
+      for (const bad of ['1', '12', '0']) {
+        await form.locator('input[name="team"]').fill(bad);
+        await form.locator('button[type="submit"]').click();
+        expect(await opened(page), `team ${bad}`).toHaveLength(0);
+      }
+    });
+
+    test('gift voucher opens WhatsApp with team size and recipient', async ({ page }) => {
+      await open(page, lang);
+      await captureOpen(page);
+      const form = page.locator('[data-voucher]');
+      await form.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      const sizes = await form.locator('select[name="team"] option').allTextContents();
+      expect(sizes.map(Number)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+      await form.locator('button[type="submit"]').click();
+      expect(await opened(page), 'recipient is required').toHaveLength(0);
+      await form.locator('select[name="team"]').selectOption('6');
+      await form.locator('input[name="recipient"]').fill('Mihai B.');
+      await form.locator('button[type="submit"]').click();
+      const urls = await opened(page);
+      expect(urls).toHaveLength(1);
+      const lines = messageOf(urls[0]).split('\n');
+      expect(lines).toHaveLength(3);
+      expect(lines[0]).toContain(BRAND);
+      expect(lines[1]).toMatch(/: 6$/);
+      expect(lines[2]).toMatch(/: Mihai B\.$/);
+    });
+
+    test('confirmed values are shown: no placeholder for players, duration, price or hours', async ({ page }) => {
+      await open(page, lang);
+      const fob = (no: string) => page.locator(`[data-fob="${no}"] .fob__value`);
+      await expect(fob('01')).toHaveText('2-11');
+      await expect(fob('02')).toContainText('60');
+      await expect(fob('04')).toContainText('1000 MDL');
+      for (const no of ['01', '02', '04']) await expect(fob(no)).not.toContainText(ASK[lang]);
+      // Age is still unknown, so that one fob keeps the neutral placeholder.
+      await expect(fob('03')).toHaveText(ASK[lang]);
+      const hours = (await page.locator('[data-hours] li').allTextContents()).map((t) => t.replace(/\s+/g, ' ').trim());
+      expect(hours).toHaveLength(3);
+      expect(hours[0]).toContain('16:00-03:00');
+      expect(hours[1]).toContain('16:00-00:00');
+      // Saturday and Sunday are round the clock: a phrase, not a time range.
+      expect(hours[2]).not.toContain(':');
+      for (const sel of ['#prices', '#location', '#checkin']) await expect(page.locator(sel)).not.toContainText(ASK[lang]);
+      await expect(page.locator('a[href*="place_id:ChIJ8UbS8b3Xy0ARaOu6EZ-iXhU"]')).toHaveCount(1);
+      await expect(page.locator('[data-review]')).toHaveAttribute('href', 'https://search.google.com/local/writereview?placeid=ChIJ8UbS8b3Xy0ARaOu6EZ-iXhU');
+    });
+
+    test('share image: og:image and twitter:card are wired to a 1200 x 630 picture', async ({ page, request }) => {
+      await open(page, lang);
+      const og = await page.locator('meta[property="og:image"]').getAttribute('content');
+      expect(og).toBe(`https://happygamer1919-tech.github.io${BASE}/og/${lang}.jpg`);
+      await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image');
+      await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute('content', og!);
+      const res = await request.get(`${BASE}/og/${lang}.jpg`);
+      expect(res.status()).toBe(200);
+      const size = await page.evaluate(
+        (src) =>
+          new Promise<number[]>((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve([img.naturalWidth, img.naturalHeight]);
+            img.onerror = () => reject(new Error('image did not load'));
+            img.src = src;
+          }),
+        `${BASE}/og/${lang}.jpg`,
+      );
+      expect(size).toEqual([1200, 630]);
+    });
+
+    test('floating WhatsApp button and no slots link while SLOTS_URL is empty', async ({ page }) => {
+      await open(page, lang);
+      const wa = page.locator('[data-wa-float]');
+      await expect(wa).toBeVisible();
+      const href = (await wa.getAttribute('href'))!;
+      expect(messageOf(href)).toContain(BRAND);
+      await expect(page.locator('[data-slots]')).toHaveCount(0);
     });
 
     test('internal links resolve under the base path', async ({ page, request }) => {
@@ -174,7 +313,7 @@ for (const lang of LANGS) {
           expect(h.startsWith(`${BASE}/`), `${h} is under ${BASE}`).toBe(true);
           pages.add(h);
         } else {
-          expect(h, 'only tel:, wa.me and Google Maps leave the site').toMatch(/^(tel:\+37368232596|https:\/\/www\.google\.com\/maps\/)/);
+          expect(h, 'only tel:, wa.me and Google leave the site').toMatch(/^(tel:\+37368232596|https:\/\/wa\.me\/37368232596\?|https:\/\/www\.google\.com\/maps\/|https:\/\/search\.google\.com\/local\/writereview\?)/);
         }
       }
       for (const p of pages) {
@@ -190,23 +329,15 @@ for (const lang of LANGS) {
       }
     });
 
-    test('contact level changes tint and copy', async ({ page }) => {
+    test('contact levels are off: one line about limits, no level promises anywhere', async ({ page }) => {
       await open(page, lang);
-      await page.locator('#keys').scrollIntoViewIfNeeded();
-      const visible = page.locator('.lvl__text:visible');
-      await expect(visible).toHaveCount(1);
-      const before = await visible.textContent();
-      const tintBefore = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--tint-a').trim());
-      // Centre the control: at the bottom edge of a phone the sticky Book bar would cover it.
-      const pick = page.locator('#keys input[value="hardcore"]');
-      await pick.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-      await pick.check({ force: true });
-      await expect(page.locator('html')).toHaveAttribute('data-level', 'hardcore');
-      await expect(visible).toHaveCount(1);
-      expect(await visible.textContent()).not.toBe(before);
-      const tintAfter = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--tint-a').trim());
-      expect(tintAfter).not.toBe(tintBefore);
-      await expect(page.locator('#checkin input[name="level"][value="hardcore"]')).toBeChecked();
+      await expect(page.locator('[data-level-input]')).toHaveCount(0);
+      await expect(page.locator('[data-limits]')).toBeVisible();
+      const body = (await page.locator('body').textContent()) ?? '';
+      expect(body).not.toMatch(/Hardcore|Standard|Contact level|Nivel de contact|Уровень контакта/);
+      await expect(page.locator('html')).toHaveAttribute('data-level', 'standard');
+      // The free-text field for limits is still on the card.
+      await expect(page.locator('#checkin textarea[name="comment"]')).toHaveCount(1);
     });
 
     test('review quotes stay hidden while the config array is empty', async ({ page }) => {
@@ -264,6 +395,7 @@ test('root redirects to the default language and robots.txt blocks crawlers', as
 test('unknown paths get the 404 page with links back', async ({ page }) => {
   const res = await page.goto(`${BASE}/no-such-room/`);
   expect(res!.status()).toBe(404);
+  await expect(page.locator('[data-wa-float]')).toBeVisible();
   for (const l of LANGS) await expect(page.locator(`a[href="${BASE}/${l}/"]`)).toHaveCount(1);
 });
 
