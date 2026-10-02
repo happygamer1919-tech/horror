@@ -12,6 +12,7 @@ import monoCyrillic from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-cyrillic
 
 import { SITE_INDEXABLE, LANGS, DEFAULT_LANG, abs, href, type Lang } from '../config';
 import { copy, site } from '../content';
+import WaFloat from '../components/WaFloat.astro';
 
 interface Props {
   lang: Lang;
@@ -24,12 +25,15 @@ interface Props {
 
 const { lang, path = `/${lang}/`, alternates = true, jsonLd = [] } = Astro.props;
 const t = copy[lang];
-const brand = site.brand[lang];
-const title = Astro.props.title ?? t.meta.title(brand);
+const brand = site.brand;
+const title = Astro.props.title ?? t.meta.title(brand, site.brandSubtitle[lang]);
+// Social share image: rendered from the hero by scripts/og.mjs into public/og/.
+const ogImage = abs(`/og/${lang}.jpg`);
 const description = Astro.props.description ?? t.meta.description;
 
 // Preload only the files the first screen needs for this language.
-const preloads = lang === 'ru' ? [serifCyrillic, monoCyrillic] : lang === 'ro' ? [serifLatin, serifLatinExt, monoLatin] : [serifLatin, monoLatin];
+// The wordmark is Cyrillic on every page, so the Cyrillic serif is always needed first.
+const preloads = lang === 'ru' ? [serifCyrillic, monoCyrillic] : lang === 'ro' ? [serifCyrillic, serifLatin, monoLatin] : [serifCyrillic, serifLatin, monoLatin];
 ---
 
 <!doctype html>
@@ -56,6 +60,16 @@ const preloads = lang === 'ru' ? [serifCyrillic, monoCyrillic] : lang === 'ro' ?
     <meta property="og:url" content={abs(path)} />
     <meta property="og:locale" content={t.locale.replace('-', '_')} />
     <meta property="og:site_name" content={brand} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={t.meta.ogAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={t.meta.ogAlt} />
     {SITE_INDEXABLE && jsonLd.map((data) => <script type="application/ld+json" set:html={JSON.stringify(data)} />)}
     <script is:inline>
       (function () {
@@ -74,6 +88,7 @@ const preloads = lang === 'ru' ? [serifCyrillic, monoCyrillic] : lang === 'ro' ?
   <body data-title={title} data-hidden-title={t.meta.hiddenTitle}>
     <a class="skip-link" href="#main">{t.ui.skipToContent}</a>
     <slot />
+    <WaFloat lang={lang} />
     <div class="torch" aria-hidden="true"><div class="torch__beam"></div></div>
     <div class="tint" aria-hidden="true"></div>
     <div class="dim" aria-hidden="true"></div>
