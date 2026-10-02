@@ -44,9 +44,11 @@ export const ro: Copy = {
     line: 'Vă așteptam.',
     sub: 'Un hotel vechi care nu s-a închis niciodată. O gazdă care nu a plecat. O oră ca să găsiți cheia și să aflați de ce.',
     cta: 'Check-in',
+    route: 'Traseu',
+    routeNote: 'Traseu în Google Maps, se deschide într-o filă nouă',
     tel: 'Sunați la recepție',
     hint: 'Liftul merge doar în jos',
-    facadeAlt: 'Fațada unui hotel vechi, noaptea. O firmă roșie de neon pe care scrie HOTEL, cu o literă care se stinge.',
+    facadeAlt: 'Fațada unui hotel vechi, noaptea, pe ploaie. O firmă roșie de neon pe care scrie HOTEL: litera E atârnă într-un singur șurub și pâlpâie.',
   },
   corridor: {
     title: 'Coridorul',

@@ -1,6 +1,6 @@
 ---
 import type { Lang } from '../config';
-import { copy, site, SLOTS_URL } from '../content';
+import { copy, site } from '../content';
 
 interface Props {
   lang: Lang;
@@ -11,6 +11,7 @@ const brand = site.brand;
 const subtitle = site.brandSubtitle[lang];
 const cut = brand.lastIndexOf(' ');
 const brandLines = cut > 0 ? [brand.slice(0, cut), brand.slice(cut + 1)] : [brand];
+const routeAddress = `${site.address.street}, ${site.city[lang]}`;
 
 // Facade geometry, viewBox 600 x 900. Everything is generated, there are no image files.
 const COLS = 5;
@@ -31,12 +32,40 @@ for (let r = 0; r < ROWS; r++) {
     windows.push({ r, c, x: winX(c), y: winY(r), kind: dressing[r][c], lit: r === LIT.r && c === LIT.c });
   }
 }
-const letters = ['H', 'O', 'T', 'E', 'L'].map((ch, i) => ({ ch, x: 112 + i * 94, dying: ch === 'E' }));
+const mullion = `M${WIN_W / 2} 0V${WIN_H}M0 ${WIN_H * 0.42}H${WIN_W}`;
+
+// The sign. Four letters are bolted down. The E hangs from one fixing and is built apart,
+// as its own small layers, so its flicker never repaints anything else (see neon.ts).
+const letters = ['H', 'O', 'T', 'E', 'L'].map((ch, i) => ({ ch, x: 112 + i * 94 }));
+const fixed = letters.filter((l) => l.ch !== 'E');
+const E = { x: 394, y: 128, box: { x: 326, y: 22, s: 136 }, pivot: { x: 364, y: 56 } };
+const eView = `${E.box.x} ${E.box.y} ${E.box.s} ${E.box.s}`;
+const eOrigin = `${(((E.pivot.x - E.box.x) / E.box.s) * 100).toFixed(2)}% ${(((E.pivot.y - E.box.y) / E.box.s) * 100).toFixed(2)}%`;
+// Tube sections of the E. Each one has its own brightness. Rest levels are what the
+// page shows without motion (reduced motion, no script): an uneven, partly lit letter.
+const eSegs = [
+  { id: 'spine', rest: 0.92, clip: { x: 340, y: 30, w: 49, h: 120 } },
+  { id: 'top', rest: 0.72, clip: { x: 389, y: 30, w: 60, h: 51 } },
+  { id: 'mid', rest: 0.28, clip: { x: 389, y: 81, w: 60, h: 24 } },
+  { id: 'bot', rest: 0.55, clip: { x: 389, y: 105, w: 60, h: 45 } },
+];
+// Spark canvas: fixed to the scaffold next to the torn feed cable, it does not sway.
+const SPARK = { x: 376, y: 84, w: 112, h: 150 };
+
 const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i === 3 || i === 8 }));
+
+// Seen only while lightning lights the building: somebody stands at every bare window.
+const watchers = windows
+  .filter((w) => !w.lit && (w.kind === '-' || w.kind === 'h'))
+  .map((w, i) => {
+    const k = (i * 37 + w.r * 11 + w.c * 5) % 10;
+    return { x: w.x, y: w.y, cx: w.kind === 'h' ? 46 : 20 + ((k * 7) % 26), s: k % 4 === 0 ? 0.66 : 0.9 + (k % 3) * 0.06 };
+  });
 ---
 
-<section class="hero" id="lobby" data-dark="0.9" aria-labelledby="hero-title">
+<section class="hero" id="lobby" data-dark="0.97" data-dark-touch="0.97" aria-labelledby="hero-title">
   <canvas class="hero__fog" data-fog aria-hidden="true"></canvas>
+  <div class="hero__sky" aria-hidden="true"></div>
 
   <div class="facade" data-facade>
     <svg class="facade__base" viewBox="0 0 600 900" preserveAspectRatio="xMidYMin slice" role="img" aria-label={t.hero.facadeAlt}>
@@ -50,56 +79,122 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
         </linearGradient>
       </defs>
 
-      <!-- sign scaffold on the roof -->
-      <g stroke="#2a2420" stroke-width="2" fill="none">
-        <path d="M70 150V34M530 150V34M70 34H530M70 140H530"></path>
-        <path d="M70 140L112 34M159 140L112 34M159 140L206 34M253 140L206 34M253 140L300 34M347 140L300 34M347 140L394 34M441 140L394 34M441 140L488 34M530 140L488 34" stroke-width="1" opacity="0.6"></path>
-      </g>
-      <!-- dead tubes: what the sign looks like with the power off -->
-      <g class="tubes tubes--dead" aria-hidden="true">
-        {letters.map((l) => <text x={l.x} y="128">{l.ch}</text>)}
-      </g>
+      <g id="bldg">
+        <!-- sign scaffold on the roof -->
+        <g stroke="#2a2420" stroke-width="2" fill="none">
+          <path d="M70 150V34M530 150V34M70 34H530M70 140H530"></path>
+          <path d="M70 140L112 34M159 140L112 34M159 140L206 34M253 140L206 34M253 140L300 34M347 140L300 34M347 140L394 34M441 140L394 34M441 140L488 34M530 140L488 34" stroke-width="1" opacity="0.6"></path>
+        </g>
+        <!-- dead tubes: what the sign looks like with the power off -->
+        <g class="tubes tubes--dead" aria-hidden="true">
+          {fixed.map((l) => <text x={l.x} y="128">{l.ch}</text>)}
+        </g>
+        <!-- what is left of the E's mounting: one bracket still holds, the rest gave way -->
+        <g fill="none" stroke="#3a322c" stroke-linecap="round">
+          <path d={`M${E.pivot.x} 34V${E.pivot.y - 3}`} stroke-width="3"></path>
+          <path d="M427 34V45l4 5" stroke-width="3"></path>
+          <path d="M370 140v-7M421 140v-5l3-3" stroke-width="2.4"></path>
+          <!-- torn feed cable, hanging off the scaffold -->
+          <path d="M446 140c1-9-1-15-5-19c-3-3-6-3-9-1" stroke="#1c1715" stroke-width="2.2"></path>
+          <path d="M432 120l-3 1M432 120l-2-2" stroke="#8a6a34" stroke-width="0.9"></path>
+        </g>
 
-      <!-- building -->
-      <rect x="60" y="150" width="480" height="750" fill="url(#wallfade)"></rect>
-      <rect x="60" y="150" width="480" height="750" fill="url(#brick)"></rect>
-      <rect x="48" y="150" width="504" height="18" fill="#2a2420"></rect>
-      <rect x="54" y="168" width="492" height="6" fill="#0f0d0c"></rect>
-      <path d="M76 174V900" stroke="#0f0d0c" stroke-width="5"></path>
-      <path d="M524 174V900" stroke="#0f0d0c" stroke-width="5"></path>
-      <rect x="60" y="742" width="480" height="8" fill="#2a2420"></rect>
+        <!-- building -->
+        <rect x="60" y="150" width="480" height="750" fill="url(#wallfade)"></rect>
+        <rect x="60" y="150" width="480" height="750" fill="url(#brick)"></rect>
+        <rect x="48" y="150" width="504" height="18" fill="#2a2420"></rect>
+        <rect x="54" y="168" width="492" height="6" fill="#0f0d0c"></rect>
+        <path d="M76 174V900" stroke="#0f0d0c" stroke-width="5"></path>
+        <path d="M524 174V900" stroke="#0f0d0c" stroke-width="5"></path>
+        <rect x="60" y="742" width="480" height="8" fill="#2a2420"></rect>
 
+        {
+          windows.map((w) => (
+            <g transform={`translate(${w.x} ${w.y})`}>
+              <rect x="-5" y="-5" width={WIN_W + 10} height={WIN_H + 10} fill="#2d2622" />
+              <rect width={WIN_W} height={WIN_H} fill="#090808" />
+              {w.kind === 'c' && <path d={`M0 0H${WIN_W}V${WIN_H}H${WIN_W - 14}C${WIN_W - 16} 50 ${WIN_W - 24} 20 ${WIN_W / 2} 6C24 20 16 50 14 ${WIN_H}H0Z`} fill="#1b1614" />}
+              {w.kind === 'h' && <path d={`M0 0H${WIN_W * 0.62}C${WIN_W * 0.55} 30 ${WIN_W * 0.4} 60 ${WIN_W * 0.3} ${WIN_H}H0Z`} fill="#1b1614" />}
+              {w.kind === 'b' && <path d={Array.from({ length: 9 }, (_, i) => `M2 ${6 + i * 6}H${WIN_W - 2}`).join('')} stroke="#1d1815" stroke-width="3" />}
+            </g>
+          ))
+        }
+        <g id="bldg-bars">
+          {
+            windows.map((w) => (
+              <g transform={`translate(${w.x} ${w.y})`}>
+                <path d={mullion} stroke="#2d2622" stroke-width="4" />
+                <rect x="-9" y={WIN_H + 5} width={WIN_W + 18} height="6" fill="#322b26" />
+              </g>
+            ))
+          }
+        </g>
+
+        <!-- ground floor -->
+        <g>
+          <rect x="92" y="772" width="88" height="106" fill="#090808" stroke="#2d2622" stroke-width="5"></rect>
+          <rect x="420" y="772" width="88" height="106" fill="#090808" stroke="#2d2622" stroke-width="5"></rect>
+          <path d="M136 772V878M464 772V878" stroke="#2d2622" stroke-width="4"></path>
+          <!-- entrance: the left leaf is shut, the right one stands ajar on a black lobby -->
+          <rect x="236" y="776" width="128" height="124" fill="#0b0909" stroke="#3a312b" stroke-width="6"></rect>
+          <path d="M244 822H296" stroke="#1a1512" stroke-width="3"></path>
+          <rect x="288" y="836" width="5" height="20" fill="#6b5327"></rect>
+          <path d="M299.5 776V900" stroke="#3a312b" stroke-width="5"></path>
+          <rect x="302" y="779" width="59" height="121" fill="#000"></rect>
+          <path d="M361 779L324 787V896L361 900Z" fill="#110e0d" stroke="#3a312b" stroke-width="3" stroke-linejoin="round"></path>
+          <path d="M356 789L330 794V890L356 893Z" fill="#0a0808"></path>
+          <path d="M330 826L356 823" stroke="#1a1512" stroke-width="2.4"></path>
+          <rect x="326" y="838" width="3.4" height="18" fill="#6b5327"></rect>
+          <path d="M184 752H416L430 774H170Z" fill="#231d1a"></path>
+          <rect x="170" y="774" width="260" height="6" fill="#0f0d0c"></rect>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="facade facade--lit" aria-hidden="true">
+    <div class="hero__glow"></div>
+
+    <!-- The building as lightning shows it. Invisible except during a strike (facade.ts). -->
+    <svg class="facade__storm" viewBox="0 0 600 900" preserveAspectRatio="xMidYMin slice" data-storm>
+      <defs>
+        <filter id="stormlit" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feComponentTransfer>
+            <feFuncR type="linear" slope="2.9" intercept="0.02"></feFuncR>
+            <feFuncG type="linear" slope="3.4" intercept="0.035"></feFuncG>
+            <feFuncB type="linear" slope="4.3" intercept="0.07"></feFuncB>
+          </feComponentTransfer>
+        </filter>
+        <linearGradient id="stormfall" x1="0" y1="0" x2="1" y2="0.8">
+          <stop offset="0" stop-color="#e6edff" stop-opacity="0.2"></stop>
+          <stop offset="0.45" stop-color="#e6edff" stop-opacity="0"></stop>
+          <stop offset="0.55" stop-color="#05060a" stop-opacity="0"></stop>
+          <stop offset="1" stop-color="#05060a" stop-opacity="0.5"></stop>
+        </linearGradient>
+      </defs>
+      <g filter="url(#stormlit)"><use href="#bldg"></use></g>
+      <rect x="60" y="150" width="480" height="750" fill="url(#stormfall)"></rect>
       {
-        windows.map((w) => (
-          <g transform={`translate(${w.x} ${w.y})`}>
-            <rect x="-5" y="-5" width={WIN_W + 10} height={WIN_H + 10} fill="#2d2622" />
-            <rect width={WIN_W} height={WIN_H} fill="#090808" />
-            {w.kind === 'c' && <path d={`M0 0H${WIN_W}V${WIN_H}H${WIN_W - 14}C${WIN_W - 16} 50 ${WIN_W - 24} 20 ${WIN_W / 2} 6C24 20 16 50 14 ${WIN_H}H0Z`} fill="#1b1614" />}
-            {w.kind === 'h' && <path d={`M0 0H${WIN_W * 0.62}C${WIN_W * 0.55} 30 ${WIN_W * 0.4} 60 ${WIN_W * 0.3} ${WIN_H}H0Z`} fill="#1b1614" />}
-            {w.kind === 'b' && <path d={Array.from({ length: 9 }, (_, i) => `M2 ${6 + i * 6}H${WIN_W - 2}`).join('')} stroke="#1d1815" stroke-width="3" />}
-            <path d={`M${WIN_W / 2} 0V${WIN_H}M0 ${WIN_H * 0.42}H${WIN_W}`} stroke="#2d2622" stroke-width="4" />
-            <rect x="-9" y={WIN_H + 5} width={WIN_W + 18} height="6" fill="#322b26" />
+        watchers.map((f) => (
+          <g transform={`translate(${f.x} ${f.y})`}>
+            <g transform={`translate(${f.cx} ${WIN_H}) scale(${f.s}) translate(${-f.cx} ${-WIN_H})`} fill="#c3ccdb" opacity="0.62">
+              <ellipse cx={f.cx} cy="31" rx="7" ry="8.6" />
+              <path d={`M${f.cx - 15} ${WIN_H}C${f.cx - 15} 54 ${f.cx - 10} 46 ${f.cx - 4} 43H${f.cx + 4}C${f.cx + 10} 46 ${f.cx + 15} 54 ${f.cx + 15} ${WIN_H}Z`} />
+            </g>
           </g>
         ))
       }
-
-      <!-- ground floor -->
-      <g>
-        <rect x="92" y="772" width="88" height="106" fill="#090808" stroke="#2d2622" stroke-width="5"></rect>
-        <rect x="420" y="772" width="88" height="106" fill="#090808" stroke="#2d2622" stroke-width="5"></rect>
-        <path d="M136 772V878M464 772V878" stroke="#2d2622" stroke-width="4"></path>
-        <rect x="236" y="776" width="128" height="124" fill="#0b0909" stroke="#3a312b" stroke-width="6"></rect>
-        <path d="M300 776V900" stroke="#3a312b" stroke-width="5"></path>
-        <rect x="288" y="836" width="5" height="20" fill="#6b5327"></rect>
-        <rect x="307" y="836" width="5" height="20" fill="#6b5327"></rect>
-        <path d="M184 752H416L430 774H170Z" fill="#231d1a"></path>
-        <rect x="170" y="774" width="260" height="6" fill="#0f0d0c"></rect>
+      <!-- and in the open door -->
+      <g fill="#c3ccdb" opacity="0.7">
+        <ellipse cx="311" cy="812" rx="6" ry="8"></ellipse>
+        <path d="M303 900V838C303 828 306 823 311 823S319 828 320 838V900Z"></path>
+        <path d="M321 846c3-1 5-1 6 1v7c-2 2-4 2-6 1Z"></path>
       </g>
+      <ellipse cx="313.4" cy="811" rx="1.3" ry="1.6" fill="#07090d"></ellipse>
+      <g filter="url(#stormlit)"><use href="#bldg-bars"></use></g>
     </svg>
 
-    <div class="hero__glow" aria-hidden="true"></div>
-
-    <svg class="facade__lit" viewBox="0 0 600 900" preserveAspectRatio="xMidYMin slice" aria-hidden="true">
+    <svg class="facade__lit" viewBox="0 0 600 900" preserveAspectRatio="xMidYMin slice">
       <defs>
         <filter id="neonblur" x="-30%" y="-60%" width="160%" height="220%">
           <feGaussianBlur stdDeviation="7"></feGaussianBlur>
@@ -108,26 +203,45 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
           <feGaussianBlur stdDeviation="10"></feGaussianBlur>
         </filter>
         <linearGradient id="redwash" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#ff2d2d" stop-opacity="0.2"></stop>
+          <stop offset="0" stop-color="#ff2d2d" stop-opacity="0.1"></stop>
           <stop offset="1" stop-color="#ff2d2d" stop-opacity="0"></stop>
         </linearGradient>
-        <linearGradient id="doorlight" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#d9b46c" stop-opacity="0.34"></stop>
-          <stop offset="1" stop-color="#d9b46c" stop-opacity="0.06"></stop>
+        <!-- The sign as a light source: it shows the scaffold and the top floors in red. -->
+        <filter id="redlit" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feColorMatrix type="matrix" values="0.95 0.95 0.95 0 0  0.15 0.15 0.15 0 0  0.14 0.14 0.14 0 0  0 0 0 1 0"></feColorMatrix>
+        </filter>
+        <linearGradient id="redfall" gradientUnits="userSpaceOnUse" x1="0" y1="20" x2="0" y2="500">
+          <stop offset="0" stop-color="#fff" stop-opacity="0.6"></stop>
+          <stop offset="0.2" stop-color="#fff" stop-opacity="1"></stop>
+          <stop offset="0.3" stop-color="#fff" stop-opacity="0.8"></stop>
+          <stop offset="0.5" stop-color="#fff" stop-opacity="0.34"></stop>
+          <stop offset="0.75" stop-color="#fff" stop-opacity="0.09"></stop>
+          <stop offset="1" stop-color="#fff" stop-opacity="0"></stop>
         </linearGradient>
+        <mask id="redmask" maskUnits="userSpaceOnUse" x="0" y="0" width="600" height="500">
+          <rect x="0" y="0" width="600" height="500" fill="url(#redfall)"></rect>
+        </mask>
         <linearGradient id="roomlight" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="#d9b46c"></stop>
           <stop offset="1" stop-color="#8a6a34"></stop>
         </linearGradient>
+        <linearGradient id="dooredge" gradientUnits="userSpaceOnUse" x1="0" y1="786" x2="0" y2="898">
+          <stop offset="0" stop-color="#d9b46c" stop-opacity="0.3"></stop>
+          <stop offset="1" stop-color="#f1d59a" stop-opacity="0.95"></stop>
+        </linearGradient>
+        {eSegs.map((s) => <clipPath id={`eseg-${s.id}`}><rect x={s.clip.x} y={s.clip.y} width={s.clip.w} height={s.clip.h} /></clipPath>)}
       </defs>
 
-      <!-- red light spilling from the sign onto the top floors -->
+      <!-- red light spilling from the sign onto the scaffold and the top floors -->
+      <g mask="url(#redmask)">
+        <g filter="url(#redlit)"><use href="#bldg"></use></g>
+      </g>
       <rect x="60" y="150" width="480" height="300" fill="url(#redwash)"></rect>
 
-      <!-- the sign: one group per letter so a single letter can fail -->
+      <!-- the four letters that still hold -->
       {
-        letters.map((l) => (
-          <g class="letter" data-dying={l.dying ? '' : undefined}>
+        fixed.map((l) => (
+          <g class="letter">
             <text class="tubes tubes--glow" x={l.x} y="128" filter="url(#neonblur)">
               {l.ch}
             </text>
@@ -143,17 +257,62 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
         <rect x="-10" y="-10" width={WIN_W + 20} height={WIN_H + 20} fill="#d9b46c" opacity="0.28" filter="url(#softblur)"></rect>
         <rect width={WIN_W} height={WIN_H} fill="url(#roomlight)" opacity="0.72"></rect>
         <path d={`M0 0H${WIN_W * 0.5}C${WIN_W * 0.46} 34 ${WIN_W * 0.3} 62 ${WIN_W * 0.22} ${WIN_H}H0Z`} fill="#2a2018" opacity="0.9"></path>
-        <path d={`M${WIN_W / 2} 0V${WIN_H}M0 ${WIN_H * 0.42}H${WIN_W}`} stroke="#1a1512" stroke-width="4"></path>
+        <path d={mullion} stroke="#1a1512" stroke-width="4"></path>
       </g>
 
-      <!-- entrance: light behind the door glass, bulbs under the canopy -->
-      <rect x="236" y="776" width="128" height="124" fill="#d9b46c" opacity="0.1" filter="url(#softblur)"></rect>
-      <rect x="244" y="784" width="50" height="116" fill="url(#doorlight)"></rect>
-      <rect x="306" y="784" width="50" height="116" fill="url(#doorlight)"></rect>
-      <path d="M244 822H294M306 822H356" stroke="#1a1512" stroke-width="3"></path>
+      <!-- entrance: a line of light on the edge of the open leaf, bulbs under the canopy -->
+      <rect x="314" y="820" width="10" height="80" fill="#d9b46c" opacity="0.1" filter="url(#softblur)"></rect>
+      <path d="M323 788V896" stroke="url(#dooredge)" stroke-width="1.7"></path>
+      <path d="M306 900L322 896.5V900Z" fill="#e9c98a" opacity="0.4"></path>
       {bulbs.map((b) => <circle cx={b.x} cy="779" r="2.6" fill={b.dead ? '#3a2f22' : '#f0cd86'} opacity={b.dead ? 1 : 0.9} />)}
     </svg>
+
+    <!-- whoever is in the lit room. Present on one pass of the light, gone on the next. -->
+    <div class="fx figure" data-figure="far" style={`--x:${winX(LIT.c)};--y:${winY(LIT.r)};--w:${WIN_W};--h:${WIN_H}`}>
+      <svg viewBox={`0 0 ${WIN_W} ${WIN_H}`}>
+        <g class="figure__body" fill="#120b07">
+          <ellipse cx="46.4" cy="32" rx="5.8" ry="7.4" transform="rotate(7 46 40)"></ellipse>
+          <path d={`M34.5 ${WIN_H}C34 66 34.5 53 39 49.5C41.5 47.6 43.6 47 44 42H48.6C49 47 51 47.6 53.5 49.5C58 53 58.6 66 58.2 ${WIN_H}Z`}></path>
+        </g>
+        <path d={mullion} stroke="#1a1512" stroke-width="4"></path>
+      </svg>
+    </div>
+
+    <!-- the E: one fixing left, a static lean plus a slow sway, and a bad feed -->
+    <div class="fx sign-e" data-dying style={`--x:${E.box.x};--y:${E.box.y};--w:${E.box.s};--h:${E.box.s};transform-origin:${eOrigin}`}>
+      <svg viewBox={eView}>
+        <text class="tubes tubes--dead" x={E.x} y={E.y}>E</text>
+      </svg>
+      {
+        eSegs.map((s) => (
+          <>
+            <svg viewBox={eView} class="sign-e__seg" data-seg={s.id} style={`opacity:${Math.pow(s.rest, 0.6).toFixed(3)}`}>
+              <g filter="url(#neonblur)">
+                <text class="tubes tubes--glow" x={E.x} y={E.y} clip-path={`url(#eseg-${s.id})`}>
+                  E
+                </text>
+              </g>
+              <g clip-path={`url(#eseg-${s.id})`}>
+                <text class="tubes tubes--red" x={E.x} y={E.y}>E</text>
+              </g>
+            </svg>
+            <svg viewBox={eView} class="sign-e__seg" data-core={s.id} style={`opacity:${Math.pow(s.rest, 1.8).toFixed(3)}`}>
+              <g clip-path={`url(#eseg-${s.id})`}>
+                <text class="tubes tubes--live" x={E.x} y={E.y}>E</text>
+              </g>
+            </svg>
+          </>
+        ))
+      }
+      <svg viewBox={eView}>
+        <rect x={E.pivot.x - 5} y={E.pivot.y - 4} width="10" height="8" rx="1" fill="#2a2420" stroke="#15110f" stroke-width="0.8"></rect>
+        <circle cx={E.pivot.x} cy={E.pivot.y} r="2.6" fill="#5a4f45" stroke="#15110f" stroke-width="0.8"></circle>
+      </svg>
+    </div>
+    <canvas class="fx sparks" data-sparks style={`--x:${SPARK.x};--y:${SPARK.y};--w:${SPARK.w};--h:${SPARK.h}`}></canvas>
   </div>
+
+  <canvas class="hero__rain" data-rain aria-hidden="true"></canvas>
 
   <div class="hero__body wrap">
     <p class="hero__kicker">
@@ -165,11 +324,22 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     {subtitle && <p class="hero__alt">{subtitle}</p>}
     <p class="hero__line">{t.hero.line}</p>
     <p class="hero__sub">{t.hero.sub}</p>
-    <div class="hero__cta">
-      <a class="btn btn--primary" href="#checkin" data-cta>{t.hero.cta}</a>
-      {SLOTS_URL && <a class="link hero__tel" href={SLOTS_URL} target="_blank" rel="noopener noreferrer" data-slots>{t.ui.slots}</a>}
-      <a class="link hero__tel" href={`tel:${site.phone.e164}`}>{t.hero.tel}</a>
+    <!-- Second light layer, over the copy only: outside the beam the words fall back to a
+         ghost, inside it they read at full strength. Same beam, moved by torch.ts. -->
+    <div class="hero__veil" aria-hidden="true">
+      <div class="veil"><div class="torch__beam"><i></i><i></i><i></i><i></i></div></div>
     </div>
+  </div>
+
+  <!-- Always lit, wherever the light is. -->
+  <div class="hero__cta wrap">
+    <a class="btn btn--primary" href="#checkin" data-cta>{t.hero.cta}</a>
+    <a class="hero__route" href={site.maps.directionsUrl} target="_blank" rel="noopener noreferrer" data-route>
+      <span class="btn btn--route">{t.hero.route}</span>
+      <span class="hero__addr" data-route-address>{routeAddress}</span>
+      <span class="sr-only">{t.hero.routeNote}</span>
+    </a>
+    <a class="link hero__tel" href={`tel:${site.phone.e164}`}>{t.hero.tel}</a>
   </div>
 
   <p class="hero__hint" aria-hidden="true"><span></span>{t.hero.hint}</p>
@@ -187,14 +357,24 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     overflow: clip;
   }
 
-  /* WebGL fog. Additive over the darkness, so it reads as light in the air. */
+  /* Stacking, bottom to top. The page flashlight (.torch, global.css) sits at 40.
+       0   .facade            the building: only the beam shows it
+      40   .torch             darkness with a hole in it
+      41   .hero__sky         lightning in the sky
+      44   .hero__fog         WebGL fog, lit by the sign
+      45   .facade--lit       everything that emits light: sign, lit room, door edge, storm
+      46   .hero__rain, scrim
+      47   .hero__body        copy, with its own veil on top (ghost outside the beam)
+      49   .hero__cta         buttons: always lit */
+
+  /* WebGL fog. Plain alpha over the darkness (no blend mode: a blended full-size layer
+     forces the browser to read back everything under it on every frame). */
   .hero__fog {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     z-index: 44;
-    mix-blend-mode: screen;
     pointer-events: none;
     opacity: 0;
     transition: opacity 1.6s;
@@ -210,6 +390,15 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     top: calc(var(--header-h) - 6px);
     height: 70vh;
     height: 70svh;
+    /* One facade unit (the SVG viewBox is 600 x 900, "xMidYMin slice") as a length, so
+       HTML layers can be placed on the drawing. facade.ts sets --u in px where container
+       units are missing. */
+    container-type: size;
+    --u: max(calc(100cqw / 600), calc(100cqh / 900));
+  }
+  .facade--lit {
+    z-index: 45;
+    pointer-events: none;
   }
   .facade svg {
     position: absolute;
@@ -217,9 +406,15 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     width: 100%;
     height: 100%;
   }
-  .facade__lit {
-    z-index: 45;
-    pointer-events: none;
+  .fx {
+    position: absolute;
+    left: calc(50% + (var(--x) - 300) * var(--u));
+    top: calc(var(--y) * var(--u));
+    width: calc(var(--w) * var(--u));
+    height: calc(var(--h) * var(--u));
+  }
+  .fx svg {
+    overflow: visible;
   }
 
   /* CSS fallback for the fog: a still halo behind the sign. Hidden once WebGL runs. */
@@ -231,7 +426,6 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     aspect-ratio: 2 / 1;
     transform: translate(-50%, -34%);
     background: radial-gradient(closest-side, rgba(var(--neon-rgb), 0.3), rgba(var(--neon-rgb), 0.08) 55%, transparent 100%);
-    z-index: 44;
     pointer-events: none;
     transition: opacity 1.6s;
   }
@@ -259,6 +453,13 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     stroke-width: 9;
     opacity: 0.85;
   }
+  /* A dim tube is deep red, not pale: the red body and the hot core fade apart (neon.ts). */
+  .tubes--red {
+    stroke: var(--neon);
+    stroke-width: 5;
+    fill: #1d0606;
+    paint-order: stroke fill;
+  }
   .tubes--live {
     stroke: #ffd9d2;
     stroke-width: 5;
@@ -266,8 +467,136 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     paint-order: stroke fill;
     filter: drop-shadow(0 0 3px var(--neon));
   }
-  .letter {
-    transition: opacity 0.07s linear;
+
+  /* The loose E. It leans from its one fixing and sways. Only transform and opacity change,
+     each on its own small layer. */
+  .sign-e {
+    transform: rotate(9deg);
+    will-change: transform;
+  }
+  .sign-e__seg {
+    will-change: opacity;
+  }
+  :global(html.motion) .sign-e {
+    animation: e-sway 3.1s ease-in-out infinite alternate;
+  }
+  @keyframes e-sway {
+    from {
+      transform: rotate(7.3deg);
+    }
+    to {
+      transform: rotate(10.7deg);
+    }
+  }
+  .sparks {
+    display: none;
+  }
+  :global(html.motion) .sparks {
+    display: block;
+  }
+
+  /* The guest in the lit room. */
+  .figure {
+    transition: opacity 0.28s linear;
+    will-change: opacity;
+  }
+  .figure__body {
+    transform-origin: 46px 84px;
+  }
+  .figure[data-figure='gone'] {
+    opacity: 0;
+  }
+  .figure[data-figure='near'] .figure__body {
+    transform: translate(-7px, 0) scale(1.42);
+  }
+
+  /* Lightning: one soft flash with a short decay. Never a double strobe. */
+  .facade__storm,
+  .hero__sky {
+    opacity: 0;
+    will-change: opacity;
+  }
+  .hero__sky {
+    position: absolute;
+    inset: 0;
+    z-index: 41;
+    pointer-events: none;
+    background: radial-gradient(130% 85% at 68% 0%, rgba(184, 202, 240, 0.5), rgba(120, 140, 190, 0.16) 46%, rgba(120, 140, 190, 0) 76%);
+  }
+  .hero.is-strike .facade__storm,
+  .hero.is-strike .hero__sky {
+    animation: strike 1.15s linear both;
+  }
+  .hero.is-strike .hero__veil {
+    animation: strike-veil 1.15s linear both;
+  }
+  /* Held at the peak, for screenshots (window.__hero.storm.hold). */
+  .hero.is-storm-hold .facade__storm,
+  .hero.is-storm-hold .hero__sky {
+    opacity: 1;
+  }
+  .hero.is-storm-hold .hero__veil {
+    opacity: 0.1;
+  }
+  @keyframes strike {
+    0% {
+      opacity: 0;
+    }
+    7% {
+      opacity: 1;
+    }
+    16% {
+      opacity: 0.62;
+    }
+    30% {
+      opacity: 0.34;
+    }
+    50% {
+      opacity: 0.15;
+    }
+    75% {
+      opacity: 0.04;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes strike-veil {
+    0% {
+      opacity: 1;
+    }
+    7% {
+      opacity: 0.1;
+    }
+    30% {
+      opacity: 0.6;
+    }
+    60% {
+      opacity: 0.9;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  /* Rain: a small canvas (facade.ts). Streaks only show where something lights them. */
+  .hero__rain {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 62%;
+    z-index: 46;
+    pointer-events: none;
+    display: none;
+  }
+  :global(html.motion) .hero__rain {
+    display: block;
+  }
+
+  /* While the hero is off screen its looping animations stand still (facade.ts). */
+  .hero.is-off .sign-e {
+    animation-play-state: paused;
   }
 
   /* Scrim so the copy stays readable where it overlaps the building on phones. */
@@ -285,6 +614,28 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     z-index: 47;
     display: grid;
     gap: 14px;
+  }
+  /* The veil is clipped to the copy block, so it never dims the sign or the lit room.
+     Inside it the dark layer is fixed to the viewport, like the page flashlight. */
+  .hero__veil {
+    position: absolute;
+    inset: -72px calc(var(--gutter) * -1) -10px;
+    z-index: 1;
+    /* The mask clips the fixed layer to this box and softens its top edge. It is static:
+       the browser composites it, nothing is repainted when the light or the page moves. */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 64px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 64px);
+    pointer-events: none;
+    display: none;
+  }
+  :global(html.motion) .hero__veil {
+    display: block;
+  }
+  .veil {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0.64;
   }
   .hero__kicker {
     display: flex;
@@ -334,14 +685,53 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     color: var(--bone);
     opacity: 0.86;
   }
+
+  /* Buttons: booking (red, primary) and the route (brass, second). Phones: two columns,
+     the call link under the booking button, the address under the route button. */
   .hero__cta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px 26px;
-    margin-top: 12px;
+    position: relative;
+    z-index: 49;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 12px;
+    align-items: start;
+    margin-top: 26px;
+  }
+  .hero__cta .btn--primary {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .hero__route {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    justify-self: start;
+    display: grid;
+    justify-items: start;
+    gap: 7px;
+    text-decoration: none;
+  }
+  .btn--route {
+    border-color: var(--brass-hi);
+    color: var(--brass-hi);
+    background: rgba(185, 151, 91, 0.16);
+    box-shadow:
+      inset 0 0 0 1px rgba(227, 200, 135, 0.22),
+      0 0 22px rgba(227, 200, 135, 0.16);
+  }
+  .hero__route:hover .btn--route,
+  .hero__route:focus-visible .btn--route {
+    background: var(--brass-hi);
+    color: var(--ink);
+  }
+  .hero__addr {
+    font-size: 11px;
+    line-height: 1.45;
+    letter-spacing: 0.03em;
+    color: var(--ash);
   }
   .hero__tel {
+    grid-column: 1;
+    grid-row: 2;
     display: inline-flex;
     align-items: center;
     min-height: 44px;
@@ -388,7 +778,7 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
       line-height: 1.5;
     }
     .hero__cta {
-      margin-top: 6px;
+      margin-top: 15px;
     }
   }
 
@@ -409,6 +799,9 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
       width: 66.6svh;
       max-width: 46vw;
     }
+    .hero__rain {
+      height: 100%;
+    }
     .hero__body {
       gap: 18px;
     }
@@ -419,8 +812,45 @@ const bulbs = Array.from({ length: 11 }, (_, i) => ({ x: 200 + i * 20, dead: i =
     .hero__kicker {
       max-width: min(56vw, 760px);
     }
+    .hero__veil {
+      top: -110px;
+      right: auto;
+      width: calc(min(56vw, 760px) + var(--gutter) + 150px);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 100px), linear-gradient(to left, transparent 0, #000 170px);
+      -webkit-mask-composite: source-in;
+      mask-image: linear-gradient(to bottom, transparent 0, #000 100px), linear-gradient(to left, transparent 0, #000 170px);
+      mask-composite: intersect;
+    }
+    .hero__cta {
+      grid-template-columns: auto auto auto;
+      justify-content: start;
+      gap: 0 26px;
+      margin-top: 30px;
+      padding-bottom: 26px;
+    }
+    .hero__route {
+      grid-row: 1;
+      position: relative;
+    }
+    .hero__addr {
+      position: absolute;
+      left: 0;
+      top: calc(100% + 8px);
+      white-space: nowrap;
+    }
+    .hero__tel {
+      grid-column: 3;
+      grid-row: 1;
+      min-height: 52px;
+    }
     .hero__hint {
       bottom: 34px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .figure {
+      transition: none;
     }
   }
 </style>

@@ -52,8 +52,9 @@ void main() {
   float wide = exp(-length(d) * 1.1);
   float fog = fbm(p * 2.4 + vec2(uTime * 0.035, -uTime * 0.02));
   fog = fog * 0.75 + 0.25 * fbm(p * 5.2 - vec2(uTime * 0.05, 0.0));
-  float light = (halo * 0.5 + wide * 0.34) * (0.3 + 1.0 * fog) * uGlow;
-  gl_FragColor = vec4(uColor * light, 1.0);
+  float light = clamp((halo * 0.5 + wide * 0.34) * (0.3 + 1.0 * fog) * uGlow, 0.0, 1.0);
+  // Premultiplied alpha: the fog is laid over the page as light, without a blend mode.
+  gl_FragColor = vec4(uColor * light, light);
 }`;
 
 export function initFog() {
@@ -66,7 +67,8 @@ export function initFog() {
   // compiled and run on the CPU and block the page, so there the CSS halo is the right answer.
   const probe = canvas.getContext('webgl', {
     failIfMajorPerformanceCaveat: true,
-    alpha: false,
+    alpha: true,
+    premultipliedAlpha: true,
     antialias: false,
     depth: false,
     stencil: false,
@@ -76,7 +78,7 @@ export function initFog() {
 
   let renderer: InstanceType<typeof Renderer>;
   try {
-    renderer = new Renderer({ canvas, dpr: 1, alpha: false, antialias: false, depth: false, webgl: 1, powerPreference: 'low-power' });
+    renderer = new Renderer({ canvas, dpr: 1, alpha: true, premultipliedAlpha: true, antialias: false, depth: false, webgl: 1, powerPreference: 'low-power' });
   } catch {
     return;
   }
@@ -136,7 +138,8 @@ export function initFog() {
     if (now - last > 32) {
       last = now;
       uniforms.uTime.value = now / 1000;
-      // The fog answers the failing letter, but only a little: one letter of five.
+      // The fog answers the failing letter, but only a little: one letter of five. It reads
+      // the low-passed level, never the raw flicker (see the safety note in neon.ts).
       glow += (0.82 + 0.18 * neonState.level - glow) * 0.3;
       uniforms.uGlow.value = glow;
       renderer.render({ scene: mesh });

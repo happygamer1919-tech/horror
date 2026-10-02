@@ -86,6 +86,9 @@ export interface Copy {
     line: string;
     sub: string;
     cta: string;
+    // Second hero button: route in Google Maps. `routeNote` is read by screen readers only.
+    route: string;
+    routeNote: string;
     tel: string;
     hint: string;
     facadeAlt: string;
