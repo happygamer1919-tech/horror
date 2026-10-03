@@ -273,13 +273,17 @@ for (const lang of LANGS) {
       // Choosing a level turns it on, at once, and nothing on the card moves.
       await form.locator('input[name="level"][value="weak"]').check({ force: true });
       await on('level chosen');
-      expect(await place()).toEqual(before);
+      // Compared within half a pixel: the card is still easing in, and its sub-pixel offset
+      // rounds differently from one sample to the next.
+      const flat = (v: Awaited<ReturnType<typeof place>>) => [v.card, ...[v.book, v.prompt, v.ask].flatMap((r) => [r.x, r.y, r.w, r.h])];
+      const unmoved = async () => flat(await place()).forEach((n, i) => expect(Math.abs(n - flat(before)[i]), 'nothing on the card moves').toBeLessThan(0.6));
+      await unmoved();
 
       // Clearing the team size, or a size outside 2 to 11, or not a whole number, turns it off again.
       for (const bad of ['', '1', '12', '0', '2.5']) {
         await team.fill(bad);
         await off(`team "${bad}"`);
-        expect(await place()).toEqual(before);
+        await unmoved();
         await team.fill('3');
         await on('team 3');
       }

@@ -478,6 +478,12 @@ test('touch: the drift stands still while the hero is off screen and goes on whe
   // Scrolled away by script: no touch, so the drift is still the one moving the light.
   await page.evaluate(() => window.scrollTo(0, document.getElementById('lobby')!.offsetHeight + window.innerHeight));
   await expect.poll(states, { timeout: 4000 }).toEqual(['paused', 'paused', 'paused', 'paused']);
+  // A pause is asynchronous: the state reads "paused" while the pause is still pending and the
+  // light finishes its current frame. Wait until no pause is pending before measuring.
+  await expect
+    .poll(() => page.evaluate(() => Array.from(document.querySelectorAll('.torch__drift')).some((el) => el.getAnimations()[0]?.pending)), { timeout: 4000 })
+    .toBe(false);
+  await page.waitForTimeout(100);
   const p1 = await lightNow(page);
   await page.waitForTimeout(600);
   const p2 = await lightNow(page);
