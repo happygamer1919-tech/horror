@@ -15,7 +15,8 @@ stand-in are used instead. The fingers on the door edge are part of the rendered
 
 - **Framing:** one face, front on or turned slightly to its left, filling the picture from
   hairline to chin. Portrait, about 3 : 4 (for example 600 x 810 px). Smaller is fine: on screen
-  the picture is drawn about 120 px wide on a desktop screen and 60 px on a phone, mostly in
+  the picture is drawn about 130 px wide on a desktop screen and 80 px on a phone, about half of
+  it hidden by the door edge, mostly in
   shadow, and is seen for about half a second.
 - **Background:** black, or as dark as possible. The picture is added to the darkness of the gap,
   so everything black in it disappears and everything bright in it shows.

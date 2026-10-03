@@ -124,8 +124,8 @@ her from above and in front, as it would through that gap; two cheats shape it, 
 - the catchlight in the open eye is drawn in the overlay pass (where the bulbs are), occluded by
   everything in front of it. A path-traced eye this small catches the lamp on a pixel at most.
 
-On screen the visible part of the face is about 60 to 80 px wide on a desktop and 35 to 45 CSS px
-on a 390 px phone, and it is there for about half a second. It is built to read as a pale face
+On screen the visible part of the face is about 65 px wide on a 1440 px desktop and about 35 CSS px
+on a 390 px phone (measured on docs/screenshots/19-scare-*), and it is there for about half a second. It is built to read as a pale face
 and one wet eye in the dark at that size, not to survive a close look.
 
 The scare plays in real time (15 frames at 24 fps, 625 ms) over a walk frame that is held, while
