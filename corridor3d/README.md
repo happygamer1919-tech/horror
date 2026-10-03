@@ -32,6 +32,7 @@ For a quick look at one frame or one prop:
 ```
 node corridor3d/render.mjs preview --set=mobile --frames=0,40,80 --scale=0.5 --samples=24
 node corridor3d/render.mjs shots --file=corridor3d/shots.json --scale=0.6 --only=a-shoe,a-claw
+node corridor3d/render.mjs preview --scare=8:face --fig='{"y":1.2,"k":1.08}'   # try a pose for the figure
 node corridor3d/encode.mjs --dummy    # numbered placeholder frames, no GPU needed
 ```
 
@@ -53,7 +54,11 @@ node corridor3d/encode.mjs --dummy    # numbered placeholder frames, no GPU need
    three stops when the lamps are gone.
 
 Everything is deterministic: progress in, pixels out. `Math.random` is replaced by a seeded
-generator, there is no wall clock, and a frame's seed depends only on its set and index.
+generator, there is no wall clock, and a frame's seed depends only on its set and index. The
+tracer's stratified sampler is rebuilt from that seed for every frame: it keeps its shuffle from
+one frame to the next otherwise, and a frame then depends on the frames rendered before it in the
+same browser (the held walk frame and the scare frames stopped matching outside the door).
+Rendering the same frame twice now gives the same pixels to within 3/255.
 
 Things the tracer needed:
 
@@ -62,6 +67,13 @@ Things the tracer needed:
 - `clearcoat` renders black in this version, so varnish is plain low roughness.
 - Emissive surfaces that are small and bright make fireflies. The bulbs are therefore drawn in a
   separate raster overlay and do their lighting through an explicit light.
+- One GPU client at a time. With a second render (or a browser test run) on the GPU, the canvas
+  sometimes comes back as the previous frame, with no error, or a frame hangs. `render.mjs` treats
+  a frame identical to the one before it, or one that takes over three minutes, as a failure and
+  restarts the browser.
+- Every material is made double sided in `scene.js`, so two coincident surfaces fight under that
+  ray offset (it is still about a millimetre at the far end). The print and the back of the
+  peeling wallpaper did, which showed as camouflage blotches; they are now 1.4 mm apart.
 
 ## The two sets
 
@@ -80,6 +92,14 @@ Door 308 is hinged on the walker's side and opens inwards, so the gap appears at
 and can be seen into from the corridor. Lamp 4 hangs just in front of it and is the last lamp
 still alight: its light goes through the gap past the jamb and lands on a strip next to the
 door edge, which is where one eye is.
+
+The stand-in behind the door is a child of about ten: a displaced head with sunken, half-lidded
+eyes, lank wet hair as about 200 thin strands that hang across one side of the face, a dark
+nightdress that stays in the shadow of the leaf, and four fingers hooked round the free edge of
+the door beside the face, nails bitten short. Only the strip of lamp light that comes through
+the gap reaches it. On screen the face is about 25 px wide on desktop and 35 px on a phone, and it
+is there for half a second: it is built to read as a pale face and one eye in the dark, not to
+survive a close look.
 
 The scare plays in real time (15 frames at 24 fps, 625 ms) over a walk frame that is held
 still. The scare frames are full renders from that held camera with the same seed and sample

@@ -498,6 +498,15 @@ export class Pipeline {
     const t0 = performance.now();
     seedRandom(seed);
     pt._pathTracer.material.seed = (seed * 7919) % 100000;
+    // The tracer's stratified sampler keeps its shuffle between frames, so without this the
+    // noise of a frame depends on which frames were rendered before it in the same browser. A
+    // fresh sampler (shuffled from the seeded Math.random) makes a frame a function of its seed
+    // alone: the held walk frame and the scare frames then differ only where the door moved.
+    // (same dimensions as renderSample asks for, or it builds another one mid-frame)
+    const ptm = pt._pathTracer.material;
+    const strat = ptm.stratifiedTexture;
+    strat.sampler = null;
+    strat.init(20, ptm.bounces + ptm.transmissiveBounces + 5);
 
     // 1. path trace, two halves
     const half = Math.max(1, Math.floor(samples / 2));

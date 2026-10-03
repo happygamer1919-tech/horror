@@ -31,7 +31,7 @@ const { server, port } = await startServer();
 let browser;
 let page;
 async function boot() {
-  if (browser) await browser.close().catch(() => {});
+  if (browser) await limit(browser.close(), 20000).catch(() => {});
   const gpuArgs = flag('software', false)
     ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']
     : ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'];
@@ -51,11 +51,22 @@ async function boot() {
   return info;
 }
 
+// The PNG last written. With another GPU client busy (a second render, a browser test run), the
+// canvas can come back unchanged from the frame before: no error, just the old picture again.
+// Two different frames are never byte-identical, so an identical one means "retry".
+let lastPng = '';
+const limit = (p, ms) => {
+  let t;
+  return Promise.race([p, new Promise((_, rej) => (t = setTimeout(() => rej(new Error(`no answer in ${ms / 1000} s`)), ms)))]).finally(() => clearTimeout(t));
+};
 async function shoot(opts, file) {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      const res = await page.evaluate((o) => window.corridor.frame(o), opts);
-      const data = await page.evaluate(() => window.corridor.png());
+      // a GPU that hangs instead of failing: give up on the attempt after three minutes
+      const res = await limit(page.evaluate((o) => window.corridor.frame(o), opts), 180000);
+      const data = await limit(page.evaluate(() => window.corridor.png()), 60000);
+      if (data === lastPng) throw new Error('the canvas did not change (stale frame)');
+      lastPng = data;
       await writeFile(file, Buffer.from(data.split(',')[1], 'base64'));
       return res;
     } catch (e) {
@@ -86,6 +97,7 @@ if (mode === 'preview') {
       ? String(flag('frames')).split(',').map(Number)
       : [0, 0.2, 0.4, 0.6, 0.8, 1].map((p) => Math.round(p * (n - 1)));
     const scare = flag('scare', null);
+    const written = new Set();
     for (const index of list) {
       const opts = { set, index, scale, samples };
       if (flag('nodenoise', false)) opts.denoise = false;
@@ -103,6 +115,9 @@ if (mode === 'preview') {
         delete opts.index;
       }
       let name = flag('name', null) ?? `${set}-${pad(index)}`;
+      // the same frame twice in one run (a determinism check) gets a suffix the second time
+      if (written.has(name)) name += '-again';
+      written.add(name);
       if (scare) {
         const [j, variant] = String(scare).split(':');
         opts.index = scareFrameIndex(set);
