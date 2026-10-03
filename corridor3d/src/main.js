@@ -101,7 +101,11 @@ window.corridor = {
       post: opts.post,
       debug: opts.debug,
     });
-    return { ...res, scene: tScene, s: at, w, h, lamps: state.lamps.length, focus: camera.focusDistance };
+    return { ...res, scene: tScene, s: at, w, h, lamps: state.lamps.length, focus: camera.focusDistance, layers: pipe.layers };
+  },
+
+  probe(name, rect) {
+    return pipe.probe(name, rect);
   },
 
   // Debug: how evenly the tracer's stratified sample table covers [0, 1) over n samples.

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { HW, CH, WALL_T, DOOR, DOORS, DADO, SPECIAL, END, LAST_ROOM, LAMPS, door as doorByNo } from './layout.js';
+import { HW, CH, WALL_T, DOOR, DOORS, DADO, SPECIAL, END, LAST_ROOM, LAMPS, SHOE_AT, door as doorByNo } from './layout.js';
 import { Bag, M, move, rotX, rotY, rotZ, scale, box, boxAt, boxUV, grid, planarUV, paint, extrude, smoothNormals, mulberry, fbm, noise2, smooth, clamp, lerp } from './util.js';
 import { wallFrame, endFrame, wallBulge, carpetHeight, alongWall } from './shell.js';
 import { leafDepth, leafMatrix, REC } from './doors.js';
@@ -488,12 +488,11 @@ export async function buildProps(bag, materials, T, doorMeta) {
   // ---- the child's shoe, on the runner, fallen over ----
   {
     const sh = shoe();
-    const s = 7.9;
-    const x = 0.12;
+    const { s: ss, x } = SHOE_AT;
     const k = 1.22; // about a size 31
-    // centred on its own length, fallen onto its side: the profile (heel, sole, strap, toe)
-    // faces up at the walker and the opening tips towards him; the toe points at the right wall
-    bag.addBag(sh, M(move(-0.08, 0, 0), scale(k), rotX(1.18), move(0, 0.031 * k, 0), rotY(0.4), move(x, carpetHeight(x, s) - 0.001, -s)));
+    // It stands where it was stepped out of, in the first pool of light: upright, the toe turned
+    // towards the right wall, side on to the walker: the sole, the strap and the dark mouth of it.
+    bag.addBag(sh, M(move(-0.08, 0, 0), scale(k), rotX(0.1), rotY(0.3), move(x, carpetHeight(x, ss) - 0.0005, -ss)));
   }
 
   // ---- trolley, parked against the left wall in the dark part ----
@@ -560,7 +559,7 @@ export async function buildProps(bag, materials, T, doorMeta) {
     bag.addBag(b, M(rotY(0.03), move(0.28, y, -s)));
     // what the sign throws on the walls: nothing in a lit corridor, the only colour in a dark one
     for (const sgn of [-1, 1]) {
-      const glow = new THREE.PointLight(new THREE.Color(0.4, 1.0, 0.55), 0.045, 0, 2);
+      const glow = new THREE.PointLight(new THREE.Color(0.4, 1.0, 0.55), 0.075, 0, 2);
       glow.position.set(0.28, y - 0.02, -s + sgn * 0.14);
       objects.push(glow);
     }
@@ -589,12 +588,10 @@ export async function buildProps(bag, materials, T, doorMeta) {
       const keep = /body/.test(src.name);
       const m = new THREE.MeshPhysicalMaterial({
         map: keep ? src.map : null,
-        normalMap: keep ? src.normalMap : null,
-        roughnessMap: keep ? src.roughnessMap : null,
-        metalnessMap: keep ? src.metalnessMap : null,
+        // (colour map only: the tracer's texture array is full)
         color: keep ? new THREE.Color(0.8, 0.8, 0.8) : /glass/.test(src.name) ? new THREE.Color(0.05, 0.05, 0.05) : new THREE.Color(0.6, 0.57, 0.5),
-        roughness: keep ? 1 : 0.4,
-        metalness: keep ? 1 : 0,
+        roughness: keep ? 0.38 : 0.4,
+        metalness: keep ? 0.35 : 0,
         side: THREE.DoubleSide,
       });
       m.name = `ext-${src.name}`;

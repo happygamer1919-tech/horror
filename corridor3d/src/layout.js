@@ -49,9 +49,9 @@ export const LAMP_Y = CH - LAMP_DROP;
 // and its shade is gone: a bare dead bulb. So the corridor is pools of light with black between
 // them from the first frame, and the far end is only ever lit by the last lamp.
 export const LAMP_KIND = [
-  { level: 1.0, warm: 0.05, drop: 0.0, dust: 0.35 },
+  { level: 1.0, warm: 0.05, drop: 0.13, dust: 0.35 },
   { level: 0.4, warm: 0.5, drop: 0.035, dust: 0.8 },
-  { level: 0.95, warm: 0.12, drop: 0.06, dust: 0.3 },
+  { level: 0.95, warm: 0.12, drop: 0.16, dust: 0.3 },
   { level: 0, warm: 1, drop: -0.02, dust: 1, dead: true, bare: true },
   { level: 0.8, warm: 0.3, drop: 0.02, dust: 0.6 },
   { level: 0.7, warm: 0.2, drop: -0.03, dust: 0.5 },
@@ -65,6 +65,7 @@ export const LAMP_KIND = [
 export const FAIL_AT = { 6: 2.4, 5: 5.2, 4: 17.5, 3: 17.8, 2: 18.1, 1: 18.4, 0: 18.75 };
 export const FADE_LEN = 0.55; // metres of walking a lamp takes to die
 
+export const SHOE_AT = { s: 5.7, x: 0.17 }; // the child's shoe: the nearest stretch of runner the first frame shows, lit by the first lamp
 export const WALK_FROM = 0.35;
 export const WALK_TO = 25.75;
 export const EYE = 1.55;
@@ -119,7 +120,7 @@ export const exposureStops = (s) => 0.3 * smooth(5, 8, s) + 0.85 * smooth(11.5, 
 export const FSTOP = { desktop: 2.2, mobile: 2.4 };
 export function focusDistance(s) {
   let f = 5.2 + 0.8 * Math.sin(s * 0.37);
-  f += (1.7 - f) * bump(5.9, 1.6, s); // the shoe
+  f += (2.3 - f) * bump(3.5, 1.3, s); // the shoe
   f += (1.75 - f) * bump(9.45, 1.3, s); // the clawed door
   f += (1.95 - f) * bump2(16.75, 1.6, 1.0, s); // door 308
   f += (3.05 - f) * smooth(23.4, 25.6, s); // the last door
@@ -133,13 +134,15 @@ export function cameraPose(s, set) {
   const bob = 0.011 * Math.sin((s * 2 * Math.PI) / 2.6);
   const sway = 0.035 * Math.sin((s * 2 * Math.PI) / 5.2 + 0.4) + 0.012 * Math.sin(s * 0.53 + 2.0);
   // hand held: the horizon is never quite level
-  const roll = 0.011 + 0.0075 * Math.sin((s * 2 * Math.PI) / 5.2 + 1.2) + 0.004 * Math.sin(s * 1.13 + 0.4);
+  const roll = 0.012 + 0.006 * Math.sin((s * 2 * Math.PI) / 5.2 + 1.2) + 0.004 * Math.sin(s * 1.13 + 0.4);
   let yaw = 0.012 * Math.sin(s * 0.71 + 0.3) + 0.008 * Math.sin(s * 1.37);
-  let pitch = -0.045 + 0.006 * Math.sin(s * 0.9 + 1.1);
-  let x = sway;
-  // the shoe, low on the right
-  yaw -= 0.04 * bump(5.7, 2.0, s);
-  pitch -= (mobile ? 0.3 : 0.27) * bump(5.75, 2.3, s); // the tall frame has room to look down further
+  // (the head a little up at the start and under the swinging lamp: a lamp sits inside the frame, not on its top edge)
+  let pitch = -0.045 + 0.006 * Math.sin(s * 0.9 + 1.1) + 0.04 * (1 - smooth(0.8, 3, s)) + 0.045 * bump(7.6, 1.4, s);
+  // nobody walks down the middle: the walker keeps a hand's width left of it at the start
+  let x = sway - 0.13 * (1 - smooth(1.5, 6, s));
+  // the shoe on the runner (props.js: s = SHOE_AT), low on the right, in the first pool of light
+  yaw -= 0.05 * bump(3.5, 1.5, s);
+  pitch -= (mobile ? 0.26 : 0.2) * bump(3.6, 1.7, s); // the tall frame has room to look down further
   // the scratched door hanging open on the left: the head turns to it and drops to the height a
   // child's hands reach, close enough to read the gouges, then the walker goes round it
   const claw = bump(9.45, 1.5, s);
@@ -154,24 +157,24 @@ export function cameraPose(s, set) {
   const L = globalThis.__look308 ?? {};
   x += (L.x ?? 0.22) * bump2(L.xc ?? 16.6, L.xw ?? 2.6, L.xa ?? 1.4, s);
   const look = bump2(L.c ?? 16.75, L.w ?? 2.4, L.wa ?? 1.0, s);
-  yaw -= (mobile ? (L.ym ?? 0.74) : (L.yd ?? 0.3)) * look;
+  yaw -= (mobile ? (L.ym ?? 0.74) : (L.yd ?? 0.36)) * look;
   pitch -= (mobile ? (L.pm ?? 0.06) : (L.pd ?? 0.03)) * look;
   // the line of light under 311, low on the left
   yaw += 0.05 * bump(21.6, 1.5, s);
   pitch -= 0.03 * bump(21.6, 1.5, s);
   // the boards on the right
   yaw -= 0.06 * bump(23.9, 1.4, s);
-  // settle on the last door
+  // settle on the last door: standing a little right of it, the shoulders not square to it
   const end = smooth(23.6, 25.7, s);
-  yaw *= 1 - end;
-  x *= 1 - 0.8 * end;
-  pitch += 0.03 * end;
+  yaw = yaw * (1 - end) + 0.03 * end;
+  x = x * (1 - 0.8 * end) + 0.12 * end;
+  pitch += 0.02 * end;
   return { x, y: EYE + bob, s, yaw, pitch, roll };
 }
 
 // Render sets. fov is vertical, in degrees.
 export const SETS = {
-  desktop: { w: 1600, h: 900, fov: 43.5, frames: 168, dir: 'd' },
+  desktop: { w: 1600, h: 900, fov: 37, frames: 168, dir: 'd' }, // 61 degrees across: about a 30 mm lens
   mobile: { w: 900, h: 1800, fov: 72, frames: 112, dir: 'm' },
 };
 export const frameS = (set, i) => camS(i / (SETS[set].frames - 1));

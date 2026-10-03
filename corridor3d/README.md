@@ -19,6 +19,7 @@ dev dependency of the render pipeline only and never reaches the browser bundle.
 | `encode.mjs` | PNGs to the shipped AVIF/WebP frames, the scare patches, the posters and `manifest.json`. |
 | `stills.json` | The six review keyframes (real frames of the desktop walk). Fixed for every review round. |
 | `publish-stills.mjs` | Copies the stills for the reviewers: PNG, JPEG (quality 92) and a 2 x 3 contact sheet. |
+| `still-stats.mjs` | Measures a still the way the reviewers do: share of pixels at luma 0 to 3 and at pure black, luma percentiles, a pixel column. |
 | `shots.json`, `crop.mjs`, `sheet.mjs` | Review shots of each prop, a crop-and-enlarge helper and a contact-sheet helper for looking at them. |
 
 ## Run it
@@ -41,6 +42,8 @@ node corridor3d/render.mjs stills --samples=64 --scale=0.5 --only=1-start,6-last
 node corridor3d/render.mjs stills --publish=../stills/r2    # final quality, then PNG, JPEG (q 92) and sheet.jpg for the reviewers
 node corridor3d/publish-stills.mjs ../stills/r2             # the same hand-over, from the stills already in out/stills/
 node corridor3d/render.mjs tex --mat=paperL4,carpet2,door313,claw   # look at a baked texture
+node corridor3d/still-stats.mjs corridor3d/out/stills/*.png --col=1300   # black share, percentiles, one column
+node corridor3d/render.mjs probe [--haze=0.01]                     # float means of a wall and a carpet patch, traced and denoised
 node corridor3d/encode.mjs --dummy    # numbered placeholder frames, no GPU needed
 ```
 
@@ -59,7 +62,8 @@ goes, only with more samples (320 against the walk's 48 to 96). One command rend
 1. **Path tracing** with `three-gpu-pathtracer` (WebGL2, real GPU through ANGLE Metal; the
    driver logs the `UNMASKED_RENDERER` string). Real global illumination, 7 bounces. Each lamp
    is a small disc light under its shade (soft penumbra); the opal glass glows as an emissive
-   surface and is what lights the ceiling. The camera is a thin lens (f/2.2, about 25 mm): what
+   surface and is what lights the ceiling. The camera is a thin lens (f/2.2, about 30 mm on the
+   wide frame, 61 degrees across): what
    is close to it, the walls at the edge of the frame, is soft, and the focus follows what the
    walker looks at (`focusDistance` in `layout.js`). It also moves a little during the exposure
    (an eighth of the step to the next frame).
@@ -76,14 +80,20 @@ goes, only with more samples (320 against the walk's 48 to 96). One command rend
 3. **Dust.** The lamp cones are ray-marched against the depth buffer: thin haze, thicker in the
    light, with slow density noise. The inverse square is held flat within about 60 cm of each
    bulb (`fogCore`).
-4. **Lens and film** (`LOOK` in `pipeline.js`). Bloom, a wide red-orange halation round the
-   bulbs, slight barrel distortion, lateral chromatic aberration, a softness that grows towards
-   the corners, vignette, a half-corrected tungsten white balance (the paper stays cream, the
-   runner red, the exit sign green), ACES filmic tone mapping, 16 % of the saturation taken out
-   after the curve, a toe that lets what is dark go black, and grain matched to the film layer
-   the site lays over its hero (`.grain` in `global.css`: fine, a little clumped, nearly
-   monochrome), stronger where the exposure has been opened up. Exposure is set for the pools of
-   light under the lamps and follows the walk.
+4. **Lens and film** (`LOOK` in `pipeline.js`). A glare round the lamps with a long warm tail
+   (it reaches 100 to 200 px) and a faint mirrored ghost, slight barrel distortion, lateral
+   chromatic aberration, a softness that grows towards the corners, vignette, a half-corrected
+   tungsten white balance (the paper stays cream, the runner red, the exit sign green). The film
+   curve works on the brightest channel and scales the colour with it, so the edge of a pool of
+   light keeps its hue (a per-channel curve turned every edge red); it is straight up to a knee,
+   so the fall-off inside a pool survives (the wall is four times brighter at the top of a pool
+   than at the rail), with a soft shoulder for the glass and the bulb and a toe that squeezes
+   the deep shadows without clipping them. Scene black is then printed at about luma 6, a little
+   warm (`lift`): no pixel of a frame is pure black, and the dark carries structure. Colour is
+   rolled off in the shadows. Grain last: clumps of about two pixels, nearly monochrome with a
+   little colour, strongest in the low midtones, fading into black and into the highlights,
+   stronger where the exposure has been opened up (the site's hero `.grain` layer is the
+   reference). Exposure is set for the pools of light and follows the walk.
 
 Everything is deterministic: progress in, pixels out. `Math.random` is replaced by a seeded
 generator, there is no wall clock, and a frame's seed depends only on its set and index. The
@@ -91,7 +101,12 @@ tracer's stratified sampler is rebuilt from that seed for every frame.
 
 ### Light
 
-The corridor is pools of light with black between them from the first frame. No two lamps are
+The corridor is pools of light with dark between them from the first frame. A bulb hangs level
+with the rim of its shade and its cone fades over its outer half, so a pool on the wall has a
+hot spot under the lamp, falls away towards the rail and ends in a penumbra some 40 cm deep; the
+lamps hang off the centre line and none plumb, so no two pools have the same shape. The opal
+glass glows on both faces: hot where the bulb sits behind it, dimmer to the rim, and its upper
+face lights the ceiling (plaster with an albedo of about a half), the flex and the rose. No two lamps are
 the same lamp (`LAMP_KIND` in `layout.js`): different bulbs, flex, dust on the glass; lamp 1 is
 a weak orange bulb; lamp 3 burnt out long ago and its shade is gone (a bare dead bulb), so there
 is always a black gap in the middle of the corridor; lamp 4, over door 308, is tired. The far
@@ -100,8 +115,10 @@ lamps fail as before, and only the lamp over door 313 stays.
 ### Surfaces
 
 The tracer keeps every texture in one array at one size, and a WebGL texture cannot be larger
-than 2 GB here: at 2048 px that is about 120 layers, at 4096 px only 30 (the scene needs about
-75, so 4k fails; `textureSize` stays 2048). Resolution therefore comes from cutting the hero
+than about 1.34 GB here (measured: 80 layers at 2048 px work, 84 do not), so 4096 px is out of
+the question and the scene is kept at about 75 layers (`textureSize` 2048). Past the limit the
+allocation fails with a console warning only and every frame comes back black in two seconds;
+`pipeline.js` counts the layers and refuses. Resolution therefore comes from cutting the hero
 surfaces into panels, each with its own albedo layer, over the scans' own normal and roughness
 maps (one layer each, a texture transform per panel):
 
@@ -117,12 +134,14 @@ maps (one layer each, a texture transform per panel):
   `wood_cabinet_worn_long` scan (real wear: scratches, nails, rubbed edges), the boards
   shuffled over a 20 board period, each stained its own tone, kicked and mopped grey at the
   bottom, with the long skipping scrapes of a trolley.
-- **Carpet**: 8 panels along the runner. The `Carpet015` scan (a woven red runner, 40 cm) with
+- **Carpet**: 16 panels along the runner (0.9 mm a texel). The `Carpet015` scan (a woven red runner, 40 cm) with
   a dark stripe down each side, a pale path worn down the middle, a bald patch in front of
-  every door, dirt at the edges, stains, lint. The mesh lies in shallow waves with two rucks and
-  its edge is not a ruled line.
-- **Doors**: a skin per leaf (four hero doors have their own, the rest share four), framed the
-  way a door is (stiles upright, rails across, two panels, from the `wood_table_001` scan):
+  every door, dirt at the edges, stains, lint. The mesh is a slab 12 mm thick with a bound edge, lies in
+  shallow waves with two rucks and one lifted edge, and its edge is not a ruled line. Beside
+  it worn strip parquet (the `plank_flooring` scan, strips along the corridor).
+- **Doors**: a skin per leaf (four hero doors have their own, the rest share three), framed the
+  way a door is (stiles upright, rails across, two panels, from the `wood_table_001` scan laid
+  at half scale and graded to a quiet brown; the panels are real mouldings 17 mm deep):
   joints full of dirt, grease round the handle and along the lock edge, varnish rubbed through
   where hands push, moulding edges rubbed pale in broken lines, the bottom rail kicked, chips,
   key scratches round the lock. One shared roughness map: glossy where nothing touches it, dull
@@ -136,17 +155,20 @@ A true volume in the tracer (`FogVolumeMaterial`, a box round the corridor) is b
 turned on with `--haze=0.01`. It is off. What it cost, measured on this machine:
 
 - about 40 % more trace time;
-- with the volume in the scene and this round's denoiser, the lit walls of the finished frame
-  come out far too dark: the same patch of wall reads 207 of 255 without the volume and 48 with
-  it, at any density down to 1e-6 per metre, so it is not the haze absorbing light. The cause
-  was not found in round 1. It is not the sampler patches below, not the firefly clamp and not
-  the edge path (each was taken out in turn); the denoiser of the commit before did not show it;
+- with the camera inside the volume, the tracer's own output loses most of the direct light
+  on the walls: the float mean of a lit wall patch in one traced half is 0.97 without the
+  volume and 0.115 with it (the carpet 0.22 and 0.16), at any density down to 1e-6 per metre.
+  Round 2 narrowed it down (`render.mjs probe`): it is still so with fog hits switched off in
+  the shader (the particle distance forced to 1e9), so it is not absorption or scattering; the
+  same box as an ordinary invisible mesh renders correctly, and so does a fog volume that does
+  not contain the camera. The fault is in how this tracer carries "the path started inside a
+  fog volume", and it was not found in the time given to it;
 - paths that scatter beside a bulb leave fireflies (white specks in the dark above the last door);
 - a box that ends just inside the room made the carpet render black wherever its waves came
   within the tracer's ray offset of the box's floor; the box must be larger than the room.
 
-The stills therefore use the ray-marched pass (step 3), thin. The volume stays in the code,
-off, for a later round if the reviewers ask for more air.
+The stills therefore use the ray-marched pass (step 3), thin (both reviewers of round 1 read it
+as air). The volume stays in the code, off.
 
 ### Things the tracer needed
 
@@ -164,6 +186,9 @@ off, for a later round if the reviewers ask for more air.
 - `clearcoat` renders black in this version, so varnish is plain low roughness.
 - Emissive surfaces that are small and bright make fireflies. The bulbs are therefore drawn in a
   separate raster overlay and do their lighting through an explicit light.
+- (The driver's check for a running Playwright test once matched the shell that had started
+  the render, because that shell's command line contained the words: the render waited for
+  ever. It now counts only the runner's own process.)
 - One GPU client at a time. With a second render (or a browser test run) on the GPU, the canvas
   sometimes comes back as the previous frame, with no error, or a frame hangs. `render.mjs`
   waits while a Playwright test run is alive (before the browser starts and before every frame),

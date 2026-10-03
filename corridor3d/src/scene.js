@@ -43,7 +43,7 @@ export const HAZE = { density: 0, color: [0.9, 0.86, 0.8] };
 
 // Which skin each door wears: the ones the walker stops at have their own.
 const OWN_SKIN = { 301: 'door301', 306: 'door306', 308: 'door308', 313: 'door313' };
-const SHARED = ['doorA', 'doorB', 'doorC', 'doorD'];
+const SHARED = ['doorA', 'doorB', 'doorC'];
 
 export async function buildScene({ textureSize = 2048, haze = HAZE.density } = {}) {
   const T = await loadTextures({ size: textureSize, small: Math.min(1024, textureSize) });

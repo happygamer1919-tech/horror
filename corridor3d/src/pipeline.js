@@ -296,15 +296,26 @@ const FINAL = /* glsl */ `
   uniform sampler2D tex; uniform sampler2D bloom; uniform sampler2D halo;
   uniform float exposure; uniform float bloomStrength; uniform float haloStrength; uniform float k1; uniform float zoom; uniform float ca;
   uniform float vignette; uniform float grain; uniform float seed; uniform float aspect; uniform vec2 res; uniform float sat;
-  uniform float soft; uniform float black; uniform float contrast; uniform vec3 balance;
+  uniform float soft; uniform float contrast; uniform vec3 balance; uniform vec3 lift; uniform float white; uniform float ghost; uniform float toe;
   varying vec2 vUv;
-  vec3 RRTAndODTFit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
-  vec3 aces(vec3 color) {
-    const mat3 inM = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
-    const mat3 outM = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
-    color *= exposure / 0.6;
-    color = inM * color; color = RRTAndODTFit(color); color = outM * color;
-    return clamp(color, 0.0, 1.0);
+  // The film curve. It works on the brightest channel and scales the colour with it, so a pool
+  // of tungsten light keeps its hue all the way down its edge (a per-channel curve bends the
+  // edge of every pool to red) and only bleaches towards white where it is about to clip. Nearly
+  // Straight up to the knee, so the fall-off inside a pool of light survives as it is (the wall
+  // is four times brighter at the top of a pool than at the rail), then an exponential shoulder
+  // for the glass and the bulb.
+  vec3 film(vec3 c) {
+    c *= exposure * 1.08;
+    float m = max(max(c.r, c.g), max(c.b, 1e-6));
+    float knee = white;
+    float t = m < knee ? m : knee + (1.0 - knee) * (1.0 - exp(-(m - knee) / (1.0 - knee)));
+    // the toe of the negative: the deep shadows are compressed (never clipped: the print's own
+    // black, the lift, is added after), so the dark between the lamps stays dark
+    t *= t / (t + toe);
+    vec3 o = c * (t / m);
+    float bleach = smoothstep(0.7, 1.0, t);
+    o = mix(o, vec3(t), 0.55 * bleach);
+    return clamp(o, 0.0, 1.0);
   }
   vec3 toSRGB(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
   float h21(vec2 p, float s) { vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973) + s * 0.137); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
@@ -321,7 +332,13 @@ const FINAL = /* glsl */ `
     return c / vec2(aspect, 1.0) + 0.5;
   }
   // the warm glow of the bulbs spread wide by the lens and the emulsion (halation is red-orange)
-  vec3 glow(vec2 uv) { return bloomStrength * texture2D(bloom, uv).rgb + haloStrength * texture2D(halo, uv).rgb * vec3(1.0, 0.42, 0.16); }
+  // and a faint ghost of the brightest things, mirrored through the middle of the frame
+  vec3 glow(vec2 uv) {
+    vec3 g = bloomStrength * texture2D(bloom, uv).rgb + haloStrength * texture2D(halo, uv).rgb * vec3(1.0, 0.5, 0.22);
+    vec2 m = vec2(0.5) + (vec2(0.5) - uv) * 0.82;
+    g += ghost * texture2D(halo, m).rgb * vec3(0.45, 1.0, 0.7) * smoothstep(0.75, 0.2, length(uv - 0.5));
+    return g;
+  }
   // A lens is sharp in the middle and soft towards the corners: a small disc of taps whose
   // radius grows with the square of the image height, stretched along the radius (coma, field
   // curvature), on top of whatever the aperture already did in the tracer.
@@ -353,21 +370,23 @@ const FINAL = /* glsl */ `
     col.b = sampleHdr(distort(vUv, k1 - ca), r2, dir).b;
     col *= 1.0 / pow(1.0 + vignette * r2, 2.0);
     col *= balance;
-    col = aces(col);
-    // a photograph's colour, not a renderer's: a little of the saturation taken out after the curve
-    col = max(mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, sat), 0.0);
-    // the toe of a negative printed for the night: what is dark goes black
-    col = max(col - black, 0.0) / (1.0 - black);
+    col = film(col);
     col = pow(col, vec3(contrast));
     col = toSRGB(col);
-    // grain, matched to the film layer the site lays over its hero: fine, a little clumped,
-    // nearly monochrome, strongest in the lower midtones and still there in the blacks
-    vec2 p = gl_FragCoord.xy;
-    float n = (vn(p * 0.9, seed) + vn(p * 1.8 + 31.0, seed + 3.0) * 0.6 - 0.8) * 1.5 + (h21(p, seed + 5.0) - 0.5) * 0.5;
     float l = dot(col, vec3(0.299, 0.587, 0.114));
-    float amt = grain * (0.45 + 0.55 * (1.0 - smoothstep(0.3, 0.95, l)));
-    vec3 chroma = vec3(h21(p + 7.0, seed + 11.0), h21(p + 13.0, seed + 12.0), h21(p + 19.0, seed + 13.0)) - 0.5;
-    col += (n * vec3(1.0, 0.98, 0.94) + chroma * 0.35) * amt;
+    // colour dies in the shadows of a negative: below about luma 20 the wood stops being red
+    col = mix(vec3(l), col, sat * mix(0.5, 1.0, smoothstep(0.015, 0.1, l)));
+    // the toe: scene black is not paper black. It lands a little above zero, a little warm, and
+    // whatever structure the shadows have rides on top of it
+    col = lift + col * (1.0 - lift);
+    // grain, matched to the film layer the site lays over its hero: clumps of about two pixels,
+    // nearly monochrome with a little colour, strongest in the low midtones, fading into the
+    // blacks and into the highlights
+    vec2 p = gl_FragCoord.xy;
+    float n = (vn(p * 0.58, seed) + 0.6 * vn(p * 1.1 + 31.0, seed + 3.0) - 0.8) * 1.7;
+    vec3 chroma = vec3(vn(p * 0.5 + 7.0, seed + 11.0), vn(p * 0.5 + 13.0, seed + 12.0), vn(p * 0.5 + 19.0, seed + 13.0)) - 0.5;
+    float amt = grain * (0.3 + 0.7 * smoothstep(0.02, 0.18, l)) * (1.0 - 0.75 * smoothstep(0.45, 0.95, l));
+    col += (n * vec3(1.0, 0.98, 0.94) + chroma * 0.4) * amt;
     gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
   }
 `;
@@ -521,8 +540,11 @@ export class Pipeline {
         halo: { value: null },
         haloStrength: { value: 0 },
         soft: { value: 0 },
-        black: { value: 0 },
         contrast: { value: 1 },
+        lift: { value: new THREE.Vector3() },
+        white: { value: 4 },
+        toe: { value: 0.03 },
+        ghost: { value: 0 },
         balance: { value: new THREE.Vector3(1, 1, 1) },
       }),
     };
@@ -549,6 +571,31 @@ export class Pipeline {
       this.mips.push(new THREE.WebGLRenderTarget(mw, mh, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false }));
     }
     this.mipsUp = this.mips.map((m) => m.clone());
+  }
+
+  // Debug: mean and median luminance of a rectangle (fractions of the frame, origin bottom left)
+  // of one of the float targets of the last frame: 'a' (a traced half), 'hdr' (after the denoiser).
+  probe(name, [x0, y0, x1, y1]) {
+    const t = this.rt[name];
+    const x = Math.floor(x0 * this.w);
+    const y = Math.floor(y0 * this.h);
+    const w = Math.max(1, Math.floor((x1 - x0) * this.w));
+    const h = Math.max(1, Math.floor((y1 - y0) * this.h));
+    const px = new Float32Array(w * h * 4);
+    this.renderer.readRenderTargetPixels(t, x, y, w, h, px);
+    const l = [];
+    let sum = 0;
+    let bad = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const v = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+      if (!Number.isFinite(v)) bad++;
+      else {
+        l.push(v);
+        sum += v;
+      }
+    }
+    l.sort((p, q) => p - q);
+    return { mean: sum / Math.max(1, l.length), median: l[l.length >> 1], p90: l[Math.floor(l.length * 0.9)], max: l[l.length - 1], bad, n: l.length };
   }
 
   // Block until the GPU has caught up (gl.finish alone does not wait under ANGLE Metal).
@@ -581,6 +628,19 @@ export class Pipeline {
         o.visible = o.userData.volumeOn !== false;
       }
     });
+    // The tracer packs every texture into one array, and here a texture cannot be larger than
+    // about 1.34 GB (80 layers at 2048 px worked, 84 did not). Past that the allocation fails
+    // with a console warning only and every frame comes back black in two seconds: refuse instead.
+    {
+      const layers = new Set();
+      scene.traverse((o) => {
+        if (!o.isMesh || !o.visible) return;
+        for (const m of Array.isArray(o.material) ? o.material : [o.material]) for (const k in m) if (m[k] && m[k].isTexture) layers.add(`${m[k].source.uuid}:${m[k].colorSpace}`);
+      });
+      this.layers = layers.size;
+      const bytes = layers.size * this.pt.textureSize.x * this.pt.textureSize.y * 4;
+      if (bytes > 1.32e9) throw new Error(`${layers.size} texture layers (${(bytes / 1e9).toFixed(2)} GB): more than the tracer's texture array can hold`);
+    }
     this.pt.setScene(scene, camera);
     for (const o of hidden) o.visible = true;
     for (const o of volumes) o.visible = false;
@@ -872,8 +932,11 @@ export class Pipeline {
       u.halo.value = this.haloTex;
       u.haloStrength.value = post.halo ?? LOOK.halo;
       u.soft.value = (post.soft ?? LOOK.soft) * (h / 900);
-      u.black.value = post.black ?? LOOK.black;
       u.contrast.value = post.contrast ?? LOOK.contrast;
+      u.lift.value.set(...(post.lift ?? LOOK.lift));
+      u.white.value = post.white ?? LOOK.white;
+      u.toe.value = post.toe ?? LOOK.toe;
+      u.ghost.value = post.ghost ?? LOOK.ghost;
       u.balance.value.set(...(post.balance ?? LOOK.balance));
       u.k1.value = post.k1 ?? LENS.k1;
       u.ca.value = post.ca ?? LENS.ca;
@@ -917,16 +980,19 @@ export class Pipeline {
 export const LENS = { k1: 0.055, ca: 0.0032 };
 // The look of the film and the lens, in one place.
 export const LOOK = {
-  dust: 0.00032, // in-scatter of the lamp cones, thin
+  dust: 0.00011, // in-scatter of the lamp cones, thin
   extinction: 0.004, // per metre: the far end loses a tenth of its contrast
-  bloom: 0.05,
-  halo: 0.045,
-  soft: 3.2, // radius of the corner softness, pixels at the corner of a 900 px high frame
-  vignette: 0.75,
-  black: 0.012,
-  contrast: 1.06,
-  sat: 0.84,
-  grain: 0.03,
+  bloom: 0.2, // the tight glow round a bulb
+  halo: 0.32, // the long warm tail: it reaches 100 to 200 px from a lamp
+  ghost: 0.02,
+  soft: 1.6, // radius of the corner softness, pixels at the corner of a 900 px high frame
+  vignette: 0.6,
+  white: 0.6, // the knee of the film curve: straight below it, a soft shoulder above
+  toe: 0.09, // scene values well below this are squeezed towards black
+  lift: [0.027, 0.0235, 0.02], // scene black on the print: about luma 6, a little warm
+  contrast: 1.08,
+  sat: 0.86,
+  grain: 0.034,
   // white balance: a tungsten bulb half corrected, so the paper is cream, not orange, and the
   // red of the runner and the green of the exit sign stay colours
   balance: [0.9, 1.0, 1.22],

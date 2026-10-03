@@ -48,7 +48,7 @@ export function makeMaterials(T) {
     });
   }
   m.wallpaperPeel = sized(P({ map: T.paperTile, roughness: 0.9, vertexColors: true, side: THREE.FrontSide }), [PAPER_TILE, PAPER_TILE]);
-  m.paperBack = sized(P({ map: T.paperBack, roughness: 0.95, vertexColors: true, side: THREE.FrontSide }), [0.6, 0.6]);
+  m.paperBack = sized(P({ map: T.paperTile, color: new THREE.Color(1.15, 1.05, 0.8), roughness: 0.95, vertexColors: true, side: THREE.FrontSide }), [0.6, 0.6]);
   m.plaster = sized(
     P({ map: T.worn_plaster_wall.map, normalMap: T.worn_plaster_wall.normalMap, roughnessMap: T.worn_plaster_wall.roughnessMap, roughness: 1, vertexColors: true }),
     [1.8, 1.8],
@@ -81,20 +81,20 @@ export function makeMaterials(T) {
     });
   }
   m.claw = sized(
-    P({ map: T.claw, normalMap: T.clawNormal, normalScale: new THREE.Vector2(2.6, 2.6), roughness: 0.62, vertexColors: true }),
+    P({ map: T.claw, normalMap: T.clawNormal, roughnessMap: T.clawRough, normalScale: new THREE.Vector2(3, 3), roughness: 1, vertexColors: true }),
     [1, 1],
   );
   m.floor = sized(
     P({
+      // worn strip parquet, the strips along the corridor, its varnish gone in patches
       map: T.floorWood,
-      normalMap: T.wood_floor_worn.normalMap,
-      roughnessMap: T.wood_floor_worn.roughnessMap,
-      color: new THREE.Color(0.34, 0.31, 0.28),
-      roughness: 1,
+      normalMap: T.plank_flooring.normalMap,
+      roughnessMap: T.plank_flooring.roughnessMap,
+      color: new THREE.Color(0.62, 0.58, 0.54),
+      roughness: 0.85,
       vertexColors: true,
     }),
-    [2.0, 2.0],
-    true,
+    [1.34, 1.34],
   );
   // Carpet runner: a baked albedo per panel over the scan's weave.
   for (let k = 0; k < CARPET_PANELS; k++) {
@@ -103,9 +103,9 @@ export function makeMaterials(T) {
       map: T.carpet[k],
       normalMap: xf(T.carpetNormal, tc),
       roughnessMap: xf(T.carpetRough, tc),
-      normalScale: new THREE.Vector2(2.2, 2.2),
+      normalScale: new THREE.Vector2(3, 3),
       roughness: 1,
-      sheen: 0.35,
+      sheen: 0.75,
       sheenRoughness: 0.6,
       sheenColor: new THREE.Color(0.4, 0.2, 0.16),
       vertexColors: true,
@@ -113,17 +113,17 @@ export function makeMaterials(T) {
   }
   m.ceiling = sized(
     P({
+      // (albedo only: the tracer's texture array has no room to spare, and the ceiling is in the dark)
       map: T.painted_plaster_wall.map,
-      normalMap: T.painted_plaster_wall.normalMap,
-      roughnessMap: T.painted_plaster_wall.roughnessMap,
-      color: new THREE.Color(0.8, 0.74, 0.6),
+      // stained off-white plaster: an albedo of about a half, so the glow of a shade shows on it
+      color: new THREE.Color(1.5, 1.38, 1.12),
       roughness: 1,
       vertexColors: true,
     }),
     [2.0, 2.0],
   );
   m.boards = sized(
-    P({ map: T.rough_wood.map, normalMap: T.rough_wood.normalMap, roughnessMap: T.rough_wood.roughnessMap, normalScale: new THREE.Vector2(1.5, 1.5), color: new THREE.Color(0.8, 0.74, 0.66), roughness: 1, vertexColors: true }),
+    P({ map: T.rough_wood.map, normalMap: T.rough_wood.normalMap, normalScale: new THREE.Vector2(1.5, 1.5), color: new THREE.Color(0.8, 0.74, 0.66), roughness: 1, vertexColors: true }),
     [0.9, 0.9],
   );
 
@@ -132,12 +132,12 @@ export function makeMaterials(T) {
   m.brassDull = P({ color: new THREE.Color(0.5, 0.39, 0.2), metalness: 1, roughness: 0.52, vertexColors: true });
   m.iron = P({ color: new THREE.Color(0.1, 0.09, 0.08), metalness: 0.9, roughness: 0.6, vertexColors: true });
   m.steel = P({ color: new THREE.Color(0.55, 0.55, 0.55), metalness: 1, roughness: 0.38, vertexColors: true });
-  m.plate = P({ map: T.plates, metalnessMap: T.platesOrm, roughnessMap: T.platesOrm, normalMap: T.platesNormal, metalness: 1, roughness: 1, vertexColors: true });
+  m.plate = P({ map: T.plates, metalnessMap: T.platesOrm, roughnessMap: T.platesOrm, metalness: 1, roughness: 1, vertexColors: true });
 
   // Lamps.
   m.bulbDead = P({ color: new THREE.Color(0.36, 0.33, 0.27), roughness: 0.3, vertexColors: true });
   m.shade = P({ color: new THREE.Color(0.8, 0.74, 0.62), roughness: 0.55, emissive: new THREE.Color(1.0, 0.56, 0.2), emissiveMap: T.shadeGlow, emissiveIntensity: 0, side: THREE.DoubleSide, vertexColors: true });
-  m.cable = P({ color: new THREE.Color(0.05, 0.045, 0.04), roughness: 0.7, vertexColors: true });
+  m.cable = P({ color: new THREE.Color(0.2, 0.17, 0.13), roughness: 0.9, vertexColors: true }); // braided flex, brown with dust
   m.bakelite = P({ color: new THREE.Color(0.09, 0.06, 0.045), roughness: 0.4, vertexColors: true });
 
   // Painted, plastic, cloth, rubber.
@@ -150,13 +150,14 @@ export function makeMaterials(T) {
 
   // Atlases.
   m.signs = P({ map: T.signs, roughness: 0.6, vertexColors: true });
-  m.exitGlow = P({ map: T.signs, emissiveMap: T.signs, emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 1.15, roughness: 0.4, vertexColors: true });
+  m.exitGlow = P({ map: T.signs, emissiveMap: T.signs, emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 3.4, roughness: 0.4, vertexColors: true });
   // the same atlas at half strength, for grime that should only be a suggestion
   m.decalSoft = P({ map: T.decals, transparent: true, opacity: 0.42, roughness: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, vertexColors: true });
   m.decal = P({ map: T.decals, transparent: true, roughness: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, vertexColors: true });
 
   // The shoe.
-  m.leather = P({ color: new THREE.Color(0.022, 0.018, 0.017), roughness: 0.12, side: THREE.DoubleSide, vertexColors: true }); // black patent
+  // a child's best shoe: pale leather gone cream, scuffed (black patent on a dark runner was a dark capsule)
+  m.leather = P({ color: new THREE.Color(0.46, 0.4, 0.3), roughness: 0.42, side: THREE.DoubleSide, vertexColors: true });
   m.sole = P({ color: new THREE.Color(0.2, 0.13, 0.08), roughness: 0.8, vertexColors: true });
 
   // The figure behind the door.

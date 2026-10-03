@@ -10,14 +10,18 @@ import { Bag, M, move, rotX, mulberry } from './util.js';
 
 export const LAMP_COLOR = new THREE.Color(1.0, 0.8, 0.58); // tungsten, seen with a tungsten-ish white balance
 export const LAMP_CD = 46; // candela at full level
-const SHADE_GLOW = 4.6;
+// The opal glass glows on both faces. Seen from below it is the brightest thing in the frame
+// after the bulb; its upper face is what the ceiling round a lamp, the flex and the rose are
+// lit by (an albedo of about a half up there: a faint stain of light a metre across, no more).
+const SHADE_GLOW = 5;
 
 function pendant(r, kind) {
   const b = new Bag();
   const drop = LAMP_DROP + kind.drop;
   // ceiling rose
-  b.add('bakelite', new THREE.CylinderGeometry(0.047, 0.052, 0.022, 28), move(0, -0.011, 0));
-  b.add('bakelite', new THREE.CylinderGeometry(0.02, 0.044, 0.03, 24), move(0, -0.036, 0));
+  // ceiling rose: cream plastic gone yellow
+  b.add('cream', new THREE.CylinderGeometry(0.047, 0.052, 0.022, 28), move(0, -0.011, 0), [0.8, 0.72, 0.52]);
+  b.add('cream', new THREE.CylinderGeometry(0.02, 0.044, 0.03, 24), move(0, -0.036, 0), [0.8, 0.72, 0.52]);
   // twisted flex, never quite straight
   const pts = [];
   const top = -0.05;
@@ -64,7 +68,11 @@ function pendant(r, kind) {
   b.add('shade', shade, turn);
   // the rolled glass rim
   const rimY = -(drop - 0.055) - 0.115;
-  b.add('shade', new THREE.TorusGeometry(0.195, 0.0035, 10, 128), M(rotX(Math.PI / 2), move(0, rimY, 0)));
+  // (its texture coordinates pinned to the rim of the glow map: left as a torus's own, the rim
+  // glowed like a neon ring)
+  const rim = new THREE.TorusGeometry(0.195, 0.0035, 10, 128);
+  for (let i = 0; i < rim.attributes.uv.count; i++) rim.attributes.uv.setY(i, 0.985);
+  b.add('shade', rim, M(rotX(Math.PI / 2), move(0, rimY, 0)));
   return b;
 }
 
@@ -88,11 +96,15 @@ export function buildLamps(materials) {
     const body = pendant(r, kind).build({ ...materials, shade: shadeMat }, `lamp${l.k}`);
     pivot.add(body);
     // not one of them hangs quite plumb
-    if (l.k !== SWING_LAMP) pivot.rotation.set((r() - 0.5) * 0.07, 0, (r() - 0.5) * 0.07);
+    // (and so no two pools of light on the walls are the same shape)
+    if (l.k !== SWING_LAMP) pivot.rotation.set((r() - 0.5) * 0.16, 0, (r() - 0.5) * 0.2);
 
-    const light = new PhysicalSpotLight(LAMP_COLOR, LAMP_CD, 0, 1.36, 0.32, 2);
-    light.radius = 0.032;
-    light.position.set(0, -(drop + 0.035), 0);
+    // The bulb hangs level with the rim of the shade, so its light reaches nearly to the
+    // horizontal; the cone fades over its outer two thirds, which on the wall is a penumbra some
+    // 40 cm deep under a faint tail, not the edge of a cookie.
+    const light = new PhysicalSpotLight(LAMP_COLOR, LAMP_CD, 0, 1.43, 0.52, 2);
+    light.radius = 0.034;
+    light.position.set(0, -(drop + 0.056), 0);
     light.target.position.set(0, -3, 0);
     pivot.add(light, light.target);
 

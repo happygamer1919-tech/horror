@@ -80,8 +80,10 @@ export function buildSurround(bag, frame, { seed = 1, sill = true, outward = fal
   const basis = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0));
   bag.add('trim', head, M(basis, move(-w / 2 - ARCH_W - 0.005, h + 0.005, 0), rotZ(j() * 0.6), frame), tint());
   if (sill) {
-    bag.add('trim', boxUV(boxAt(-w / 2, 0, -WALL_T, w, 0.01, WALL_T + 0.004), { along: 'x' }), frame, [0.5, 0.5, 0.5]);
-    bag.add('brassDull', boxAt(-w / 2, 0.01, -0.012, w, 0.0025, 0.016), frame, tint());
+    // threshold: a worn board and a tarnished brass strip, set back from the wall face (its pale
+    // end stuck out at the foot of every frame)
+    bag.add('trim', boxUV(boxAt(-w / 2, 0, -WALL_T, w, 0.01, WALL_T - 0.006), { along: 'x' }), frame, [0.32, 0.3, 0.28]);
+    bag.add('brassDull', boxAt(-w / 2 + 0.004, 0.01, -0.03, w - 0.008, 0.0025, 0.016), frame, [0.4, 0.36, 0.3]);
   }
 }
 
@@ -99,17 +101,23 @@ export function leafDepth(x, y) {
   ]) {
     if (x <= px0 || x >= px1 || y <= a || y >= c) continue;
     const d = Math.min(x - px0, px1 - x, y - a, c - y); // distance in from the panel edge
-    if (d < 0.024) return -ramp(d, 0.024, 0.011);
-    if (d < 0.024 + 0.05) return -0.011;
-    return -0.011 + ramp(d - 0.074, 0.012, 0.005);
+    if (d < 0.03) return -ramp(d, 0.03, 0.017);
+    if (d < 0.03 + 0.05) return -0.017;
+    return -0.017 + ramp(d - 0.08, 0.012, 0.006);
   }
   return 0;
 }
 
 // A lever handle on its backplate, origin at the spindle. `dir` is the way the lever points (+1/-1 in x).
 function handle(bag, dir, droop, mat = 'brass') {
-  const plate = new RoundedBoxGeometry(0.044, 0.21, 0.005, 2, 0.002);
-  bag.add(mat, plate, move(0, -0.03, 0.0025));
+  const plate = new RoundedBoxGeometry(0.046, 0.2, 0.0065, 4, 0.0031);
+  bag.add(mat, plate, move(0, -0.03, 0.0028));
+  // two slotted screws, and a rose round the spindle
+  for (const y of [0.055, -0.118]) {
+    bag.add(mat, new THREE.CylinderGeometry(0.0042, 0.0046, 0.0022, 14), M(rotX(Math.PI / 2), move(0, y, 0.0068)), [0.7, 0.66, 0.6]);
+    bag.add('void', box(0.0066, 0.0011, 0.001), M(rotZ(y * 30), move(0, y, 0.0078)));
+  }
+  bag.add(mat, new THREE.TorusGeometry(0.0145, 0.0028, 10, 28), move(0, 0, 0.0062));
   const boss = new THREE.CylinderGeometry(0.0115, 0.0135, 0.016, 20);
   bag.add(mat, boss, M(rotX(Math.PI / 2), move(0, 0, 0.013)));
   const path = new THREE.CatmullRomCurve3(
@@ -164,8 +172,8 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
   ])
     b.add(skin, face(px0, a, px1, c, 0, uv));
   // panels: a bevel down to a field set back 11 mm, with a raised centre
-  const bev = 0.024;
-  const dz = -0.011;
+  const bev = 0.03;
+  const dz = -0.017;
   for (const [a, c] of [
     [ys[1], ys[2]],
     [ys[3], ys[4]],
@@ -196,7 +204,7 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
     const fy0 = a + bev;
     const fy1 = c - bev;
     const inset = 0.05;
-    const rz = dz + 0.005;
+    const rz = dz + 0.006;
     b.add(skin, face(fx0, fy0, fx1, fy0 + inset, dz, uv));
     b.add(skin, face(fx0, fy1 - inset, fx1, fy1, dz, uv));
     b.add(skin, face(fx0, fy0 + inset, fx0 + inset, fy1 - inset, dz, uv));
@@ -227,7 +235,7 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
   // edges
   const edge = (g) => b.add('trim', g, null, [0.5, 0.48, 0.46]);
   // the body sits behind the deepest panel; thin strips close the perimeter up to the face
-  const deep = 0.0125;
+  const deep = 0.0185;
   edge(boxUV(boxAt(x0, y0, -t, lw, y1 - y0, t - deep), { along: 'y', offset: [r() * 3, r() * 3] }));
   for (const x of [x0, x1 - 0.002]) edge(boxUV(boxAt(x, y0, -deep, 0.002, y1 - y0, deep - 0.0002), { along: 'y' }));
   for (const y of [y0, y1 - 0.002]) edge(boxUV(boxAt(x0, y, -deep, lw, 0.002, deep - 0.0002), { along: 'x' }));
@@ -252,7 +260,7 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
   // furniture
   const hx = handleSide * (lw / 2 - 0.058);
   const hb = new Bag();
-  handle(hb, -handleSide, 0.03 + r() * 0.07);
+  handle(hb, -handleSide, 0.07 + r() * 0.12); // old springs: every lever sags a little, some a lot
   b.addBag(hb, move(hx, 1.0, 0));
   const hb2 = new Bag();
   handle(hb2, handleSide, 0.05, 'brassDull');

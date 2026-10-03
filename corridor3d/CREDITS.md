@@ -13,7 +13,7 @@ here anyway. The files are not committed: `npm run corridor:fetch` downloads the
 | wood_cabinet_worn_long | 2k, 1.0 x 0.5 m (laid at 1.86 x 0.93 m) | The boarded wainscot: albedo, normal and roughness, the boards shuffled | https://polyhaven.com/a/wood_cabinet_worn_long |
 | wood_table_001 | 2k, 1.5 m | Door leaves (stiles, rails, panels cut from it), the clawed inside of door 305, the grain normal of every leaf | https://polyhaven.com/a/wood_table_001 |
 | dark_wood | 2k, 2.0 m | Skirting, dado rail, architraves, door linings, leaf edges | https://polyhaven.com/a/dark_wood |
-| wood_floor_worn | 1k, 2.0 m | Floorboards beside the runner | https://polyhaven.com/a/wood_floor_worn |
+| plank_flooring | 2k, 1.34 m | Worn strip parquet beside the runner | https://polyhaven.com/a/plank_flooring |
 | painted_plaster_wall | 1k, 2.0 m | Ceiling and cornice | https://polyhaven.com/a/painted_plaster_wall |
 | worn_plaster_wall | 1k, 1.8 m | Bare plaster where the wallpaper has come away (decals) | https://polyhaven.com/a/worn_plaster_wall |
 | rough_wood | 1k, 0.9 m | The boards nailed across door 312 | https://polyhaven.com/a/rough_wood |

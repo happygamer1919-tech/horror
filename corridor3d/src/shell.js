@@ -4,7 +4,7 @@
 // vertex colours: rubbed pale along the nose of the rail, dust on every ledge.
 import * as THREE from 'three';
 import { HW, CH, WALL_T, START, END, DOOR, DOORS, DADO, SKIRT, RUNNER, LAMPS } from './layout.js';
-import { grid, extrude, paint, planarUV, fbm, noise2, smooth, clamp, M, move, rotX, rotY } from './util.js';
+import { grid, extrude, paint, planarUV, fbm, noise2, smooth, clamp, mulberry, M, move, rotX, rotY } from './util.js';
 import { wallPanels, panelUV, CARPET_PANELS, carpetPanel, carpetUV } from './surfaces.js';
 
 // Right-handed frame of a side wall: local x runs along the wall, y up, z out into the corridor.
@@ -39,7 +39,9 @@ export function carpetHeight(x, s) {
   const edge = smooth(RUNNER, RUNNER - 0.06, Math.abs(x));
   const ruck = 0.012 * Math.exp(-Math.pow((s - 12.1 - x * 0.25) / 0.09, 2)) * smooth(-0.6, 0.1, x) + 0.008 * Math.exp(-Math.pow((s - 4.6 + x * 0.4) / 0.07, 2)) * smooth(0.55, -0.1, x);
   const wave = 0.005 * (fbm(x * 1.3, s * 0.9, 83, 2) - 0.4) + 0.0035 * (fbm(x * 3, s * 1.5, 81, 3) - 0.3);
-  return 0.011 + edge * (wave + ruck);
+  // one edge has lifted where a trolley wheel caught it, in the first pool of light
+  const lifted = 0.016 * Math.exp(-Math.pow((s - 2.7) / 0.2, 2)) * smooth(0.36, 0.6, x);
+  return 0.012 + edge * (wave + ruck) + lifted;
 }
 // The edge of the runner is not a ruled line either.
 export const carpetEdge = (sx, s) => 0.006 * (fbm(s * 0.6 + sx * 7, 1.5, 85, 3) - 0.5) + 0.0025 * (noise2(s * 9, sx, 87) - 0.5);
@@ -104,12 +106,13 @@ const CORNICE = (() => {
 export function buildShell(bag) {
   // --- floor: boards along the corridor ---
   {
-    const g = grid(-HW - WALL_T, START, HW + WALL_T, END, 0.16);
+    const g = grid(-HW - WALL_T, START, HW + WALL_T, END, 0.07);
     planarUV(g, 0, 1);
     const p = paint(g, (v) => {
       const edge = smooth(HW - 0.02, HW - 0.3, Math.abs(v.x));
-      const k = (0.55 + 0.45 * edge) * (0.8 + 0.4 * fbm(v.x * 2, v.y * 0.8, 71, 3));
-      return [k, k, k];
+      // dust and old polish lie against the skirting; slow patches of wear, nothing at the scale of the mesh
+      const k = (0.5 + 0.5 * edge) * (0.82 + 0.36 * fbm(v.x * 0.9, v.y * 0.45, 71, 2));
+      return [k, k * 0.985, k * 0.96];
     });
     bag.add('floor', p, rotX(-Math.PI / 2));
   }
@@ -144,8 +147,8 @@ export function buildShell(bag) {
         const quad = [
           [xa, sa, carpetHeight(sx * RUNNER, sa), ua],
           [xb, sb, carpetHeight(sx * RUNNER, sb), ub],
-          [xb + sx * 0.004, sb, 0.0005, ub],
-          [xa + sx * 0.004, sa, 0.0005, ua],
+          [xb + sx * 0.007, sb, 0.0005, ub],
+          [xa + sx * 0.007, sa, 0.0005, ua],
         ];
         for (const j of sx > 0 ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3]) {
           vp.push(quad[j][0], quad[j][1], quad[j][2]);
@@ -156,7 +159,7 @@ export function buildShell(bag) {
       e.setAttribute('position', new THREE.Float32BufferAttribute(vp, 3));
       e.setAttribute('uv', new THREE.Float32BufferAttribute(vu, 2));
       e.computeVertexNormals();
-      bag.add(`carpet${k}`, e, rotX(-Math.PI / 2), [0.5, 0.5, 0.5]);
+      bag.add(`carpet${k}`, e, rotX(-Math.PI / 2), [0.28, 0.28, 0.28]);
     }
   }
   // --- ceiling ---
@@ -165,8 +168,8 @@ export function buildShell(bag) {
     planarUV(g, 0, 1);
     const p = paint(g, (v) => {
       const s = -v.y;
-      let k = 0.7 + 0.5 * fbm(v.x * 1.1, s * 0.6, 101, 4);
-      k *= 0.8 + 0.4 * fbm(v.x * 5, s * 5, 103, 3);
+      let k = 0.8 + 0.3 * fbm(v.x * 1.1, s * 0.6, 101, 4);
+      k *= 0.86 + 0.28 * fbm(v.x * 5, s * 5, 103, 3);
       k *= 1 - 0.3 * smooth(HW - 0.35, HW, Math.abs(v.x));
       // where the roof let the water in: the same places the walls are stained
       k *= 1 - 0.45 * smooth(0.55, 0.75, fbm(v.x * 0.9 + 4, s * 0.5, 105, 3));
@@ -214,7 +217,25 @@ export function buildShell(bag) {
       const place = (y) => (side < 0 ? M(move(-HW, y, -s1)) : M(rotY(Math.PI), move(HW, y, -s0)));
       const sAt = (z) => (side < 0 ? s1 - z : s0 + z);
       bag.add('trim', paint(extrude(PROFILE.skirting, len, { step: 0.12 }), (v) => trimWear(sAt(v.z) + side * 40, v.y, v.x / 0.018, smooth(SKIRT - 0.03, SKIRT, v.y) * smooth(0.012, 0.002, v.x), 61)), place(0));
-      bag.add('trim', paint(extrude(PROFILE.dado, len, { step: 0.08 }), (v) => trimWear(sAt(v.z) + side * 40, v.y, v.x / 0.033, smooth(0.04, 0.058, v.y), 71)), place(DADO - 0.03));
+      // the rail went up in lengths: a hair's gap at each joint, no two lengths at quite the same
+      // height, and a long one sags
+      {
+        const rr = mulberry(Math.round(s0 * 97) + (side > 0 ? 5000 : 0));
+        let z = 0;
+        while (z < len - 0.01) {
+          let piece = 1.5 + 1.4 * rr();
+          if (len - z - piece < 0.7) piece = len - z;
+          const dy = (rr() - 0.5) * 0.004;
+          const tilt = (rr() - 0.5) * 0.0022;
+          const z0 = z;
+          const g = extrude(PROFILE.dado, piece - 0.0025, { step: 0.08, caps: true });
+          const pos = g.attributes.position;
+          for (let i = 0; i < pos.count; i++) pos.setY(i, pos.getY(i) + dy + tilt * pos.getZ(i) - 0.0025 * Math.sin((Math.PI * pos.getZ(i)) / piece));
+          g.translate(0, 0, z0);
+          bag.add('trim', paint(g, (v) => trimWear(sAt(v.z) + side * 40, v.y, v.x / 0.033, smooth(0.04, 0.058, v.y), 71)), place(DADO - 0.03));
+          z += piece;
+        }
+      }
     }
     for (const d of DOORS.filter((x) => x.side === side)) addWall(d.s, d.s + DOOR.w, DOOR.h, CH, 'paper', 0.11);
     // cornice, the whole length

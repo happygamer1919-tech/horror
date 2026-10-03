@@ -36,7 +36,16 @@ const pad = (n) => String(n).padStart(3, '0');
 // One GPU client at a time: a browser test run on the GPU while a frame is traced can hand back
 // a stale or half-drawn canvas without any error. So before the browser starts and before every
 // frame, wait until no Playwright test run is alive on this machine.
-const busy = () => new Promise((resolve) => execFile('pgrep', ['-f', 'playwright test'], (err, out) => resolve(!err && out.trim().length > 0)));
+// (Only the runner itself counts: a shell whose command line merely mentions the words, such as
+// the one that started this render after checking for it, must not make the render wait for ever.)
+const busy = () =>
+  new Promise((resolve) =>
+    execFile('pgrep', ['-fl', 'playwright test'], (err, out) => {
+      if (err) return resolve(false);
+      const runners = out.split('\n').filter((l) => /^\d+ (\S*node|npm exec|\S*npx)\b/.test(l) && !l.includes('render.mjs'));
+      resolve(runners.length > 0);
+    }),
+  );
 async function quiet() {
   let waited = 0;
   while (await busy()) {
@@ -115,7 +124,13 @@ const sets = which === 'both' ? ['desktop', 'mobile'] : [which];
 await boot();
 const started = Date.now();
 
-if (mode === 'strat') {
+if (mode === 'probe') {
+  // debug: float means of a wall patch and a carpet patch of frame 0, in a traced half and after the denoiser
+  await page.evaluate((o) => window.corridor.frame(o), { set: 'desktop', index: 0, scale: 0.3, samples: Number(flag('samples', 64)), ...JSON.parse(String(flag('opts', '{}'))) });
+  for (const [what, rect] of [['wall', [0.72, 0.4, 0.84, 0.62]], ['carpet', [0.45, 0.05, 0.55, 0.2]]]) {
+    for (const t of ['a', 'b', 'hdr']) console.log(what, t, JSON.stringify(await page.evaluate(([n, r]) => window.corridor.probe(n, r), [t, rect])));
+  }
+} else if (mode === 'strat') {
   await page.evaluate((o) => window.corridor.frame(o), { set: 'desktop', index: 0, scale: 0.1, samples: 2 });
   console.log(JSON.stringify(await page.evaluate(() => window.corridor.strat(200)), null, 1).slice(0, 3000));
 } else if (mode === 'stills') {

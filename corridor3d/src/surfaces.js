@@ -593,7 +593,7 @@ export { printTile };
 // A woven red runner with a dark stripe down each side, the kind every hotel of the time had,
 // 1.2 m wide. Forty years of feet have worn a pale path down its middle and a bald patch in
 // front of every door; the edges, where nobody walks, kept their colour and took the dirt.
-export const CARPET_PANELS = 8;
+export const CARPET_PANELS = 16; // 1.87 m each: 0.9 mm a texel along the runner, so the weave is in the albedo
 export const CARPET_FROM = START + 0.3;
 export const CARPET_TO = END - 0.12;
 export const CARPET_LEN = (CARPET_TO - CARPET_FROM) / CARPET_PANELS;
@@ -717,7 +717,7 @@ export function carpetAlbedo(p, S, src) {
 const LW = DOOR.w - 0.007;
 const STILE = 0.108;
 const YS = [0.014, 0.21, 0.88, 1.035, DOOR.h - 0.004 - 0.112, DOOR.h - 0.004];
-export const DOOR_TILE = 1.5; // the scan of the varnished veneer covers 1.5 m
+export const DOOR_TILE = 0.8; // the scan covers 1.5 m; laid at half scale its figure is the size of a door's
 const HANDLE = { x: -(LW / 2 - 0.058), y: 1.0 };
 export const doorUV = (x, y, handleSide) => [(handleSide < 0 ? x + LW / 2 : LW / 2 - x) / LW, y / DOOR.h];
 
@@ -779,14 +779,18 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
   }
   // dirt lies in the mouldings: dark in the corner of every bevel, dust on the ledge that faces up
   for (const [a, b] of [[YS[1], YS[2]], [YS[3], YS[4]]]) {
-    g.strokeStyle = 'rgba(8,5,3,0.3)';
+    g.strokeStyle = 'rgba(8,5,3,0.14)';
     g.lineWidth = 0.014;
     g.strokeRect(px0 + 0.02, a + 0.02, px1 - px0 - 0.04, b - a - 0.04);
-    g.strokeStyle = 'rgba(8,5,3,0.25)';
+    g.strokeStyle = 'rgba(8,5,3,0.1)';
     g.lineWidth = 0.008;
     g.strokeRect(px0 + 0.074, a + 0.074, px1 - px0 - 0.148, b - a - 0.148);
-    g.fillStyle = 'rgba(120,112,100,0.1)';
-    g.fillRect(px0 + 0.004, a + 0.002, px1 - px0 - 0.008, 0.02);
+    // every ledge that faces up holds a line of dark dust (a pale ledge under a ceiling lamp
+    // reads as a strip light): the lower bevel of the panel and the top chamfer of its raised field
+    g.fillStyle = 'rgba(16,12,9,0.5)';
+    g.fillRect(px0 + 0.002, a + 0.001, px1 - px0 - 0.004, 0.03);
+    g.fillStyle = 'rgba(16,12,9,0.62)';
+    g.fillRect(px0 + 0.07, b - 0.1, px1 - px0 - 0.14, 0.022);
   }
   // one slow field of dirt: darker to the floor, greasy round the handle, old runs in the varnish
   pixels(g);
@@ -815,7 +819,7 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
     const y = (1 - v) * DOOR.h;
     const dx = (x - HANDLE.x - 0.07) / 0.085;
     const dy = (y - HANDLE.y - 0.2) / 0.13;
-    let a = 0.3 * Math.exp(-dx * dx - dy * dy) * smooth(0.3, 0.7, fbm(x * 9 + seed, y * 5, 311, 3));
+    let a = 0.07 * Math.exp(-dx * dx - dy * dy) * smooth(0.3, 0.7, fbm(x * 9 + seed, y * 5, 311, 3));
     // and along the edge of the lock stile, where it is pulled shut
     a += 0.3 * smooth(x0 + 0.018, x0, x) * smooth(0.45, 0.62, fbm(seed, y * 5, 313, 3)) * smooth(0.5, 0.8, y) * smooth(1.6, 1.3, y);
     return [0.62, 0.48, 0.34, a * (0.6 + 0.6 * grime)];
@@ -837,7 +841,7 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
     }
   };
   for (const [a, b] of [[YS[1], YS[2]], [YS[3], YS[4]]]) {
-    for (const inset of [0, 0.074, 0.086]) {
+    for (const inset of [0]) {
       rub(px0 + inset, a + inset, px1 - inset, a + inset);
       rub(px0 + inset, b - inset, px1 - inset, b - inset);
       rub(px0 + inset, a + inset, px0 + inset, b - inset);
@@ -903,8 +907,8 @@ export function doorRough(S = 512) {
     if (Math.abs(x) < LW / 2 - STILE) {
       for (const a of [YS[1], YS[3]]) {
         k += 0.5 * smooth(a - 0.004, a + 0.004, y) * smooth(a + 0.034, a + 0.024, y);
-        k += 0.45 * smooth(a + 0.07, a + 0.076, y) * smooth(a + 0.094, a + 0.086, y);
       }
+      for (const b of [YS[2], YS[4]]) k += 0.6 * smooth(b - 0.104, b - 0.098, y) * smooth(b - 0.07, b - 0.078, y);
     }
     return [k, k, k];
   });

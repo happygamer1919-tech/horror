@@ -421,7 +421,7 @@ function hand(edgeX, dirX, y0) {
       return (base + j(0.2, 0.05, 0.18) + j(0.47, 0.03, 0.13) + j(0.76, 0.026, 0.09)) * (0.3 + 0.7 * tip);
     };
     const sw = sweep(pts, rad, { tint: (u) => skinTint(u, i), up: new THREE.Vector3(0, 1, 0), flat: 0.8 });
-    b.add('skin', sw.geo, null, [0.8, 0.77, 0.76]);
+    b.add('skin', sw.geo, null, [0.4, 0.38, 0.37]); // a stop under the face: no brighter than the door edge it holds
     // the nail on the back of the last bone, facing the corridor: short, ridged, broken at the edge
     const nu = 0.885;
     const nc = sw.at(nu);
@@ -431,7 +431,7 @@ function hand(edgeX, dirX, y0) {
     const basis = new THREE.Matrix4().makeBasis(nt, back, side);
     const nail = new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2);
     const centre = nc.clone().addScaledVector(back, rad(nu) * 0.7);
-    b.add('nail', nail, M(new THREE.Matrix4().makeScale(w * 0.72, w * 0.2, w * 0.6), basis, move(centre.x, centre.y, centre.z)), [0.9 - 0.06 * i, 0.82 - 0.05 * i, 0.72 - 0.05 * i]);
+    b.add('nail', nail, M(new THREE.Matrix4().makeScale(w * 0.72, w * 0.2, w * 0.6), basis, move(centre.x, centre.y, centre.z)), [0.45 - 0.03 * i, 0.41 - 0.025 * i, 0.36 - 0.025 * i]);
   });
   // the thumb, flat against the edge face, its tip towards the corridor
   {
@@ -444,7 +444,7 @@ function hand(edgeX, dirX, y0) {
     ];
     const rad = (u) => lerp(0.0102, 0.0072, u) * (u > 0.92 ? 0.4 + 0.6 * Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.92) / 0.08, 2))) : 1) * (1 + 0.15 * Math.exp(-Math.pow((u - 0.55) / 0.05, 2)));
     const sw = sweep(pts, rad, { tint: (u) => skinTint(u * 0.9, 5), up: new THREE.Vector3(0, 0, 1), flat: 0.78 });
-    b.add('skin', sw.geo, null, [0.9, 0.86, 0.84]);
+    b.add('skin', sw.geo, null, [0.45, 0.43, 0.42]);
   }
   // the back of the hand and the wrist, in the gap and going back into the dark room
   const back = new THREE.SphereGeometry(1, 28, 20);
@@ -458,7 +458,7 @@ function hand(edgeX, dirX, y0) {
   }
   back.computeVertexNormals();
   const hc = new THREE.Vector3(edgeX + out * 0.016, y0 - 0.002, -t - 0.035);
-  b.add('skin', back, M(new THREE.Matrix4().makeScale(0.014, 0.043, 0.048), move(hc.x, hc.y, hc.z)), [0.8, 0.76, 0.74]);
+  b.add('skin', back, M(new THREE.Matrix4().makeScale(0.014, 0.043, 0.048), move(hc.x, hc.y, hc.z)), [0.4, 0.38, 0.37]);
   const wrist = sweep([new THREE.Vector3(hc.x + out * 0.003, hc.y - 0.004, hc.z - 0.03), new THREE.Vector3(hc.x + out * 0.02, hc.y - 0.06, hc.z - 0.1), new THREE.Vector3(hc.x + out * 0.05, hc.y - 0.22, hc.z - 0.2)], (u) => lerp(0.021, 0.028, u), { flat: 0.75, up: new THREE.Vector3(1, 0, 0) });
   b.add('skin', wrist.geo, null, [0.6, 0.57, 0.55]);
   return b;
@@ -548,14 +548,14 @@ export function buildFigure(materials, { hingeSide = 1 } = {}) {
     key.position.set(kp.x ?? -0.42, kp.y ?? 0.3, kp.z ?? 0.36).applyMatrix4(headGroup.matrix);
     const eyeAt = H.eyes[P.glintEye ?? 0].clone().applyMatrix4(headGroup.matrix);
     keyTarget.position.copy(eyeAt).add(new THREE.Vector3(kp.ox ?? 0, kp.oy ?? -0.012, kp.oz ?? 0));
-    key.intensity = kp.cd ?? 1.3; // deep shadow: the stand-in is a presence, not a portrait
+    key.intensity = kp.cd ?? 0.75; // deep shadow: the stand-in is a presence, not a portrait
     key.angle = kp.angle ?? 0.11;
     key.penumbra = kp.pen ?? 0.8;
     // the rim: from deeper in the room, behind her on the side away from the door
     const rp = P.rim ?? {};
     rim.position.set(pose.x + far * (rp.along ?? 1.25), pose.y + (rp.up ?? 0.25), pose.z - (rp.deep ?? 0.6));
     rimTarget.position.set(pose.x, pose.y + (rp.ty ?? -0.12), pose.z);
-    rim.intensity = rp.cd ?? 0.6;
+    rim.intensity = rp.cd ?? 0; // off: its cold glint on one wet strand read as a blue speck
     rim.angle = rp.angle ?? 0.22;
 
     // the catchlight: on the cornea of the eye nearer the gap, where the key is mirrored towards
