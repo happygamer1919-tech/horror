@@ -134,9 +134,15 @@ test(`touch scroll through the full page, ${CPU_THROTTLE}x CPU throttle [${varia
       longTaskMaxMs: profiled.metrics.longTasks.maxMs,
       topLongTasks: profiled.metrics.longTasks.top,
     },
+    // Runs kept although the machine check failed (only after RUNS * 2 attempts were set aside,
+    // or with PERF_KEEP_NOISY). With any of them the verdict is about the machine, not the site.
+    noisyRunsKept: 0,
+    verdict: '' as 'pass' | 'fail' | 'inconclusive (busy machine)',
     pass: false,
   };
   summary.pass = summary.droppedPct.worst < BUDGET.droppedPct && summary.longTaskMaxMs.worst <= BUDGET.longTaskMs;
+  summary.noisyRunsKept = runs.filter((r) => r.machine.noisy).length;
+  summary.verdict = summary.noisyRunsKept ? 'inconclusive (busy machine)' : summary.pass ? 'pass' : 'fail';
 
   mkdirSync(outDir, { recursive: true });
   const suffix = [label, variant.name === 'base' ? '' : variant.name].filter(Boolean).join('.');
@@ -154,6 +160,9 @@ test(`touch scroll through the full page, ${CPU_THROTTLE}x CPU throttle [${varia
 
   expect(summary.conditions.reachedBottom, 'the scripted scroll reached the end of the page').toBe(true);
   if (!enforce) return;
+  // A busy machine drops frames on an empty page too, so a failure then says nothing about the
+  // site. Say so instead of reporting the budget as missed. Re-run on a quiet machine.
+  expect(summary.noisyRunsKept, 'runs measured on a busy machine (an empty page dropped frames too): inconclusive, re-run when the machine is quiet').toBe(0);
   expect(summary.droppedPct.worst, 'dropped frames, worst of the runs, percent').toBeLessThan(BUDGET.droppedPct);
   expect(summary.longTaskMaxMs.worst, 'longest main thread task during the scroll, ms').toBeLessThanOrEqual(BUDGET.longTaskMs);
 });
