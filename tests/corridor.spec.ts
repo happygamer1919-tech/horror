@@ -149,7 +149,7 @@ test('the door opens once: not on a second pass, and not after a reload in the s
   expect(patches, 'no scare frames are even fetched once it has played').toEqual([]);
 });
 
-test('the scare is quiet: the door moves for 500 to 700 ms, then shuts, in a small part of the frame', async ({ page }) => {
+test('the scare is quiet: the door moves for 500 to 700 ms, then shuts, and nothing flashes', async ({ page }) => {
   await open(page);
   const canvas = canvasOf(page);
   const { set } = await setInfo(page);
@@ -157,9 +157,10 @@ test('the scare is quiet: the door moves for 500 to 700 ms, then shuts, in a sma
   // the door is shut on the first and the last frame of the run
   expect(sc.has[0]).toBe(0);
   expect(sc.has[sc.count - 1]).toBe(0);
-  // the patch that changes is a fraction of the picture: not a full-screen event
+  // the patch is the door and what is behind it, not the whole picture (the walker stands
+  // close to the door, so the leaf fills about half of the frame)
   const share = (sc.rect[2] * sc.rect[3]) / (set.w * set.h);
-  expect(share).toBeLessThan(0.3);
+  expect(share).toBeLessThan(0.6);
 
   await approach(page, set);
   // Watch every animation frame from here on: the scare state, the patch on the canvas, and a
@@ -168,7 +169,19 @@ test('the scare is quiet: the door moves for 500 to 700 ms, then shuts, in a sma
     ([rect, fw, fh]) => {
       const c = document.querySelector<HTMLCanvasElement>('[data-corridor]')!;
       const g = c.getContext('2d')!;
-      const log: [number, string, string, number][] = [];
+      const log: [number, string, string, number, number][] = [];
+      // mean relative luminance of the whole canvas (sRGB decoded), for the flash check
+      const lin = (v: number) => (v <= 10.31 ? v / 3295.4 : Math.pow((v / 255 + 0.055) / 1.055, 2.4));
+      const meanY = () => {
+        const d = g.getImageData(0, 0, c.width, c.height).data;
+        let y = 0;
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4 * 9) {
+          y += 0.2126 * lin(d[i]) + 0.7152 * lin(d[i + 1]) + 0.0722 * lin(d[i + 2]);
+          n++;
+        }
+        return y / n;
+      };
       (window as unknown as { __rec: typeof log }).__rec = log;
       let after = 0;
       const tick = (t: number) => {
@@ -184,7 +197,7 @@ test('the scare is quiet: the door moves for 500 to 700 ms, then shuts, in a sma
           const d = g.getImageData(x0, y0, x1 - x0, y1 - y0).data;
           for (let i = 0; i < d.length; i += 4 * 5) sum = (sum * 31 + d[i] + d[i + 1] * 7 + d[i + 2] * 13) >>> 0;
         }
-        log.push([t, c.dataset.scare ?? '', c.dataset.patch ?? '', sum]);
+        log.push([t, c.dataset.scare ?? '', c.dataset.patch ?? '', sum, c.dataset.scare === 'playing' || c.dataset.scare === 'done' ? meanY() : -1]);
         if (c.dataset.scare === 'done') after++;
         if (after < 20 && log.length < 2000) requestAnimationFrame(tick);
       };
@@ -195,7 +208,7 @@ test('the scare is quiet: the door moves for 500 to 700 ms, then shuts, in a sma
   await toFrame(page, sc.frame + 5, set.frames);
   await expect(canvas).toHaveAttribute('data-scare', 'done', { timeout: 6000 });
   await expect.poll(() => page.evaluate(() => (window as unknown as { __rec: unknown[] }).__rec.length)).toBeGreaterThan(5);
-  const rec = await page.evaluate(() => (window as unknown as { __rec: [number, string, string, number][] }).__rec);
+  const rec = await page.evaluate(() => (window as unknown as { __rec: [number, string, string, number, number][] }).__rec);
   const playing = rec.filter((r) => r[1] === 'playing');
   expect(playing.length, 'animation frames while the door moves').toBeGreaterThan(8);
   const start = playing[0][0];
@@ -207,6 +220,11 @@ test('the scare is quiet: the door moves for 500 to 700 ms, then shuts, in a sma
   const drawn = new Set(playing.map((r) => r[2]).filter((p) => p !== '-1'));
   expect(drawn.size, 'patches drawn').toBeGreaterThanOrEqual(8);
   expect(new Set(playing.map((r) => r[3])).size, 'different pictures in the door rectangle').toBeGreaterThanOrEqual(6);
+  // Nothing flashes: over the whole beat, the door opening and shutting, the mean relative
+  // luminance of the picture moves far less than the 0.1 that counts as a flash (WCAG 2.3.1).
+  const lum = rec.map((r) => r[4]).filter((v) => v >= 0);
+  expect(lum.length).toBeGreaterThan(8);
+  expect(Math.max(...lum) - Math.min(...lum), 'change in mean relative luminance').toBeLessThan(0.1);
   // and it is shut again at the end: once it is over, no patch is drawn
   expect(rec[rec.length - 1][1]).toBe('done');
   expect(rec[rec.length - 1][2]).toBe('-1');
