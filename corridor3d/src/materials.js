@@ -150,7 +150,7 @@ export function makeMaterials(T) {
   m.decal = P({ map: T.decals, transparent: true, roughness: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, vertexColors: true });
 
   // The shoe.
-  m.leather = P({ color: new THREE.Color(0.36, 0.31, 0.25), roughness: 0.5, side: THREE.DoubleSide, vertexColors: true });
+  m.leather = P({ color: new THREE.Color(0.25, 0.225, 0.185), roughness: 0.5, side: THREE.DoubleSide, vertexColors: true });
   m.sole = P({ color: new THREE.Color(0.3, 0.2, 0.12), roughness: 0.8, vertexColors: true });
 
   // The figure behind the door.

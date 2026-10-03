@@ -103,8 +103,8 @@ export function cameraPose(s, set) {
   let pitch = -0.045 + 0.006 * Math.sin(s * 0.9 + 1.1);
   let x = sway;
   // the shoe, low on the right
-  yaw -= 0.04 * bump(5.2, 2.0, s);
-  pitch -= 0.17 * bump(5.2, 2.3, s);
+  yaw -= 0.04 * bump(5.7, 2.0, s);
+  pitch -= (mobile ? 0.3 : 0.19) * bump(5.7, 2.3, s); // the tall frame has room to look down further
   // the scratched door hanging open on the left: look at it, then walk round it
   yaw += 0.1 * bump(9.0, 1.6, s);
   x += 0.4 * bump(10.7, 2.7, s);

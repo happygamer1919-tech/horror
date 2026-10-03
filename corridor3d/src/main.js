@@ -70,7 +70,7 @@ window.corridor = {
     }
     await pipe.compiled();
     const tScene = performance.now() - t0;
-    const shutterLen = (opts.shutter ?? 0.28) * ds;
+    const shutterLen = (opts.shutter ?? 0.12) * ds; // a short exposure: a scrubbed frame is looked at standing still
     const seed = opts.seed ?? (set === 'desktop' ? 1000 : 5000) + (opts.index ?? Math.round(at * 100));
     const res = pipe.render({
       camera,

@@ -500,7 +500,8 @@ export async function buildProps(bag, materials, T, doorMeta) {
     const sh = shoe();
     const s = 8.15;
     const x = 0.24;
-    bag.addBag(sh, M(move(-0.08, 0, 0), rotX(0.09), rotY(-0.72), move(x, carpetHeight(x, s) - 0.0005, -s)));
+    // side on to the walker, so heel, strap and toe read as a shoe and not a white blot
+    bag.addBag(sh, M(move(-0.08, 0, 0), rotX(0.09), rotY(-0.12), move(x, carpetHeight(x, s) - 0.0005, -s)));
   }
 
   // ---- trolley, parked against the left wall in the dark part ----

@@ -64,7 +64,7 @@ async function shoot(opts, file) {
     try {
       // a GPU that hangs instead of failing: give up on the attempt after three minutes
       const res = await limit(page.evaluate((o) => window.corridor.frame(o), opts), 180000);
-      const data = await limit(page.evaluate(() => window.corridor.png()), 60000);
+      const data = await limit(page.evaluate(() => window.corridor.png()), 150000);
       if (data === lastPng) throw new Error('the canvas did not change (stale frame)');
       lastPng = data;
       await writeFile(file, Buffer.from(data.split(',')[1], 'base64'));

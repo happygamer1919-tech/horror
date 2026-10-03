@@ -42,7 +42,8 @@ node corridor3d/encode.mjs --dummy    # numbered placeholder frames, no GPU need
    driver logs the `UNMASKED_RENDERER` string). Real global illumination: the upper walls and the
    ceiling are lit only by light bounced off the carpet and by the glow of the opal shades.
    Each lamp is a small disc light under its shade (soft penumbra), 48 samples per pixel, 5 bounces.
-   The camera moves a little during the exposure, so frames carry a trace of motion blur.
+   The camera moves a little during the exposure (an eighth of the step to the next frame), so
+   frames carry a trace of motion blur. More than that and a frame looked soft when the scroll stops on it.
 2. **Denoise.** The traced image is split into two independent halves to estimate noise, divided
    by an albedo buffer (so texture detail is never blurred), filtered with a variance-guided
    edge-avoiding a-trous filter, and multiplied back. Pixels on silhouettes are filtered among
