@@ -342,6 +342,11 @@ html.motion .grain {
 }
 
 /* Flashlight. Darkness with a hole in it, moved by transform only (torch.ts).
+   On touch screens the light is on from the first paint and wanders over the hero until
+   the first touch: two wrappers around the beam (.torch__drift) each walk a slow loop, as
+   CSS keyframes on transform (printed by Base.astro from scripts/drift.ts), so the
+   compositor moves it and no script runs. From the first touch the script has the light
+   (html.torch-js): the drift is off and the beam itself is moved, as on a pointer device.
    The beam is a zero-size anchor. Its ::before is the hole: one square texture holding the
    soft edge. The four <i> panels around it are flat colour, which the compositor draws
    without a texture. Nothing here is repainted while the light moves or the page scrolls. */
@@ -357,6 +362,14 @@ html.motion .grain {
 }
 html.motion .torch {
   display: block;
+}
+/* The size of the viewport, so the keyframes can be written in percent of it. */
+.torch__drift {
+  position: absolute;
+  inset: 0;
+}
+html.torch-js .torch__drift {
+  animation: none;
 }
 .torch__beam {
   /* --torch-r: where the light has faded to about a third. --torch-h: where it is gone. */
@@ -415,36 +428,11 @@ html.motion .torch {
 .torch__beam > i:nth-child(4) {
   left: calc(var(--torch-h) - 1px);
 }
-/* A flat cover over the hole. Touch screens start with it up: there is no light until the
-   first touch. torch.ts then sets html.has-light and the cover fades out (opacity only),
-   which brings the light in at the finger. Shared by the copy veil in the hero. */
-.torch::after,
-.veil::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgb(4, 3, 3);
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-}
 @media (hover: none) {
-  /* Touch: a wider light. */
+  /* Touch: a wider light. Until the script takes it, the wrappers carry the position. */
   .torch__beam {
     --torch-r: 21vmax;
-  }
-  .torch::after,
-  .veil::after {
-    opacity: 1;
-    visibility: visible;
-  }
-  html.has-light .torch::after,
-  html.has-light .veil::after {
-    opacity: 0;
-    visibility: hidden;
-    transition:
-      opacity 0.4s ease-out,
-      visibility 0s linear 0.4s;
+    transform: translate3d(0, 0, 0);
   }
 }
 

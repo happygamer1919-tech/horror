@@ -39,15 +39,28 @@ function errorsOf(page: Page) {
   return errors;
 }
 
-// Where the beam element really is, read from its transform (not from the hook).
+// Where the beam element really is on the screen (not from the hook): the beam has no size,
+// so its box is its centre, with the drift wrappers and its own transform applied.
 const beamCentres = (page: Page) =>
   page.evaluate(() =>
     Array.from(document.querySelectorAll<HTMLElement>('.torch__beam')).map((b) => {
-      const m = new DOMMatrixReadOnly(getComputedStyle(b).transform);
-      return { x: m.m41, y: m.m42 };
+      const r = b.getBoundingClientRect();
+      return { x: r.left, y: r.top };
     }),
   );
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+// The hook and the real beams, read in one go, so they describe the same instant.
+const lightNow = (page: Page) =>
+  page.evaluate(() => ({
+    t: performance.now(),
+    hook: { x: window.__hero.torch.x, y: window.__hero.torch.y },
+    lit: window.__hero.torch.lit,
+    touched: window.__hero.torch.touched,
+    beams: Array.from(document.querySelectorAll<HTMLElement>('.torch__beam')).map((b) => {
+      const r = b.getBoundingClientRect();
+      return { x: r.left, y: r.top };
+    }),
+  }));
 
 // A rectangle of the facade drawing (600 x 900 units) in CSS px, for clips.
 type Box = { x: number; y: number; width: number; height: number };
@@ -96,10 +109,46 @@ async function luminance(page: Page, shots: (Buffer | string)[], parts: number[]
 }
 const meanOf = async (page: Page, clip: Box) => (await luminance(page, [await page.screenshot({ clip, type: 'png' })]))[0][0].mean;
 
+// How strong the text in `clip` is on the screen: the mean luminance (0 to 255) of its
+// brightest 5 percent of pixels, which are the solid insides of the glyphs.
+async function glyphStrength(page: Page, clip: Box) {
+  const png = (await page.screenshot({ clip, type: 'png' })).toString('base64');
+  return page.evaluate(async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const bmp = await createImageBitmap(new Blob([bytes]));
+    const cv = document.createElement('canvas');
+    cv.width = bmp.width;
+    cv.height = bmp.height;
+    const cx = cv.getContext('2d', { willReadFrequently: true })!;
+    cx.drawImage(bmp, 0, 0);
+    const d = cx.getImageData(0, 0, bmp.width, bmp.height).data;
+    const lum: number[] = [];
+    for (let i = 0; i < d.length; i += 4) lum.push(0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]);
+    lum.sort((p, q) => q - p);
+    const top = lum.slice(0, Math.max(1, Math.round(lum.length * 0.05)));
+    return top.reduce((p, q) => p + q, 0) / top.length;
+  }, png);
+}
+
+// A point in the bottom left corner of the screen: far from the sign, the upper facade and
+// the headline, and on nothing that can be pressed. Sending the light there leaves the
+// rest of the hero outside it.
+async function farCorner(page: Page) {
+  const vp = page.viewportSize()!;
+  const p = { x: 8, y: vp.height - 8 };
+  const pressable = await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest('a, button, summary, input, select, label')), p);
+  expect(pressable, 'the far corner is not a control').toBe(false);
+  return p;
+}
+
 const touchPoint = (p: { x: number; y: number }) => [{ x: p.x, y: p.y, id: 1 }];
 const touchStart = (cdp: CDPSession, p: { x: number; y: number }) => cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: touchPoint(p) });
 const touchMove = (cdp: CDPSession, p: { x: number; y: number }) => cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: touchPoint(p) });
 const touchEnd = (cdp: CDPSession) => cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+const tap = async (cdp: CDPSession, p: { x: number; y: number }) => {
+  await touchStart(cdp, p);
+  await touchEnd(cdp);
+};
 
 for (const lang of LANGS) {
   test(`${lang}: route button has the exact Google Maps URL and the street address under it`, async ({ page }) => {
@@ -218,15 +267,15 @@ test('darkness, measured in pixels: the wall is near black without the light and
   const wall = await facadeBox(page, isMobile ? { x: 90, y: 300, w: 420, h: 62 } : { x: 90, y: 440, w: 420, h: 280 });
   const centre = { x: wall.x + wall.width / 2, y: wall.y + wall.height / 2 };
   const cdp = isMobile ? await page.context().newCDPSession(page) : null;
-  // Light away: the cursor in the far corner. On a phone nobody has touched the screen yet.
-  if (!isMobile) await page.mouse.move(40, page.viewportSize()!.height - 30, { steps: 3 });
+  // Light away: the cursor in the far corner. On a phone the light drifts over the facade
+  // from the start, so a touch in the far corner takes it there.
+  if (cdp) await tap(cdp, await farCorner(page));
+  else await page.mouse.move(40, page.viewportSize()!.height - 30, { steps: 3 });
   await page.waitForTimeout(1200);
   const dark = await meanOf(page, wall);
   // Light on it.
-  if (cdp) {
-    await touchStart(cdp, centre);
-    await touchEnd(cdp);
-  } else await page.mouse.move(centre.x, centre.y, { steps: 3 });
+  if (cdp) await tap(cdp, centre);
+  else await page.mouse.move(centre.x, centre.y, { steps: 3 });
   await page.waitForTimeout(1200);
   const lit = await meanOf(page, wall);
   test.info().annotations.push({ type: 'luminance', description: `wall without the light ${dark.toFixed(1)}, in the light ${lit.toFixed(1)} (of 255)` });
@@ -241,63 +290,152 @@ test('darkness, measured in pixels: the wall is near black without the light and
   expect((await luminance(page, [await page.screenshot({ clip: route, type: 'png' })]))[0][0].max).toBeGreaterThan(150);
 });
 
-test('touch: no light before the first touch, then it appears at the touch point and follows a drag', async ({ page, isMobile }) => {
+test('headline strength, measured in pixels: outside the light it keeps at least 58 percent of what it has inside it', async ({ page, isMobile }) => {
+  await open(page);
+  await expect.poll(() => page.evaluate(() => Number(getComputedStyle(document.querySelector('.torch')!).opacity))).toBeGreaterThanOrEqual(0.95);
+  await expect.poll(() => page.evaluate(() => typeof window.__hero?.storm?.hold)).toBe('function');
+  await page.evaluate(() => window.__hero.storm.hold(false)); // lightning thins the veil: keep it out
+  const veil = () => page.evaluate(() => Number(getComputedStyle(document.querySelector('.veil')!).opacity) * Number(getComputedStyle(document.querySelector('.hero__veil')!).opacity));
+  // Before any input (drifting light on a phone, roaming light on the desktop).
+  expect(await page.evaluate(() => window.__hero.torch.touched)).toBe(false);
+  expect(await veil()).toBeLessThanOrEqual(0.41);
+
+  // The right third of the first line of the headline.
+  const line = (await page.locator('.hero__title span').first().boundingBox())!;
+  const clip = { x: line.x + line.width * 0.66, y: line.y, width: line.width * 0.34, height: line.height };
+  const on = { x: clip.x + clip.width * 0.3, y: clip.y + clip.height / 2 };
+  const far = await farCorner(page);
+  // The hole in the darkness ends 2.6 beam radii from its centre (--torch-h, global.css).
+  // The far corner is further than that from every pixel that is measured.
+  const hole = (await page.evaluate(() => window.__hero.torch.r)) * 2.6;
+  expect(dist(far, { x: clip.x, y: clip.y + clip.height })).toBeGreaterThan(hole + 10);
+  const cdp = isMobile ? await page.context().newCDPSession(page) : null;
+  const send = async (p: { x: number; y: number }) => {
+    if (cdp) await tap(cdp, p);
+    else await page.mouse.move(p.x, p.y, { steps: 3 });
+    await expect.poll(async () => Math.max(...(await beamCentres(page)).map((c) => dist(c, p))), { timeout: 4000 }).toBeLessThan(1.5);
+    await page.waitForTimeout(300);
+  };
+
+  await send(far);
+  expect(await veil()).toBeLessThanOrEqual(0.41);
+  const outside = await glyphStrength(page, clip);
+  await send(on);
+  const inside = await glyphStrength(page, clip);
+  const ratio = outside / inside;
+  test.info().annotations.push({ type: 'headline', description: `outside the light ${outside.toFixed(1)}, inside ${inside.toFixed(1)} (of 255), ratio ${ratio.toFixed(3)}` });
+  // Inside the light the headline is at full strength (bone on near black).
+  expect(inside).toBeGreaterThan(190);
+  expect(ratio).toBeGreaterThanOrEqual(0.58);
+  // And it is a light: inside is brighter than outside.
+  expect(ratio).toBeLessThan(0.75);
+
+  // The buttons, the address and the phone link do not answer to the light at all.
+  expect(await page.evaluate(() => Number(getComputedStyle(document.querySelector('.hero__cta')!).zIndex))).toBeGreaterThan(await page.evaluate(() => Number(getComputedStyle(document.querySelector('.hero__body')!).zIndex)));
+});
+
+test('touch: the light is on before the first touch and drifts over the hero, then it follows the finger', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'touch input is the phone project');
   await open(page);
+  await expect.poll(() => page.evaluate(() => typeof window.__hero?.storm?.hold)).toBe('function');
+  await page.evaluate(() => window.__hero.storm.hold(false)); // no lightning during the measurements
   const cdp = await page.context().newCDPSession(page);
   const vp = page.viewportSize()!;
+  const centre = { x: vp.width / 2, y: vp.height / 2 };
 
-  // Before the first touch there is no beam anywhere: no static centre light. The flat
-  // cover is up over the hole, on the page and on the copy veil.
-  await page.waitForTimeout(600);
-  const before = await page.evaluate(() => ({
+  // Before any touch the light is already on. Nothing covers the hole in the darkness, on
+  // the page or on the copy veil, and the script has not taken the light.
+  const start = await page.evaluate(() => ({
     lit: window.__hero.torch.lit,
     touched: window.__hero.torch.touched,
-    hasLight: document.documentElement.classList.contains('has-light'),
-    cover: getComputedStyle(document.querySelector('.torch')!, '::after').opacity,
-    veilCover: getComputedStyle(document.querySelector('.veil')!, '::after').opacity,
+    script: document.documentElement.classList.contains('torch-js'),
+    cover: getComputedStyle(document.querySelector('.torch')!, '::after').content,
+    veilCover: getComputedStyle(document.querySelector('.veil')!, '::after').content,
+    names: Array.from(document.querySelectorAll('.torch__drift')).map((el) => getComputedStyle(el).animationName),
   }));
-  expect(before).toEqual({ lit: false, touched: false, hasLight: false, cover: '1', veilCover: '1' });
-  // On arrival the copy sits under a thinner veil, so the paragraph reads before any touch:
-  // measured on the paragraph itself, its brightest pixels are well above the black around it.
-  const veilOf = () => page.evaluate(() => Number(getComputedStyle(document.querySelector('.veil')!).opacity));
-  expect(await veilOf()).toBeCloseTo(0.45, 2);
+  expect(start).toEqual({ lit: true, touched: false, script: false, cover: 'none', veilCover: 'none', names: ['torch-drift-a', 'torch-drift-b', 'torch-drift-a', 'torch-drift-b'] });
+
+  // It is seen, not just reported: a stretch of wall with no light of its own (the second
+  // row of windows, under the light as it sets out) is brighter now than it is later in
+  // this test, when the light has been taken to the far corner.
+  const wall = await facadeBox(page, { x: 90, y: 300, w: 300, h: 62 });
+  const wallLit = await meanOf(page, wall);
+
+  // It drifts: sampled for 3 seconds. The hook reports where the beam really is, both
+  // beam layers (page and copy veil) are in the same place, it is never still, it is never
+  // parked at the centre of the screen, and it stays over the hero.
+  const samples: Awaited<ReturnType<typeof lightNow>>[] = [];
+  for (let i = 0; i <= 12; i++) {
+    samples.push(await lightNow(page));
+    if (i < 12) await page.waitForTimeout(250);
+  }
+  for (const m of samples) {
+    expect(m.lit).toBe(true);
+    expect(m.touched).toBe(false);
+    expect(m.beams.length).toBe(2);
+    for (const b of m.beams) expect(dist(b, m.hook), 'hook is the beam position').toBeLessThan(1.5);
+    expect(m.hook.x).toBeGreaterThan(vp.width * 0.1);
+    expect(m.hook.x).toBeLessThan(vp.width * 0.9);
+    expect(m.hook.y).toBeGreaterThan(vp.height * 0.1);
+    expect(m.hook.y).toBeLessThan(vp.height * 0.7);
+    expect(dist(m.hook, centre), 'not at the centre of the screen').toBeGreaterThan(40);
+  }
+  const first = samples[0];
+  const lastSample = samples[samples.length - 1];
+  const seconds = (lastSample.t - first.t) / 1000;
+  const moved = dist(first.hook, lastSample.hook);
+  const steps = samples.slice(1).map((m, i) => dist(m.hook, samples[i].hook));
+  test.info().annotations.push({
+    type: 'drift',
+    description: `moved ${moved.toFixed(0)} px in ${seconds.toFixed(1)} s, from ${first.hook.x.toFixed(0)},${first.hook.y.toFixed(0)} to ${lastSample.hook.x.toFixed(0)},${lastSample.hook.y.toFixed(0)}; smallest step between samples ${Math.min(...steps).toFixed(1)} px`,
+  });
+  expect(seconds).toBeGreaterThan(2.9);
+  expect(moved, 'distance covered in 3 seconds').toBeGreaterThan(30);
+  // Slow: a drift, not a sweep.
+  expect(moved / seconds).toBeLessThan(60);
+  for (const d of steps) expect(d, 'never still between two samples').toBeGreaterThan(0.8);
+  // Only transform moves it, and the script writes nothing while it drifts.
+  expect(await page.evaluate(() => document.querySelector<HTMLElement>('.torch .torch__beam')!.style.transform)).toBe('');
+
+  // The copy reads before any touch.
   const subBox = (await page.locator('.hero__sub').boundingBox())!;
   expect((await luminance(page, [await page.screenshot({ clip: subBox, type: 'png' })]))[0][0].max).toBeGreaterThan(70);
-  // In pixels: where the old resting light used to sit (centre of the upper facade) and
-  // the middle of the screen are both as dark as the far edge of the wall.
-  const upper = await facadeBox(page, { x: 250, y: 300, w: 100, h: 62 });
-  const edge = await facadeBox(page, { x: 90, y: 300, w: 60, h: 62 });
-  const upperDark = await meanOf(page, upper);
-  const edgeDark = await meanOf(page, edge);
-  expect(upperDark).toBeLessThan(20);
-  expect(Math.abs(upperDark - edgeDark)).toBeLessThan(6);
-  // And it stays that way without input.
-  await page.waitForTimeout(900);
-  expect(await page.evaluate(() => window.__hero.torch.lit)).toBe(false);
-  expect(await meanOf(page, upper)).toBeLessThan(20);
-  // What the visitor does see: the sign, the lit room and both buttons.
-  expect(await meanOf(page, (await page.locator('#lobby [data-cta]').boundingBox())!)).toBeGreaterThan(60);
-  expect((await luminance(page, [await page.screenshot({ clip: (await page.locator('#lobby [data-route] .btn').boundingBox())!, type: 'png' })]))[0][0].max).toBeGreaterThan(150);
-  const signBox = await facadeBox(page, { x: 70, y: 34, w: 250, h: 110 });
-  expect((await luminance(page, [await page.screenshot({ clip: signBox, type: 'png' })]))[0][0].max).toBeGreaterThan(150);
-  expect((await luminance(page, [await page.screenshot({ clip: (await page.locator('[data-figure]').boundingBox())!, type: 'png' })]))[0][0].max).toBeGreaterThan(110);
 
-  // Touch, lower left: the light comes on there. Both beam layers are on the touch point.
+  // First touch: the drift stops where the light is and the script takes it from there.
+  // Read in the same task as the touch, before any frame: the beam has not jumped.
   const a = { x: 84, y: Math.round(vp.height * 0.76) };
+  const handover = await page.evaluate((p) => {
+    const beam = document.querySelector<HTMLElement>('.torch .torch__beam')!;
+    const at = () => {
+      const r = beam.getBoundingClientRect();
+      return { x: r.left, y: r.top };
+    };
+    const before = at();
+    const touch = new Touch({ identifier: 7, target: document.body, clientX: p.x, clientY: p.y });
+    window.dispatchEvent(new TouchEvent('touchstart', { touches: [touch], targetTouches: [touch], changedTouches: [touch], bubbles: true }));
+    const after = at();
+    window.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [touch], bubbles: true }));
+    return { before, after, script: document.documentElement.classList.contains('torch-js'), names: Array.from(document.querySelectorAll('.torch__drift')).map((el) => getComputedStyle(el).animationName) };
+  }, a);
+  expect(dist(handover.before, handover.after), 'no jump at the handover').toBeLessThan(1.5);
+  expect(handover.script).toBe(true);
+  expect(handover.names).toEqual(['none', 'none', 'none', 'none']);
+  // From there it eases to the touch point.
+  await expect.poll(async () => Math.max(...(await beamCentres(page)).map((c) => dist(c, a))), { timeout: 3000 }).toBeLessThan(1.5);
+
+  // A real touch, lower left: both beam layers are on the touch point.
   await touchStart(cdp, a);
   await expect.poll(async () => Math.max(...(await beamCentres(page)).map((c) => dist(c, a))), { timeout: 3000 }).toBeLessThan(3);
   expect((await beamCentres(page)).length).toBe(2);
   expect(await page.evaluate(() => ({ t: window.__hero.torch.touched, l: window.__hero.torch.lit }))).toEqual({ t: true, l: true });
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector('.torch')!, '::after').opacity), { timeout: 3000 }).toBe('0');
 
   // Drag up and to the right. This is a scroll drag: the page scrolls, the light stays
   // under the finger.
   const b = { x: 300, y: Math.round(vp.height * 0.3) };
-  const steps = 12;
+  const dragSteps = 12;
   let worst = 0;
-  for (let i = 1; i <= steps; i++) {
-    const p = { x: a.x + ((b.x - a.x) * i) / steps, y: a.y + ((b.y - a.y) * i) / steps };
+  for (let i = 1; i <= dragSteps; i++) {
+    const p = { x: a.x + ((b.x - a.x) * i) / dragSteps, y: a.y + ((b.y - a.y) * i) / dragSteps };
     await touchMove(cdp, p);
     await page.waitForTimeout(90);
     worst = Math.max(worst, ...(await beamCentres(page)).map((c) => dist(c, p)));
@@ -307,16 +445,93 @@ test('touch: no light before the first touch, then it appears at the touch point
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(40);
   await touchEnd(cdp);
 
-  // After the finger lifts: it eases to rest at the last touch point and stays.
+  // After the finger lifts: it eases to rest at the last touch point and stays. The drift
+  // does not come back.
   await expect.poll(async () => Math.max(...(await beamCentres(page)).map((c) => dist(c, b))), { timeout: 3000 }).toBeLessThan(1.5);
   await page.waitForTimeout(1200);
   for (const c of await beamCentres(page)) expect(dist(c, b)).toBeLessThan(1.5);
+  const rest = await lightNow(page);
+  expect(dist(rest.hook, b)).toBeLessThan(1.5);
 
   // A second touch somewhere else takes it there.
   const c = { x: 310, y: 150 };
-  await touchStart(cdp, c);
-  await touchEnd(cdp);
+  await tap(cdp, c);
   await expect.poll(async () => Math.max(...(await beamCentres(page)).map((q) => dist(q, c))), { timeout: 3000 }).toBeLessThan(1.5);
+
+  // Back at the top, with the light taken to the far corner, the same wall is dark: what
+  // was measured before the first touch was the light.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await tap(cdp, await farCorner(page));
+  await page.waitForTimeout(1200);
+  const wallDark = await meanOf(page, wall);
+  test.info().annotations.push({ type: 'luminance', description: `wall under the drifting light ${wallLit.toFixed(1)}, with the light away ${wallDark.toFixed(1)} (of 255)` });
+  expect(wallDark).toBeLessThan(20);
+  expect(wallLit).toBeGreaterThan(wallDark * 1.5);
+  expect(wallLit).toBeGreaterThan(wallDark + 8);
+});
+
+test('touch: the drift stands still while the hero is off screen and goes on when it is back', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'touch input is the phone project');
+  await open(page);
+  const states = () => page.evaluate(() => Array.from(document.querySelectorAll('.torch__drift')).map((el) => el.getAnimations()[0]?.playState));
+  expect(await states()).toEqual(['running', 'running', 'running', 'running']);
+  // Scrolled away by script: no touch, so the drift is still the one moving the light.
+  await page.evaluate(() => window.scrollTo(0, document.getElementById('lobby')!.offsetHeight + window.innerHeight));
+  await expect.poll(states, { timeout: 4000 }).toEqual(['paused', 'paused', 'paused', 'paused']);
+  const p1 = await lightNow(page);
+  await page.waitForTimeout(600);
+  const p2 = await lightNow(page);
+  expect(dist(p1.hook, p2.hook)).toBe(0);
+  expect(dist(p1.beams[0], p2.beams[0])).toBe(0);
+  // The four copies stopped on the same instant: both beam layers are still together.
+  expect(dist(p2.beams[0], p2.beams[1])).toBeLessThan(0.5);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(states, { timeout: 4000 }).toEqual(['running', 'running', 'running', 'running']);
+  await page.waitForTimeout(600);
+  const p3 = await lightNow(page);
+  expect(dist(p2.hook, p3.hook)).toBeGreaterThan(1);
+  expect(dist(p3.beams[0], p3.beams[1])).toBeLessThan(0.5);
+  expect(dist(p3.beams[0], p3.hook)).toBeLessThan(1.5);
+  expect(p3.touched).toBe(false);
+  // The same while the tab is hidden.
+  const hide = (hidden: boolean) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => h });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+  await hide(true);
+  expect(await states()).toEqual(['paused', 'paused', 'paused', 'paused']);
+  await hide(false);
+  expect(await states()).toEqual(['running', 'running', 'running', 'running']);
+});
+
+test('touch: without the Web Animations API the script walks the same drift', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'touch input is the phone project');
+  await page.addInitScript(() => {
+    // An older browser: CSS animations run, but there is no clock to read them from.
+    delete (Element.prototype as unknown as { getAnimations?: unknown }).getAnimations;
+  });
+  await open(page);
+  await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('torch-js'))).toBe(true);
+  const vp = page.viewportSize()!;
+  const m1 = await lightNow(page);
+  await page.waitForTimeout(1000);
+  const m2 = await lightNow(page);
+  for (const m of [m1, m2]) {
+    expect(m.lit).toBe(true);
+    expect(m.touched).toBe(false);
+    for (const b of m.beams) expect(dist(b, m.hook)).toBeLessThan(1.5);
+    expect(m.hook.x).toBeGreaterThan(vp.width * 0.1);
+    expect(m.hook.x).toBeLessThan(vp.width * 0.9);
+    expect(m.hook.y).toBeGreaterThan(vp.height * 0.1);
+    expect(m.hook.y).toBeLessThan(vp.height * 0.7);
+  }
+  expect(dist(m1.hook, m2.hook)).toBeGreaterThan(5);
+  // A touch still takes it.
+  const cdp = await page.context().newCDPSession(page);
+  const a = { x: 120, y: 560 };
+  await tap(cdp, a);
+  await expect.poll(async () => Math.max(...(await beamCentres(page)).map((c) => dist(c, a))), { timeout: 3000 }).toBeLessThan(1.5);
 });
 
 test('touch: the lit room has its guest on phones too, above the copy, and it changes when the light leaves', async ({ page, isMobile }) => {
@@ -329,20 +544,19 @@ test('touch: the lit room has its guest on phones too, above the copy, and it ch
   expect(room.y + room.height).toBeLessThan(kicker.y - 8);
   const at = { x: room.x + room.width / 2, y: room.y + room.height / 2 };
   const away = { x: 30, y: 560 };
-  const tap = async (p: { x: number; y: number }) => {
-    await touchStart(cdp, p);
-    await touchEnd(cdp);
-  };
   const state = () => page.evaluate(() => window.__hero.figure.state);
   const lit = () => page.evaluate(() => window.__hero.figure.lit);
-  // Nobody has touched yet: the room is not being watched.
-  expect(await lit()).toBe(false);
+  // Nobody has touched yet, and the room is already being watched: the drifting light sets
+  // out from this window, so the guest is the first thing it shows.
+  await expect.poll(lit, { timeout: 3000 }).toBe(true);
+  expect(await state()).toBe('far');
+  expect(await page.evaluate(() => window.__hero.torch.touched)).toBe(false);
   const seen: string[] = [];
   for (let pass = 0; pass < 2; pass++) {
-    await tap(at);
+    await tap(cdp, at);
     await expect.poll(lit, { timeout: 3000 }).toBe(true);
     seen.push(await state());
-    await tap(away);
+    await tap(cdp, away);
     await expect.poll(lit, { timeout: 4000 }).toBe(false);
     await page.waitForTimeout(1000);
   }
@@ -498,7 +712,10 @@ test('large-area flicker, measured in pixels: the top of the building never flas
   await expect.poll(() => page.evaluate(() => typeof window.__hero?.storm?.hold)).toBe('function');
   await page.evaluate(() => window.__hero.storm.hold(false)); // lightning has its own tests
   // No visitor light in the frame: this measures what the sign does to its surroundings.
-  if (!isMobile) await page.mouse.move(30, page.viewportSize()!.height - 20);
+  // On a phone the light drifts under the sign from the start, so a touch parks it in the
+  // far corner first.
+  if (isMobile) await tap(await page.context().newCDPSession(page), await farCorner(page));
+  else await page.mouse.move(30, page.viewportSize()!.height - 20);
   // The fog starts on the first input (or after 6 s) and fades in over 1.6 s. Start it now
   // with a key event, which moves no light, and measure once it is fully there.
   await page.evaluate(() => window.dispatchEvent(new Event('keydown')));
