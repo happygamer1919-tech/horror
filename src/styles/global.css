@@ -467,11 +467,17 @@ html.lenis body {
   overflow: hidden;
 }
 
-/* Idle: after 20 seconds without input the lights go down (see torch.ts). */
+/* Idle: after 20 seconds without input the lights go down (see torch.ts).
+   The layer sits under the hero copy (47) and the hero buttons (49), over everything the
+   scene is made of: the facade, the sign and the lit room (45), the rain, the sections, the
+   cards. So the building and the page go dark, the headline keeps the strength its veil
+   gives it (60 percent outside the light) and the buttons stay fully lit. The header, the
+   sticky bar and the floating "ask" control (60, 61) are whole above it: controls do not
+   dim. It comes after the hero in the document, so at 46 it is over the rain and the scrim. */
 .dim {
   position: fixed;
   inset: 0;
-  z-index: 88;
+  z-index: 46;
   background: #030202;
   opacity: 0;
   pointer-events: none;

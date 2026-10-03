@@ -334,6 +334,97 @@ test('headline strength, measured in pixels: outside the light it keeps at least
   expect(await page.evaluate(() => Number(getComputedStyle(document.querySelector('.hero__cta')!).zIndex))).toBeGreaterThan(await page.evaluate(() => Number(getComputedStyle(document.querySelector('.hero__body')!).zIndex)));
 });
 
+test('idle dimming, measured in pixels: the headline keeps at least 58 percent, the hero buttons do not change, the building goes dark', async ({ page, isMobile }) => {
+  test.setTimeout(60000);
+  // Same mechanism as the idle test in site.spec.ts: a clock that can be moved forward.
+  await page.clock.install();
+  await open(page);
+  await expect.poll(() => page.evaluate(() => Number(getComputedStyle(document.querySelector('.torch')!).opacity))).toBeGreaterThanOrEqual(0.95);
+  await expect.poll(() => page.evaluate(() => typeof window.__hero?.storm?.hold)).toBe('function');
+  await page.evaluate(() => window.__hero.storm.hold(false)); // no lightning during the measurements
+  const html = page.locator('html');
+  const dim = () => page.evaluate(() => Number(getComputedStyle(document.querySelector('.dim')!).opacity));
+
+  // The right third of the first line of the headline, as in the headline strength test.
+  const first = (await page.locator('.hero__title span').first().boundingBox())!;
+  const clip = { x: first.x + first.width * 0.66, y: first.y, width: first.width * 0.34, height: first.height };
+  const on = { x: clip.x + clip.width * 0.3, y: clip.y + clip.height / 2 };
+  const far = await farCorner(page);
+  const hole = (await page.evaluate(() => window.__hero.torch.r)) * 2.6;
+  expect(dist(far, { x: clip.x, y: clip.y + clip.height })).toBeGreaterThan(hole + 10);
+  const cdp = isMobile ? await page.context().newCDPSession(page) : null;
+  const send = async (p: { x: number; y: number }) => {
+    if (cdp) await tap(cdp, p);
+    else await page.mouse.move(p.x, p.y, { steps: 3 });
+    await expect.poll(async () => Math.max(...(await beamCentres(page)).map((c) => dist(c, p))), { timeout: 4000 }).toBeLessThan(1.5);
+    await page.waitForTimeout(300);
+  };
+  const cta = (await page.locator('#lobby [data-cta]').boundingBox())!;
+  const route = (await page.locator('#lobby [data-route] .btn').boundingBox())!;
+  const tel = (await page.locator('#lobby .hero__tel').boundingBox())!;
+  // Four letters of the sign that never flicker: part of the scene, with its own light.
+  const sign = await facadeBox(page, { x: 70, y: 34, w: 250, h: 110 });
+  const read = async () => ({
+    head: await glyphStrength(page, clip),
+    cta: await meanOf(page, cta),
+    route: await meanOf(page, route),
+    routeText: await glyphStrength(page, route),
+    tel: await glyphStrength(page, tel),
+    sign: await meanOf(page, sign),
+  });
+
+  // Full strength: the light on the headline, not idle.
+  await send(on);
+  await expect(html).not.toHaveClass(/idle/);
+  const full = await glyphStrength(page, clip);
+  // Not idle, the light away: what the idle state is compared with.
+  await send(far);
+  expect(await dim()).toBeLessThan(0.01);
+  const awake = await read();
+
+  // 20 seconds without input: the lights go down. Wait for the layer to finish fading in.
+  await page.clock.fastForward(21000);
+  await expect(html).toHaveClass(/idle/);
+  await expect.poll(dim, { timeout: 10000 }).toBeGreaterThan(0.54);
+  await page.waitForTimeout(300);
+  const idle = await read();
+  const ratio = idle.head / full;
+  test.info().annotations.push({
+    type: 'idle',
+    description:
+      `headline: full ${full.toFixed(1)}, light away ${awake.head.toFixed(1)}, light away and idle ${idle.head.toFixed(1)}, idle ratio ${ratio.toFixed(3)}; ` +
+      `booking button ${awake.cta.toFixed(1)} to ${idle.cta.toFixed(1)}, route button ${awake.route.toFixed(1)} to ${idle.route.toFixed(1)}, ` +
+      `route label ${awake.routeText.toFixed(1)} to ${idle.routeText.toFixed(1)}, phone link ${awake.tel.toFixed(1)} to ${idle.tel.toFixed(1)}; ` +
+      `sign ${awake.sign.toFixed(1)} to ${idle.sign.toFixed(1)} (of 255)`,
+  });
+  // The headline, light away and idle: at least 58 percent of its full strength.
+  expect(ratio).toBeGreaterThanOrEqual(0.58);
+  // The buttons, the route label and the phone link: the same pixels as when not idle.
+  expect(Math.abs(idle.cta - awake.cta)).toBeLessThan(4);
+  expect(Math.abs(idle.route - awake.route)).toBeLessThan(4);
+  expect(Math.abs(idle.routeText - awake.routeText)).toBeLessThan(8);
+  expect(Math.abs(idle.tel - awake.tel)).toBeLessThan(8);
+  expect(idle.cta).toBeGreaterThan(60);
+  // The idle effect is there: the sign, like the rest of the scene, is clearly darker.
+  expect(awake.sign).toBeGreaterThan(20);
+  expect(idle.sign).toBeLessThan(awake.sign * 0.75);
+
+  // Nothing is half under the idle layer and half over it: the hero copy, the hero buttons,
+  // the header, the sticky bar and the floating control are whole above it; the facade, its
+  // lights and the flashlight are whole under it.
+  const z = await page.evaluate(() => {
+    const zi = (sel: string) => Number(getComputedStyle(document.querySelector(sel)!).zIndex);
+    return { dim: zi('.dim'), over: ['.hero__body', '.hero__cta', 'header', '[data-sticky]', '[data-float]'].map(zi), under: ['.torch', '.facade--lit', '.hero__rain'].map(zi) };
+  });
+  for (const v of z.over) expect(v).toBeGreaterThan(z.dim);
+  for (const v of z.under) expect(v).toBeLessThanOrEqual(z.dim);
+
+  // Any input brings the lights back.
+  await page.keyboard.press('Shift');
+  await expect(html).not.toHaveClass(/idle/);
+  await expect.poll(dim, { timeout: 5000 }).toBeLessThan(0.01);
+});
+
 test('touch: the light is on before the first touch and drifts over the hero, then it follows the finger', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'touch input is the phone project');
   await open(page);
