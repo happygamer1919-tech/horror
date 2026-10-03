@@ -42,6 +42,9 @@ All in `src/content/site.ts`, marked `TODO(owner)`.
 | 5 | Instagram handle | Footer link | No link |
 | 6 | Contact-level rules | Selector, off behind the flag | One line about limits |
 
+Optional: a photograph for the face behind door 308 in the corridor. Until one is supplied, a 3D
+stand-in is shown. What to send and where it goes: `src/assets/scare/README.md`.
+
 Please also confirm:
 
 - +373 682 32 596 is registered on WhatsApp. The card, the voucher and the floating button all depend on it.
@@ -98,7 +101,8 @@ In `docs/screenshots/`, each at 390px (`-390.jpg`) and 1440px (`-1440.jpg`):
 
 - `01-preloader`
 - `02-hero-ro`, `02-hero-ru`, `02-hero-en`: wordmark and subtitles
-- `03-corridor-a-start`, `03-corridor-b-lamps-failing`, `03-corridor-c-silhouette`, `03-corridor-d-last-door`
+- `03-corridor-1` to `03-corridor-6`: six points of the walk. `03-corridor-still`: the reduced-motion still
+- `19-scare`: the door of room 308, open (plays once per session)
 - `04-file`
 - `05-keys`: filled key tags and the limits line
 - `05b-prices`: price list (Russian)

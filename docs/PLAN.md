@@ -19,7 +19,8 @@ preloader is the lift, and every section is a place in the building
 - GSAP + ScrollTrigger for scroll-driven work, Lenis for smooth scroll.
 - OGL for the single WebGL scene (hero fog around the neon sign), rendered at
   low internal resolution, lazy loaded, with a CSS glow fallback.
-- Corridor is drawn on a 2D canvas (not WebGL), driven by scroll progress.
+- Corridor is a pre-rendered walk (authored in 3D, path traced offline, see `corridor3d/`),
+  shipped as an image sequence and scrubbed on a 2D canvas by scroll progress. No WebGL at run time.
 - Fonts self-hosted through Fontsource: Playfair Display (display serif) and
   IBM Plex Mono (monospace). Both cover Latin Extended and Cyrillic.
 - No trackers, no cookies, no external CDNs.
@@ -59,8 +60,10 @@ screenshots at 390px and 1440px, a critique against the concept, and fixes.
 2. Arrival hero: night facade (SVG), neon HOTEL sign with one dying letter,
    headline, "Check in" CTA, flashlight overlay (pointer on desktop, slow
    drift plus scroll on touch), WebGL fog with CSS fallback.
-3. Corridor: sticky pinned canvas, forward movement, numbered doors, lamps
-   failing in sequence, child silhouette once per session for about 400ms.
+3. Corridor: sticky pinned canvas, a walk down a rendered hotel corridor, numbered
+   doors, lamps failing in sequence. Once per session, on the first pass, one door
+   opens a hand's width for about 600ms (a face in the dark, fingers on the door edge),
+   then it is a closed door.
 4. The file: guest registry with crossed-out names, 1989 clipping, legend
    revealed on scroll.
 5. Key tags: brass fobs (players, duration, age, price) and the contact-level
