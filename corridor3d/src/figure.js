@@ -60,9 +60,9 @@ function headSurface(d, features = true) {
   const my = -0.0585 - 0.0035 * Math.pow(ax / 0.02, 2);
   disp += 0.0032 * g2(fx, fy, 0, my + 0.0045, 0.0175, 0.0036);
   disp += 0.0036 * g2(fx, fy, 0, my - 0.0055, 0.015, 0.0048);
-  disp -= 0.0042 * g2(fx, fy, 0, my, 0.019, 0.0015);
+  disp -= 0.0062 * g2(fx, fy, 0, my, 0.018, 0.0022); // lips a little apart
   lips = clamp(g2(fx, fy, 0, my + 0.0038, 0.016, 0.004) + g2(fx, fy, 0, my - 0.0048, 0.0135, 0.0046), 0, 1);
-  dark += 0.7 * g2(fx, fy, 0, my, 0.017, 0.0011);
+  dark += 0.9 * g2(fx, fy, 0, my, 0.016, 0.0019);
   disp -= 0.0017 * g2(fx, fy, 0, -0.047, 0.0035, 0.005); // philtrum
   // a narrow chin, the jaw line under the hollow cheeks
   disp += 0.0022 * g2(fx, fy, 0, -0.087, 0.018, 0.011);
@@ -72,7 +72,7 @@ function headSurface(d, features = true) {
   dark = clamp(dark * front, 0, 1);
   red = clamp(red * front, 0, 1);
   // bloodless skin, mottled, with the veins faintly through it at the temples
-  const n = 0.9 + 0.18 * fbm(d.x * 11 + 3, d.y * 11 + d.z * 7, 77, 4);
+  const n = (0.9 + 0.18 * fbm(d.x * 11 + 3, d.y * 11 + d.z * 7, 77, 4)) * (0.92 + 0.16 * fbm(d.x * 3.5 + 9, d.y * 3.5 - d.z * 2, 78, 3));
   const vein = 0.08 * g2(ax, fy, 0.058, 0.03, 0.01, 0.02) * front;
   // the light falls off away from the open eye: brow, jaw and the far cheek sink into the dark
   const pool = 0.42 + 0.58 * Math.exp(-Math.pow((fx + 0.022) / 0.062, 2) - Math.pow((fy - 0.004) / 0.072, 2));
@@ -247,8 +247,13 @@ function hair() {
       clump(0.25 + 0.75 * u, side, 1.5 + 1.6 * u + (r() - 0.5) * 0.08, 9, 0.36 + 0.12 * r(), r() * 1.2);
     }
   }
-  // two or three loose strands across the cheek on the open side
-  for (let i = 0; i < 3; i++) strand(0.02 + 0.02 * i, -1, 0.82 + 0.05 * i, 0.12, 0.3, 0.0013, 2.6, r() * 6, 0.003);
+  // wet strands come down over the temple and the outer cheek on the open side, breaking the
+  // outline of the face, and a few cross the forehead towards the eye
+  for (let i = 0; i < 14; i++) {
+    const az = 0.62 + 0.26 * r();
+    strand(0.01 + 0.06 * r(), -1, az, 0.22 + 0.12 * r(), 0.3 + 0.08 * r(), 0.0012 + 0.0012 * r(), 2.4 + 1.4 * r(), r() * 6, (r() - 0.6) * 0.008);
+  }
+  for (let i = 0; i < 2; i++) strand(0.01 + 0.02 * i, -1, 0.5 + 0.08 * i, 0.45, 0.26, 0.001, 2.8 + r(), r() * 6, -0.006);
   return b;
 }
 
