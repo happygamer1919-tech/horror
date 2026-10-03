@@ -13,12 +13,12 @@ export const LAMP_CD = 46; // candela at full level
 // The opal glass glows on both faces. Seen from below it is the brightest thing in the frame
 // after the bulb; its upper face is what the ceiling round a lamp, the flex and the rose are
 // lit by (an albedo of about a half up there: a faint stain of light a metre across, no more).
-const SHADE_GLOW = 5;
+const SHADE_GLOW = 6.5;
 // What the camera sees of the glass. A camera exposed for the pools of light clips the lamps:
 // the glass burns out to white where the bulb sits behind it and rolls off warm to the rim. That
 // brightness is drawn in the overlay pass (like the bulb), on top of the traced glass, so the
 // lamp reads as a source without the ceiling getting any more light than it has.
-const SHADE_SEEN = 6.5;
+const SHADE_SEEN = 5;
 
 function pendant(r, kind) {
   const b = new Bag();

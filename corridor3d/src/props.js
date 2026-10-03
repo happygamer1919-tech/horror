@@ -284,7 +284,7 @@ function trolley() {
   for (const x of [0, Lx]) for (const z of [0, Dz]) tube(x, z, H - 0.1);
   // shelves with a lip
   for (const y of [0.16, 0.52, 0.9]) {
-    b.add('cream', box(Lx, 0.016, Dz, Lx / 2, y, Dz / 2), null, [0.75, 0.75, 0.75]);
+    b.add('cream', box(Lx, 0.016, Dz, Lx / 2, y, Dz / 2), null, [0.3, 0.3, 0.3]);
     for (const z of [0, Dz]) b.add('steel', box(Lx, 0.03, 0.006, Lx / 2, y + 0.02, z));
   }
   // push handle
@@ -299,7 +299,7 @@ function trolley() {
   const stack = (x, y, z, n, w, d) => {
     for (let i = 0; i < n; i++) {
       const g = new RoundedBoxGeometry(w * (0.94 + 0.08 * r()), 0.03, d * (0.94 + 0.08 * r()), 3, 0.012);
-      const k = 0.8 + 0.25 * r();
+      const k = 0.42 + 0.14 * r(); // grey with age: it must not be the lightest thing in the dark
       b.add('cloth', g, M(rotY((r() - 0.5) * 0.12), move(x + (r() - 0.5) * 0.01, y + 0.015 + i * 0.029, z)), [k, k, k * 0.94]);
     }
   };

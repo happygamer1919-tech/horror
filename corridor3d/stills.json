@@ -5,19 +5,19 @@
       "name": "1-start",
       "set": "desktop",
       "frame": 0,
-      "why": "the first frame the visitor sees: the whole corridor ahead"
+      "why": "the first frame: tight to the left wall in the dark under a dying lamp, the first pool of light and the shoe six metres off"
     },
     {
       "name": "2-mid",
       "set": "desktop",
       "frame": 44,
-      "why": "mid walk: the swinging lamp, the open clawed door, the dead lamp beyond it"
+      "why": "mid walk, on the right of the corridor: the swinging lamp half in the frame overhead, the open clawed door, the dark beyond"
     },
     {
       "name": "3-scratched-door",
       "set": "desktop",
       "frame": 55,
-      "why": "the walker glances at the inside of door 305: the closest view of the gouges"
+      "why": "the walker glances at the inside of door 305: the gouges at hand height, the black room behind the leaf"
     },
     {
       "name": "4-scare-door-closed",
@@ -39,7 +39,7 @@
       "name": "6-last-door",
       "set": "desktop",
       "frame": 167,
-      "why": "the end of the walk: door 313 under the last lamp"
+      "why": "the end of the walk: tight to the right wall, door 313 in the one pool of light"
     }
   ]
 }

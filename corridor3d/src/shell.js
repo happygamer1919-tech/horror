@@ -147,8 +147,8 @@ export function buildShell(bag) {
         const quad = [
           [xa, sa, carpetHeight(sx * RUNNER, sa), ua],
           [xb, sb, carpetHeight(sx * RUNNER, sb), ub],
-          [xb + sx * 0.007, sb, 0.0005, ub],
-          [xa + sx * 0.007, sa, 0.0005, ua],
+          [xb + sx * 0.012, sb, 0.0005, ub],
+          [xa + sx * 0.012, sa, 0.0005, ua],
         ];
         for (const j of sx > 0 ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3]) {
           vp.push(quad[j][0], quad[j][1], quad[j][2]);
@@ -159,7 +159,9 @@ export function buildShell(bag) {
       e.setAttribute('position', new THREE.Float32BufferAttribute(vp, 3));
       e.setAttribute('uv', new THREE.Float32BufferAttribute(vu, 2));
       e.computeVertexNormals();
-      bag.add(`carpet${k}`, e, rotX(-Math.PI / 2), [0.28, 0.28, 0.28]);
+      // (the same colour as the top: a darker strip a fraction of a pixel wide is where the
+      // traced image and the albedo buffer disagree, and the quotient showed as a bright hairline)
+      bag.add(`carpet${k}`, e, rotX(-Math.PI / 2));
     }
   }
   // --- ceiling ---

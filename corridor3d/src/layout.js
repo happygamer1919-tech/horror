@@ -49,9 +49,9 @@ export const LAMP_Y = CH - LAMP_DROP;
 // and its shade is gone: a bare dead bulb. So the corridor is pools of light with black between
 // them from the first frame, and the far end is only ever lit by the last lamp.
 export const LAMP_KIND = [
-  { level: 1.0, warm: 0.0, drop: 0.13, dust: 0.3 },
-  { level: 0.38, warm: 0.7, drop: 0.035, dust: 0.85, tilt: 0.09, lean: -0.14 }, // dim, orange, and hanging crooked
-  { level: 0.8, warm: 0.3, drop: 0.16, dust: 0.3 },
+  { level: 0.09, warm: 1, drop: 0.13, dust: 0.9 }, // the first lamp is all but dead, an orange ember in a dusty shade: the walk starts in the dark
+  { level: 0.75, warm: 0.5, drop: 0.035, dust: 0.7, tilt: 0.09, lean: -0.14 }, // warm, and hanging crooked: the first pool of light, the shoe in it
+  { level: 0.85, warm: 0.2, drop: 0.16, dust: 0.3 },
   { level: 0, warm: 1, drop: -0.02, dust: 1, dead: true, bare: true },
   { level: 1.0, warm: 0.35, drop: 0.02, dust: 0.6 },
   { level: 0.7, warm: 0.2, drop: -0.03, dust: 0.5 },
@@ -112,7 +112,7 @@ export function swing(s) {
 }
 
 // Exposure in stops relative to the lit corridor: the eye opens up when the lamps are gone.
-export const exposureStops = (s) => 0.3 * smooth(5, 8, s) + 0.85 * smooth(11.5, 14.5, s) + 1.7 * smooth(17.3, 19.5, s) - 2.45 * smooth(20.6, 25.7, s);
+export const exposureStops = (s) => 0.3 * smooth(5, 8, s) + 0.85 * smooth(11.5, 14.5, s) + 1.7 * smooth(17.3, 19.5, s) - 2.95 * smooth(20.6, 25.7, s);
 
 // The lens: where it is focused (metres from the camera) for a walker at s. A corridor shot at
 // night is taken nearly wide open, so what is close to the camera, the walls at the edge of the
@@ -134,28 +134,34 @@ export function cameraPose(s, set) {
   const bob = 0.011 * Math.sin((s * 2 * Math.PI) / 2.6);
   const sway = 0.035 * Math.sin((s * 2 * Math.PI) / 5.2 + 0.4) + 0.012 * Math.sin(s * 0.53 + 2.0);
   // hand held: the horizon is never quite level
-  const roll = 0.02 + 0.006 * Math.sin((s * 2 * Math.PI) / 5.2 + 1.2) + 0.004 * Math.sin(s * 1.13 + 0.4) + 0.012 * smooth(23.6, 25.7, s);
+  const roll = 0.022 + 0.006 * Math.sin((s * 2 * Math.PI) / 5.2 + 1.2) + 0.004 * Math.sin(s * 1.13 + 0.4) + 0.012 * (1 - smooth(1, 5, s)) + 0.03 * smooth(23.6, 25.7, s);
   let yaw = 0.012 * Math.sin(s * 0.71 + 0.3) + 0.008 * Math.sin(s * 1.37);
   // (the head a little up at the start and under the swinging lamp: a lamp sits inside the frame, not on its top edge)
-  let pitch = -0.045 + 0.006 * Math.sin(s * 0.9 + 1.1) + 0.04 * (1 - smooth(0.8, 3, s)) + 0.045 * bump(7.6, 1.4, s);
+  // (under the swinging lamp the head stays down: only the lower half of its shade comes into
+  // the top of the frame, and its moving light tells the rest)
+  let pitch = -0.045 + 0.006 * Math.sin(s * 0.9 + 1.1) + 0.015 * (1 - smooth(0.8, 3, s)) - 0.06 * bump(7.6, 1.4, s);
   // Nobody walks down the middle, and nobody holds a camera square to a corridor. The walk
   // starts close to the left wall (its near end soft at the edge of the frame), the head turned a
   // little to the right, so neither the vanishing point nor a lamp sits in the middle of the frame.
-  const start = 1 - smooth(1.2, 6, s);
-  let x = sway - 0.3 * start;
-  yaw -= 0.075 * start;
+  // (Round 4: tight to it, 40 cm off, so the dark wall takes the left third of the frame.)
+  const start = 1 - smooth(1.2, 6.5, s);
+  let x = sway - 0.6 * start;
+  yaw -= 0.07 * start;
   // under the swinging lamp the walker is already drifting right, to pass the open door, and
   // looks across at it: the right wall close at the edge of the frame
-  x += 0.24 * bump(7.6, 2.2, s);
-  yaw += 0.075 * bump(7.6, 2.0, s);
+  // (he has crossed to the right wall by then: the frame of door 304 soft at the right edge)
+  x += 0.38 * bump(7.6, 2.6, s);
+  yaw += 0.19 * bump(7.6, 2.0, s);
   // the shoe on the runner (props.js: s = SHOE_AT), low on the right, in the first pool of light
   yaw -= 0.05 * bump(4.4, 1.5, s);
   pitch -= (mobile ? 0.26 : 0.2) * bump(4.5, 1.7, s); // the tall frame has room to look down further
   // the scratched door hanging open on the left: the head turns to it and drops to the height a
   // child's hands reach, close enough to read the gouges, then the walker goes round it
   const claw = bump(9.45, 1.5, s);
-  yaw += (mobile ? 0.3 : 0.34) * claw;
-  pitch -= (mobile ? 0.16 : 0.2) * claw;
+  // (the head turns past the handle: the door and the black room behind it fill the frame, the
+  // corridor floor is a strip at its edge)
+  yaw += (mobile ? 0.3 : 0.47) * claw;
+  pitch -= (mobile ? 0.16 : 0.18) * claw;
   x += 0.4 * bump(10.7, 2.7, s) - 0.06 * claw;
   // drift towards the right wall and turn the head to door 308 before it moves. On the wide
   // frame the door stays at the side and the corridor stays the subject; the tall phone frame is
@@ -176,9 +182,10 @@ export function cameraPose(s, set) {
   const end = smooth(23.6, 25.7, s);
   // (well to the right of it, by the boarded door, the head turned left to it: the right wall
   // close and soft at the edge of the frame, the door off centre and lit from one side)
-  yaw = yaw * (1 - end) + 0.13 * end;
-  x = x * (1 - 0.8 * end) + 0.34 * end;
-  pitch += 0.02 * end;
+  // (Round 4: tight to the right wall, which takes the right third of the frame, dark and soft.)
+  yaw = yaw * (1 - end) + 0.1 * end;
+  x = x * (1 - 0.8 * end) + 0.62 * end;
+  pitch += 0.01 * end;
   return { x, y: EYE + bob, s, yaw, pitch, roll };
 }
 

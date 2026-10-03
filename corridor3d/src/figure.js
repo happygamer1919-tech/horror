@@ -489,7 +489,7 @@ export function buildFigure(materials, { hingeSide = 1 } = {}) {
 
   // A small, hidden light for the face: the strip of lamp light that comes through the gap,
   // shaped. It lights one cheek, the eye and the bridge of the nose from the lamp's side.
-  const key = new PhysicalSpotLight(new THREE.Color(1.0, 0.82, 0.62), 0, 0, 0.16, 0.9, 2);
+  const key = new PhysicalSpotLight(new THREE.Color(1.0, 0.72, 0.46), 0, 0, 0.16, 0.9, 2);
   key.radius = 0.015;
   key.name = 'face-key';
   const keyTarget = new THREE.Object3D();
@@ -548,7 +548,7 @@ export function buildFigure(materials, { hingeSide = 1 } = {}) {
     key.position.set(kp.x ?? -0.42, kp.y ?? 0.3, kp.z ?? 0.36).applyMatrix4(headGroup.matrix);
     const eyeAt = H.eyes[P.glintEye ?? 0].clone().applyMatrix4(headGroup.matrix);
     keyTarget.position.copy(eyeAt).add(new THREE.Vector3(kp.ox ?? 0, kp.oy ?? -0.012, kp.oz ?? 0));
-    key.intensity = kp.cd ?? 0.75; // deep shadow: the stand-in is a presence, not a portrait
+    key.intensity = kp.cd ?? 0.42; // deep shadow: the stand-in is a presence, not a portrait
     key.angle = kp.angle ?? 0.11;
     key.penumbra = kp.pen ?? 0.8;
     // the rim: from deeper in the room, behind her on the side away from the door

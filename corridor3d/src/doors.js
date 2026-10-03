@@ -101,9 +101,9 @@ export function leafDepth(x, y) {
   ]) {
     if (x <= px0 || x >= px1 || y <= a || y >= c) continue;
     const d = Math.min(x - px0, px1 - x, y - a, c - y); // distance in from the panel edge
-    if (d < 0.03) return -ramp(d, 0.03, 0.017);
-    if (d < 0.03 + 0.05) return -0.017;
-    return -0.017 + ramp(d - 0.08, 0.012, 0.006);
+    if (d < 0.032) return -ramp(d, 0.032, 0.009);
+    if (d < 0.032 + 0.05) return -0.009;
+    return -0.009 + ramp(d - 0.082, 0.022, 0.0035);
   }
   return 0;
 }
@@ -172,8 +172,9 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
   ])
     b.add(skin, face(px0, a, px1, c, 0, uv));
   // panels: a bevel down to a field set back 11 mm, with a raised centre
-  const bev = 0.03;
-  const dz = -0.017;
+  // (shallow: under a lamp right over the door a steep bevel is a black bar, a shallow one a half tone)
+  const bev = 0.032;
+  const dz = -0.009;
   for (const [a, c] of [
     [ys[1], ys[2]],
     [ys[3], ys[4]],
@@ -204,12 +205,12 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
     const fy0 = a + bev;
     const fy1 = c - bev;
     const inset = 0.05;
-    const rz = dz + 0.006;
+    const rz = dz + 0.0035;
     b.add(skin, face(fx0, fy0, fx1, fy0 + inset, dz, uv));
     b.add(skin, face(fx0, fy1 - inset, fx1, fy1, dz, uv));
     b.add(skin, face(fx0, fy0 + inset, fx0 + inset, fy1 - inset, dz, uv));
     b.add(skin, face(fx1 - inset, fy0 + inset, fx1, fy1 - inset, dz, uv));
-    const e = 0.012;
+    const e = 0.022;
     const rr = [
       [fx0 + inset, fy0 + inset, fx1 - inset, fy0 + inset, fx1 - inset - e, fy0 + inset + e, fx0 + inset + e, fy0 + inset + e],
       [fx1 - inset, fy0 + inset, fx1 - inset, fy1 - inset, fx1 - inset - e, fy1 - inset - e, fx1 - inset - e, fy0 + inset + e],
@@ -235,7 +236,7 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
   // edges
   const edge = (g) => b.add('trim', g, null, [0.5, 0.48, 0.46]);
   // the body sits behind the deepest panel; thin strips close the perimeter up to the face
-  const deep = 0.0185;
+  const deep = 0.0105;
   edge(boxUV(boxAt(x0, y0, -t, lw, y1 - y0, t - deep), { along: 'y', offset: [r() * 3, r() * 3] }));
   for (const x of [x0, x1 - 0.002]) edge(boxUV(boxAt(x, y0, -deep, 0.002, y1 - y0, deep - 0.0002), { along: 'y' }));
   for (const y of [y0, y1 - 0.002]) edge(boxUV(boxAt(x0, y, -deep, lw, 0.002, deep - 0.0002), { along: 'x' }));

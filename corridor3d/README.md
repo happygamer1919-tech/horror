@@ -116,9 +116,28 @@ the camera sees of the glass is drawn in the overlay pass on top of the traced g
 (`SHADE_SEEN` in `lamps.js`): a camera exposed for the pools clips its lamps, so the glass burns
 out to white where the bulb sits behind it and rolls off warm to the rim, with a glow of 25 to
 40 px round it, without the ceiling getting any more light. The last bulb sits crooked in its
-holder and throws its light at door 313 and the left wall. The walker never stands square in the
-middle: close to the left wall at the start, drifting right under the swinging lamp, right of
-door 313 at the end, the horizon one to two degrees off level. No two lamps are
+holder and throws its light at door 313 and the left wall.
+
+The owner's rule, applied literally in round 4: light only what holds up. The first lamp is an
+orange ember in a dusty shade, so the walk starts in the dark and the first pool of light (with
+the child's shoe in it) is six metres off; the runner and a near, large shade are never lit
+heroes. The camera (`cameraPose` in `layout.js`) never stands square in the middle:
+
+- s 0.35 (frame 0): 40 cm off the left wall, which takes the left third of the frame, dark and
+  soft; the head turned 4 degrees right, 2.5 degrees of roll.
+- to s 7.6 (frame 44): the walker crosses to the right half of the corridor (0.4 m right of the
+  axis), looking across at the open door 305; the head stays down, so only the lower part of the
+  swinging lamp's shade comes into the top of the frame.
+- s 9.4 (frame 55): the glance at the clawed inside of door 305: the head turns 27 degrees left
+  and 13 down, past the handle, so the door and the black room behind it fill the frame.
+- he passes the open door on its right, comes back to the axis by s 13, drifts 0.2 m right and
+  turns 23 degrees to door 308 for the scare (frame 99), turns back within a metre.
+- from s 23.6 he drifts to the right wall and stops 33 cm off it (frame 167), the head turned
+  6 degrees left to door 313, 3 degrees of roll: the right wall takes the right third of the
+  frame, dark, and the door stands in the one pool of light. Exposure is half a stop under the
+  rest there.
+Every term is a smooth function of the distance walked, so the keyframes are points on one
+continuous path; the frames between them have not been rendered or looked at. No two lamps are
 the same lamp (`LAMP_KIND` in `layout.js`): different bulbs, flex, dust on the glass; lamp 1 is
 a weak orange bulb; lamp 3 burnt out long ago and its shade is gone (a bare dead bulb), so there
 is always a black gap in the middle of the corridor; lamp 4, over door 308, is tired. The far
@@ -153,7 +172,8 @@ maps (one layer each, a texture transform per panel):
   it worn strip parquet (the `plank_flooring` scan, strips along the corridor).
 - **Doors**: a skin per leaf (four hero doors have their own, the rest share three), framed the
   way a door is (stiles upright, rails across, two panels, from the `wood_table_001` scan laid
-  at half scale and graded to a quiet brown; the panels are real mouldings 17 mm deep):
+  at half scale and graded to a quiet brown; the panels are real mouldings, shallow (9 mm) and
+  matt, so that a lamp right over a door shades them in half tones, not in black and white bars):
   joints full of dirt, grease round the handle and along the lock edge, varnish rubbed through
   where hands push, moulding edges rubbed pale in broken lines, the bottom rail kicked, chips,
   key scratches round the lock. One shared roughness map: glossy where nothing touches it, dull

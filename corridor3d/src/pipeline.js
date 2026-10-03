@@ -393,12 +393,13 @@ const FINAL = /* glsl */ `
     col = toSRGB(col);
     float l = dot(col, vec3(0.299, 0.587, 0.114));
     // colour dies in the shadows of a negative: below about luma 20 the wood stops being red
-    col = mix(vec3(l), col, sat * mix(0.5, 1.0, smoothstep(0.015, 0.1, l)));
+    // (and white things under a lamp stay nearer to white than the wall beside them)
+    col = mix(vec3(l), col, sat * mix(0.5, 1.0, smoothstep(0.015, 0.1, l)) * mix(1.0, 0.82, smoothstep(0.55, 0.9, l)));
     // the toe: scene black is not paper black. It lands a little above zero, a little warm, and
     // whatever structure the shadows have rides on top of it
     // one hue over everything is a tint, not a photograph: the deep shadows drift a little
     // cooler and greener than the tungsten pools (their level is not touched)
-    col *= mix(vec3(0.93, 1.02, 1.07), vec3(1.0), smoothstep(0.02, 0.22, l));
+    col *= mix(vec3(0.872, 1.038, 1.142), vec3(1.0), smoothstep(0.02, 0.25, l));
     col = lift + col * (1.0 - lift);
     // grain, matched to the film layer the site lays over its hero: clumps of about two pixels,
     // nearly monochrome with a little colour, strongest in the low midtones, fading into the
@@ -1011,7 +1012,7 @@ export const LOOK = {
   vignette: 0.6,
   white: 0.6, // the knee of the film curve: straight below it, a soft shoulder above
   toe: 0.09, // scene values well below this are squeezed towards black
-  lift: [0.027, 0.0235, 0.02], // scene black on the print: about luma 6, a little warm
+  lift: [0.0235, 0.0245, 0.0235], // scene black on the print: about luma 6, neutral to faintly green (the warmth belongs to the pools)
   contrast: 1.08,
   sat: 0.86,
   grain: 0.034,

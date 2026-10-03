@@ -12,7 +12,7 @@ const BASE = '/corridor3d/textures';
 const GRADE = {
   paper: 'grayscale(0.45) brightness(1.5) contrast(0.62)',
   boards: 'hue-rotate(9deg) saturate(0.44) brightness(1.0) contrast(0.96)', // brown, not crimson
-  carpet: 'hue-rotate(-14deg) saturate(0.8) contrast(1.2) brightness(0.3)',
+  carpet: 'hue-rotate(-4deg) saturate(0.5) contrast(1.2) brightness(0.24)', // a dusty brown-rose
   door: 'hue-rotate(10deg) saturate(0.36) brightness(1.2) contrast(0.78)', // brown, the grain quiet
 };
 // Door skins: [material name, seed, { grime, kicked }]. scene.js hands them out.
@@ -634,10 +634,10 @@ function plates(S) {
   const ag = a.getContext('2d');
   const mg = m.getContext('2d');
   const hg = hgt.getContext('2d');
-  ag.fillStyle = 'rgb(196,158,92)';
+  ag.fillStyle = 'rgb(150,116,60)';
   ag.fillRect(0, 0, S, S);
   // roughness in G, metalness in B
-  mg.fillStyle = 'rgb(0,96,255)';
+  mg.fillStyle = 'rgb(0,168,255)'; // dull: a tarnished plate does not flash back at the lamp
   mg.fillRect(0, 0, S, S);
   hg.fillStyle = '#909090';
   hg.fillRect(0, 0, S, S);
@@ -1007,7 +1007,8 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
     const rr = mulberry(4411);
     for (let y = 0; y < 256; y++) {
       const v = 1 - y / 255; // 0 at the holder, 1 at the rim
-      const base = v < 0.12 ? 0.75 + 0.25 * (v / 0.12) : v < 0.5 ? 1 - 0.25 * ((v - 0.12) / 0.38) : v < 0.85 ? 0.75 - 0.3 * ((v - 0.5) / 0.35) : 0.45 - 0.1 * ((v - 0.85) / 0.15);
+      // two stops from the bulb to the rim
+      const base = v < 0.12 ? 0.8 + 0.2 * (v / 0.12) : v < 0.5 ? 1 - 0.51 * ((v - 0.12) / 0.38) : 0.49 - 0.2 * ((v - 0.5) / 0.5);
       for (let x = 0; x < 512; x++) {
         const u = x / 512;
         // wraps round the shade: blend the noise with itself half a turn on
