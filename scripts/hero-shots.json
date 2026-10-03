@@ -75,7 +75,11 @@
  },
  {
   "out": "docs/screenshots/15-hero-dark-390.jpg",
-  "touch": true
+  "touch": true,
+  "tap": [
+   8,
+   836
+  ]
  },
  {
   "out": "docs/screenshots/15-hero-dark-1440.jpg",
@@ -113,7 +117,11 @@
   },
   "wait": 500,
   "scale": 3,
-  "touch": true
+  "touch": true,
+  "tap": [
+   8,
+   836
+  ]
  },
  {
   "out": "docs/screenshots/17-sign-e-1-1440.jpg",
@@ -144,7 +152,11 @@
   },
   "wait": 500,
   "scale": 3,
-  "touch": true
+  "touch": true,
+  "tap": [
+   8,
+   836
+  ]
  },
  {
   "out": "docs/screenshots/17-sign-e-2-1440.jpg",
@@ -175,7 +187,11 @@
   },
   "wait": 500,
   "scale": 3,
-  "touch": true
+  "touch": true,
+  "tap": [
+   8,
+   836
+  ]
  },
  {
   "out": "docs/screenshots/17-sign-e-3-1440.jpg",
@@ -206,7 +222,11 @@
   },
   "scale": 3,
   "wait": 700,
-  "touch": true
+  "touch": true,
+  "tap": [
+   8,
+   836
+  ]
  },
  {
   "out": "docs/screenshots/18-facade-figure-1440.jpg",
@@ -237,7 +257,11 @@
   },
   "scale": 3,
   "wait": 700,
-  "touch": true
+  "touch": true,
+  "tap": [
+   8,
+   836
+  ]
  },
  {
   "out": "docs/screenshots/18-facade-figure-gone-1440.jpg",
@@ -268,7 +292,11 @@
   },
   "scale": 3,
   "wait": 700,
-  "touch": true
+  "touch": true,
+  "tap": [
+   8,
+   836
+  ]
  },
  {
   "out": "docs/screenshots/18-facade-figure-near-1440.jpg",
@@ -292,7 +320,11 @@
   "out": "docs/screenshots/18-facade-lightning-390.jpg",
   "eval": "window.__hero.storm.hold(true)",
   "wait": 600,
-  "touch": true
+  "touch": true,
+  "tap": [
+   8,
+   836
+  ]
  },
  {
   "out": "docs/screenshots/18-facade-lightning-1440.jpg",
@@ -403,5 +435,23 @@
   "wait": 1800,
   "w": 1440,
   "h": 900
+ },
+ {
+  "out": "docs/screenshots/19-hero-drift-a-390.jpg",
+  "touch": true,
+  "settle": 300,
+  "wait": 300
+ },
+ {
+  "out": "docs/screenshots/19-hero-drift-b-390.jpg",
+  "touch": true,
+  "settle": 300,
+  "wait": 3300
+ },
+ {
+  "out": "docs/screenshots/19-hero-drift-c-390.jpg",
+  "touch": true,
+  "settle": 300,
+  "wait": 6300
  }
 ]

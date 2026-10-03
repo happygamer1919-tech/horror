@@ -1,6 +1,6 @@
 // Hero screenshot helper. Needs `PORT=4342 node scripts/serve.mjs` running after a build.
 // Usage: node scripts/hero-shots.mjs ['<json>'] where json is one shot or an array of shots:
-//   { out, w, h, touch, lang, still, mouse:[x,y], tap:[x,y], drag:[[x,y],...], eval:"js", wait, clip:{x,y,width,height},
+//   { out, w, h, touch, lang, still, mouse:[x,y], tap:[x,y], drag:[[x,y],...], eval:"js", settle, wait, clip:{x,y,width,height},
 //     unit:{x,y,w,h,pad} (clip given in facade units), scale }
 import { chromium } from '@playwright/test';
 
