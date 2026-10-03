@@ -178,6 +178,11 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(he
       opacity 0.25s,
       transform 0.25s;
   }
+  /* When a button of the card sits under the header: the bottom of the screen instead. */
+  .toast.is-low {
+    top: auto;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+  }
 
   @media (min-width: 900px) {
     .ask,

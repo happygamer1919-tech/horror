@@ -8,7 +8,16 @@ export function showToast(text: string) {
   if (!el || !text) return;
   window.clearTimeout(timer);
   el.textContent = text;
+  el.classList.remove('is-low');
   el.classList.add('is-on');
+  // It sits under the header. When the booking button or a pressed "ask" link is up there
+  // (a tall card on a phone), it goes to the bottom of the screen instead. One read, on a click.
+  const t = el.getBoundingClientRect();
+  const covers = ['[data-book]', '[data-ask-wa]', '[data-ask-tg]'].some((sel) => {
+    const b = document.querySelector(sel)?.getBoundingClientRect();
+    return !!b && b.width > 0 && t.top - 12 < b.bottom && b.top < t.bottom + 12 && t.left < b.right && b.left < t.right;
+  });
+  if (covers) el.classList.add('is-low');
   timer = window.setTimeout(() => {
     el.classList.remove('is-on');
     el.textContent = '';

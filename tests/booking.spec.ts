@@ -350,6 +350,34 @@ for (const lang of LANGS) {
       await expect(page.locator('[data-ask-wa]')).toHaveAttribute('target', '_blank');
     });
 
+    test('the Telegram toast never lands on the booking button, wherever the card is on screen', async ({ page, context, isMobile }) => {
+      test.skip(!isMobile, 'the card is taller than the screen on phones only');
+      await seal(context);
+      await open(page, lang);
+      const form = await fill(page, lang, CASES[3]);
+      const tg = form.locator('[data-ask-tg]');
+      const toast = page.locator('[data-toast]');
+      await expect(form).toHaveClass(/is-in/);
+      await form.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      // The link in the middle of the screen puts the booking button right under the header,
+      // where the toast normally shows.
+      for (const block of ['center', 'start'] as const) {
+        await tg.evaluate((el, b) => el.scrollIntoView({ block: b }), block);
+        await tg.evaluate((el) => (el as HTMLElement).click());
+        await expect(toast).toBeVisible();
+        await page.waitForTimeout(350);
+        const t = (await toast.boundingBox())!;
+        const vp = page.viewportSize()!;
+        expect(t.y).toBeGreaterThanOrEqual(0);
+        expect(t.y + t.height).toBeLessThanOrEqual(vp.height);
+        for (const sel of ['[data-book]', '[data-ask-tg]', '[data-ask-wa]']) {
+          const b = (await form.locator(sel).boundingBox())!;
+          expect(t.y + t.height <= b.y || b.y + b.height <= t.y, `toast clear of ${sel} with the link at ${block}`).toBe(true);
+        }
+        await expect(toast).toBeHidden({ timeout: 6000 });
+      }
+    });
+
     test('ask a question on Telegram: copies the message, shows the toast, opens Telegram in a new tab', async ({ page, context }) => {
       const hits = await seal(context);
       await open(page, lang);

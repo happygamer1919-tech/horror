@@ -103,3 +103,16 @@ screenshots at 390px and 1440px, a critique against the concept, and fixes.
 - Flags in `src/content/site.ts`: `CONTACT_LEVELS_ENABLED` (false), `VOUCHERS_ENABLED` (true), `SLOTS_URL` (empty).
 - Share images 1200 x 630 per language (`scripts/og.mjs`), `og:image` and `twitter:card`.
 - Live checks (`tests/live.spec.ts`) run as a `verify` job after each deploy.
+
+## Update 3: quality pass
+
+- Live: content (age, languages, cash, levels), EasyWeek booking window with a copied summary
+  line, Telegram, two-channel floating button, darker hero with a drifting touch light, the
+  loose E, route button, four facade effects, native scroll on touch devices.
+- Owner rulings applied: booking button disabled until a level is chosen, confirmation call
+  line behind `CONFIRM_CALL_ENABLED`, headline at about 60 percent outside the light.
+- Corridor: a path traced 3D corridor exists on `wt/corridor` but is not merged. Six stills
+  were reviewed in four rounds (6.9, 7.2 to 7.3, 7.3 to 7.4, 7.4 to 7.5 of 10) and did not
+  reach 8, so no full render was run and the 2D canvas corridor stays live. Stills are in
+  `docs/corridor-stills/`.
+- `npm run test:perf` measures phone scroll at 4x CPU throttle, outside the deploy gate.
