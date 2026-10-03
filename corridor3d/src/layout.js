@@ -119,7 +119,7 @@ export function cameraPose(s, set) {
   const L = globalThis.__look308 ?? {};
   x += (L.x ?? 0.22) * bump2(L.xc ?? 16.6, L.xw ?? 2.6, L.xa ?? 1.4, s);
   const look = bump2(L.c ?? 16.75, L.w ?? 2.4, L.wa ?? 1.0, s);
-  yaw -= (mobile ? (L.ym ?? 0.74) : (L.yd ?? 0.25)) * look;
+  yaw -= (mobile ? (L.ym ?? 0.74) : (L.yd ?? 0.3)) * look;
   pitch -= (mobile ? (L.pm ?? 0.06) : (L.pd ?? 0.03)) * look;
   // the line of light under 311, low on the left
   yaw += 0.05 * bump(21.6, 1.5, s);
@@ -137,7 +137,7 @@ export function cameraPose(s, set) {
 // Render sets. fov is vertical, in degrees.
 export const SETS = {
   desktop: { w: 1600, h: 900, fov: 43.5, frames: 168, dir: 'd' },
-  mobile: { w: 720, h: 1440, fov: 72, frames: 112, dir: 'm' },
+  mobile: { w: 900, h: 1800, fov: 72, frames: 112, dir: 'm' },
 };
 export const frameS = (set, i) => camS(i / (SETS[set].frames - 1));
 

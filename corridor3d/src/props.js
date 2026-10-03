@@ -501,12 +501,12 @@ export async function buildProps(bag, materials, T, doorMeta) {
       peel(bag, side < 0 ? left : right, side, null, x0, y0, w, len, { seed, curl });
     };
     // in the band the lamps light, so the pale back of the paper and its torn edge catch the light
-    strip(-1, 8.5, 1, 1.5, 0.15, 0.56, 3, 2.3);
+    strip(-1, 8.5, 1, 1.5, 0.12, 0.5, 3, 2.0);
     strip(-1, 8.5, -1, 1.66, 0.08, 0.36, 4, 2.0);
     strip(-1, 4.1, 1, 1.72, 0.09, 0.34, 6, 2.1);
     strip(1, 1.9, 1, 1.7, 0.08, 0.36, 12, 2.1);
-    strip(1, 11.3, -1, 1.52, 0.13, 0.52, 9, 2.2);
-    strip(1, 15.8, 1, 1.46, 0.15, 0.6, 8, 2.4);
+    strip(1, 11.3, -1, 1.52, 0.1, 0.48, 9, 1.8);
+    strip(1, 15.8, 1, 1.5, 0.1, 0.5, 8, 1.8);
     strip(-1, 17.6, 1, 1.45, 0.12, 0.6, 5, 2.2);
     strip(-1, 17.6, -1, 1.62, 0.07, 0.4, 15, 2.0);
     // past the dead lamps the end lamp is behind every flap, so they hang as narrow tongues of
@@ -614,7 +614,7 @@ export async function buildProps(bag, materials, T, doorMeta) {
 
   // ---- exit sign, hung from the ceiling; the way out is behind the walker ----
   {
-    const s = 19.75;
+    const s = 21.9; // far enough down the corridor to sit near its vanishing point, clear of the page heading
     const w = 0.36;
     const h = 0.17;
     const dpt = 0.055;
@@ -628,11 +628,11 @@ export async function buildProps(bag, materials, T, doorMeta) {
       b.add('exitGlow', g, M(rotY(sgn > 0 ? 0 : Math.PI), move(0, 0, sgn * (dpt / 2 + 0.001))));
     }
     for (const sx of [-1, 1]) b.add('steel', new THREE.CylinderGeometry(0.004, 0.004, CH - y - h / 2, 8), move(sx * 0.13, h / 2 + (CH - y - h / 2) / 2, 0));
-    bag.addBag(b, M(rotY(0.03), move(0.3, y, -s)));
+    bag.addBag(b, M(rotY(0.03), move(0.28, y, -s)));
     // what the sign throws on the walls: nothing in a lit corridor, the only colour in a dark one
     for (const sgn of [-1, 1]) {
       const glow = new THREE.PointLight(new THREE.Color(0.4, 1.0, 0.55), 0.045, 0, 2);
-      glow.position.set(0.3, y - 0.02, -s + sgn * 0.14);
+      glow.position.set(0.28, y - 0.02, -s + sgn * 0.14);
       objects.push(glow);
     }
 
