@@ -302,7 +302,7 @@ function wallMarks(side) {
   const at = () => (side === 0 ? 60 - HW : START) + r() * len;
   const marks = { scratches: [], spots: [], tears: [], smudges: [], kicks: [], scrapes: [] };
   const n = side === 0 ? 0.08 : 1;
-  for (let i = 0; i < 70 * n; i++) marks.scratches.push({ s: at(), y: DADO + 0.05 + r() * 1.1, len: 0.03 + r() * 0.25, tilt: (r() - 0.5) * 0.8, pale: r() < 0.55, a: 0.15 + 0.4 * r(), w: 0.0006 + r() * 0.0012 });
+  for (let i = 0; i < 44 * n; i++) marks.scratches.push({ s: at(), y: DADO + 0.05 + r() * 1.1, len: 0.02 + Math.pow(r(), 2) * 0.2, tilt: (r() - 0.5) * 0.8, pale: r() < 0.4, a: 0.08 + 0.2 * r(), w: 0.0005 + r() * 0.0009 });
   for (let i = 0; i < 260 * n; i++) marks.spots.push({ s: at(), y: DADO + 0.02 + Math.pow(r(), 0.7) * (CH - DADO - 0.1), rad: 0.0012 + Math.pow(r(), 3) * 0.012, a: 0.15 + 0.45 * r(), seed: i });
   for (let i = 0; i < 0; i++) marks.tears.push({ s: at(), y: DADO + 0.08 + r() * 1.2, rx: 0.012 + Math.pow(r(), 2) * 0.06, ry: 0.01 + Math.pow(r(), 2) * 0.045, seed: i * 7 + 3 });
   for (let i = 0; i < 26 * n; i++) marks.smudges.push({ s: at(), y: 0.98 + r() * 0.6, len: 0.15 + r() * 0.7, h: 0.012 + r() * 0.04, a: 0.08 + 0.16 * r() });
@@ -538,14 +538,16 @@ export function wallAlbedo(p, S, src) {
   for (const m of M.scrapes) {
     if (!vis(m.s, 2.2)) continue;
     const x = ax(m.s);
-    g.strokeStyle = `rgba(150,128,104,${m.a})`;
     g.lineWidth = m.w;
+    const yy = (t) => m.y + 0.012 * Math.sin(t * 2.1 + m.wob) + 0.005 * (fbm(t * 6, m.wob, 963, 2) - 0.5);
     for (let t = 0; t < m.len; t += 0.03) {
       // it skips: the edge of a shelf touches, lifts, touches again
-      if (noise2(t * 7 + m.wob, m.wob, 961) < 0.38) continue;
+      const v = noise2(t * 7 + m.wob, m.wob, 961);
+      if (v < 0.45) continue;
+      g.strokeStyle = `rgba(140,118,96,${m.a * 0.6 * clamp((v - 0.45) * 4, 0, 1)})`;
       g.beginPath();
-      g.moveTo(x + t, m.y + 0.004 * Math.sin(t * 5 + m.wob));
-      g.lineTo(x + t + 0.031, m.y + 0.004 * Math.sin((t + 0.03) * 5 + m.wob));
+      g.moveTo(x + t, yy(t));
+      g.lineTo(x + t + 0.031, yy(t + 0.03));
       g.stroke();
     }
   }
@@ -608,7 +610,7 @@ export function carpetTransform(p) {
 // How worn the pile is at a point, 0..1.
 export function carpetWear(x, s) {
   const wander = 0.07 * Math.sin(s * 0.7 + 1) + 0.04 * Math.sin(s * 1.9);
-  let a = 0.62 * Math.exp(-Math.pow((x - wander) / 0.2, 2)) * (0.3 + 1.0 * fbm(x * 3, s * 1.2, 91, 3));
+  let a = 0.7 * Math.exp(-Math.pow((x - wander) / 0.23, 2)) * (0.25 + 1.1 * fbm(x * 3, s * 1.2, 91, 3));
   for (const d of DOORS) {
     const ds = (s - d.s - DOOR.w / 2) / 0.34;
     if (Math.abs(ds) > 2.5) continue;
@@ -654,16 +656,20 @@ export function carpetAlbedo(p, S, src) {
       g.fillStyle = col;
       g.fillRect(sx > 0 ? x0 : -x1, p.s0 - CM, x1 - x0, L);
     };
-    band(0.395, 0.41, 'rgb(120,116,92)');
-    band(0.43, 0.5, 'rgb(74,84,62)');
-    band(0.515, 0.535, 'rgb(96,100,76)');
-    band(0.585, 0.62, 'rgb(60,56,52)');
+    band(0.395, 0.41, 'rgb(150,144,120)');
+    band(0.43, 0.5, 'rgb(96,104,82)');
+    band(0.515, 0.535, 'rgb(124,126,100)');
+    band(0.585, 0.62, 'rgb(84,78,72)');
   }
   g.globalCompositeOperation = 'source-over';
   for (const sx of [-1, 1]) {
-    g.fillStyle = 'rgba(150,118,62,0.4)';
-    g.fillRect(sx > 0 ? 0.415 : -0.423, p.s0 - CM, 0.008, L);
-    g.fillRect(sx > 0 ? 0.505 : -0.512, p.s0 - CM, 0.007, L);
+    // the ochre lines are woven, not ruled: a little uneven in strength along their length
+    for (let s = p.s0 - CM; s < p.s1 + CM; s += 0.05) {
+      const k = 0.14 + 0.2 * fbm(s * 1.3, sx * 3, 191, 3);
+      g.fillStyle = `rgba(150,118,62,${k})`;
+      g.fillRect(sx > 0 ? 0.415 : -0.423, s, 0.008, 0.0505);
+      g.fillRect(sx > 0 ? 0.505 : -0.512, s, 0.007, 0.0505);
+    }
   }
   // dirt and stains
   pixels(g);
@@ -672,7 +678,7 @@ export function carpetAlbedo(p, S, src) {
   g.drawImage(field(256, 768, (u, v) => carpetDirt(-RUNNER - CM + u * W, p.s0 - CM + (1 - v) * L)), 0, 0, S, S);
   g.globalCompositeOperation = 'source-over';
   // wear: the pile gone pale and grey, down to the backing where it is worst
-  g.drawImage(field(256, 768, (u, v) => [0.5, 0.41, 0.34, 0.8 * carpetWear(-RUNNER - CM + u * W, p.s0 - CM + (1 - v) * L)]), 0, 0, S, S);
+  g.drawImage(field(256, 768, (u, v) => [0.5, 0.38, 0.31, 0.62 * carpetWear(-RUNNER - CM + u * W, p.s0 - CM + (1 - v) * L)]), 0, 0, S, S);
   // lint and grit: along the edges and anywhere the vacuum never reached; a few burns
   world(g);
   const r = mulberry(8800 + p.k);
@@ -779,9 +785,8 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
     g.strokeStyle = 'rgba(8,5,3,0.25)';
     g.lineWidth = 0.008;
     g.strokeRect(px0 + 0.074, a + 0.074, px1 - px0 - 0.148, b - a - 0.148);
-    g.fillStyle = 'rgba(150,140,126,0.13)';
+    g.fillStyle = 'rgba(120,112,100,0.1)';
     g.fillRect(px0 + 0.004, a + 0.002, px1 - px0 - 0.008, 0.02);
-    g.fillRect(px0 + 0.078, a + 0.075, px1 - px0 - 0.156, 0.01);
   }
   // one slow field of dirt: darker to the floor, greasy round the handle, old runs in the varnish
   pixels(g);
@@ -797,7 +802,9 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
     mul(cc, smooth(0.6, 0.02, y) * (0.3 + 0.5 * kicked) * (0.5 + fbm(x * 3 + seed, y * 2, 305, 3)), 0.45, 0.45, 0.46);
     const dx = (x - HANDLE.x - 0.05) / 0.15;
     const dy = (y - HANDLE.y - 0.02) / 0.22;
-    mul(cc, (0.35 + 0.5 * grime) * Math.exp(-dx * dx - dy * dy) * (0.5 + fbm(x * 12, y * 12, 307, 2)), 0.32, 0.3, 0.28);
+    mul(cc, (0.4 + 0.6 * grime) * Math.exp(-dx * dx - dy * dy) * (0.45 + 1.1 * fbm(x * 12, y * 12, 307, 2)), 0.22, 0.2, 0.18);
+    // a hand's width of grease along the edge where the door is pushed shut
+    mul(cc, (0.2 + 0.5 * grime) * smooth(x0 + 0.1, x0, x) * smooth(0.7, 1.0, y) * smooth(1.7, 1.3, y) * (0.4 + 1.2 * fbm(x * 9, y * 6, 317, 2)), 0.3, 0.28, 0.26);
     mul(cc, smooth(0.6, 0.8, fbm(x * 26 + seed, y * 0.5, 309, 3)) * 0.3, 0.6, 0.55, 0.5);
     return cc;
   }), 0, 0, S, S);
@@ -891,6 +898,14 @@ export function doorRough(S = 512) {
     const dy = (y - HANDLE.y - 0.06) / 0.25;
     k += 0.36 * Math.exp(-dx * dx - dy * dy);
     k += 0.38 * smooth(0.5, 0.05, y) * (0.5 + 0.5 * fbm(x * 4, y * 4, 405, 2));
+    // dust lies on every ledge that faces up (the lower bevel of each panel and of its raised
+    // field): matt, where a clean moulding would throw a white line back at the lamp
+    if (Math.abs(x) < LW / 2 - STILE) {
+      for (const a of [YS[1], YS[3]]) {
+        k += 0.5 * smooth(a - 0.004, a + 0.004, y) * smooth(a + 0.034, a + 0.024, y);
+        k += 0.45 * smooth(a + 0.07, a + 0.076, y) * smooth(a + 0.094, a + 0.086, y);
+      }
+    }
     return [k, k, k];
   });
 }

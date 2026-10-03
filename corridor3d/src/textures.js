@@ -11,9 +11,9 @@ const BASE = '/corridor3d/textures';
 // How each scan is graded before it is laid (CSS filter syntax).
 const GRADE = {
   paper: 'grayscale(0.45) brightness(1.62) contrast(0.9)',
-  boards: 'brightness(0.8) saturate(0.55) contrast(1.06)',
-  carpet: 'hue-rotate(-14deg) saturate(0.95) brightness(0.52)',
-  door: 'saturate(0.5) brightness(1.15)',
+  boards: 'brightness(1.0) saturate(0.55) contrast(1.06)',
+  carpet: 'hue-rotate(-14deg) saturate(1.1) contrast(1.12) brightness(0.5)',
+  door: 'saturate(0.4) brightness(1.22)',
 };
 // Door skins: [material name, seed, { grime, kicked }]. scene.js hands them out.
 export const DOOR_SKINS = [
@@ -305,8 +305,8 @@ function decalAtlas(plaster, size) {
       const len = C * (0.25 + 0.45 * r());
       const lean = (r() - 0.5) * 0.22;
       for (const pass of [0, 1]) {
-        g.strokeStyle = pass ? pale : 'rgba(18,10,6,0.8)';
-        g.lineWidth = pass ? C * 0.006 : C * 0.012;
+        g.strokeStyle = pass ? pale : 'rgba(18,10,6,0.55)';
+        g.lineWidth = pass ? C * 0.0035 : C * 0.008;
         g.lineCap = 'round';
         g.beginPath();
         g.moveTo(x, y0);
@@ -316,8 +316,8 @@ function decalAtlas(plaster, size) {
     }
   };
   // the cut is pale but not white: raw wood, grey plaster dust, in the shade of its own lip
-  inCell(DECAL.gouge1, () => gouges(51, 16, 'rgba(168,140,104,0.85)'));
-  inCell(DECAL.gouge2, () => gouges(67, 12, 'rgba(166,152,128,0.85)'));
+  inCell(DECAL.gouge1, () => gouges(51, 16, 'rgba(150,126,96,0.6)'));
+  inCell(DECAL.gouge2, () => gouges(67, 12, 'rgba(120,112,98,0.55)'));
 
   // Bare plaster where the paper came away: the photographed plaster, ragged alpha.
   const bare = (seed) => {
@@ -499,6 +499,8 @@ function clawedDoor(wood, W, H) {
   // bright, the far wall of the groove is in shadow, fibres are torn up along the edges, and
   // the height map gives it real depth for the normal map.
   const track = (x, y, len, lean, w, depth) => {
+    // old cuts have gone grey-brown with dirt, the last ones are still pale
+    const tone = 0.7 + 0.42 * Math.pow(r(), 1.6);
     // a nail skids: the line wavers, bites deeper in places and lifts off at the end
     const N = 24;
     const pts = [];
@@ -524,16 +526,16 @@ function clawedDoor(wood, W, H) {
       // crushed, dirty varnish either side; the walls of the groove raw wood, pale and grey, not
       // gold; the bottom of the cut in its own shadow; a thin torn lip catching the light
       seg(g, i, w * 2.6, `rgba(30,18,10,${0.26 * b})`);
-      seg(g, i, w * (0.6 + 0.6 * b), `rgba(${156 + 20 * b},${134 + 18 * b},${106 + 14 * b},${0.4 + 0.5 * b})`);
+      seg(g, i, w * (0.6 + 0.6 * b), `rgba(${Math.round(tone * (140 + 30 * b))},${Math.round(tone * (118 + 26 * b))},${Math.round(tone * (92 + 20 * b))},${0.35 + 0.5 * b})`);
       seg(g, i, w * 0.32, `rgba(24,15,9,${0.7 * b})`);
-      seg(g, i, w * 0.18, `rgba(198,182,156,${0.3 * b})`, -w * 0.42);
+      seg(g, i, w * 0.18, `rgba(188,170,142,${0.22 * b * tone})`, -w * 0.42);
       seg(hg, i, w * (0.8 + 0.6 * b), `rgba(0,0,0,${0.35 + 0.6 * b})`);
     }
     // a splinter or two torn up at the deepest point
     for (let i = 0; i < 3; i++) {
       const t = 0.2 + 0.5 * r();
       const k = Math.floor(t * N);
-      g.strokeStyle = `rgba(184,166,136,${0.4 + 0.3 * r()})`;
+      g.strokeStyle = `rgba(150,132,106,${0.25 + 0.3 * r()})`;
       g.lineWidth = Math.max(1, w * 0.3);
       g.beginPath();
       g.moveTo(pts[k][0], pts[k][1]);

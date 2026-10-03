@@ -10,7 +10,7 @@ import { Bag, M, move, rotX, mulberry } from './util.js';
 
 export const LAMP_COLOR = new THREE.Color(1.0, 0.8, 0.58); // tungsten, seen with a tungsten-ish white balance
 export const LAMP_CD = 46; // candela at full level
-const SHADE_GLOW = 6.5;
+const SHADE_GLOW = 4.6;
 
 function pendant(r, kind) {
   const b = new Bag();
@@ -77,7 +77,7 @@ export function buildLamps(materials) {
     const kind = LAMP_KIND[l.k];
     const drop = LAMP_DROP + kind.drop;
     const pivot = new THREE.Group();
-    pivot.position.set((r() - 0.5) * 0.05, CH, -l.s + (r() - 0.5) * 0.06);
+    pivot.position.set((r() - 0.5) * 0.14, CH, -l.s + (r() - 0.5) * 0.1);
     pivot.name = `lamp${l.k}`;
     const shadeMat = materials.shade.clone();
     shadeMat.name = `shade${l.k}`;
@@ -117,7 +117,7 @@ export function setLamp(f, level) {
   f.light.color.setRGB(LAMP_COLOR.r, LAMP_COLOR.g * (0.75 + 0.25 * warm), LAMP_COLOR.b * (0.5 + 0.5 * warm));
   // dusty glass lets less through
   f.shadeMat.emissiveIntensity = on ? SHADE_GLOW * level * (1 - 0.45 * f.kind.dust) : 0;
-  f.shadeMat.emissive.setRGB(1.0, 0.66 * (0.75 + 0.25 * warm), 0.34 * (0.5 + 0.5 * warm));
+  f.shadeMat.emissive.setRGB(1.0, 0.62 * (0.75 + 0.25 * warm), 0.28 * (0.5 + 0.5 * warm));
   const b = 60 * level;
   f.bulb.material.color.setRGB(b * 1.0, b * 0.84 * (0.75 + 0.25 * warm), b * 0.6 * (0.5 + 0.5 * warm));
   f.bulb.visible = on;

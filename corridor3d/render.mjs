@@ -8,6 +8,9 @@
 //   node corridor3d/render.mjs scare --set=both --samples=64 [--force]
 //   node corridor3d/render.mjs stills [--samples=320] [--only=1-start,5-scare] [--scale=1] [--publish=dir]
 //                                              the six review keyframes of stills.json, to out/stills/
+//   node corridor3d/render.mjs tex --mat=paperL4,carpet2,door313   a baked texture, to out/tex/
+//   node corridor3d/render.mjs strat           debug: is the tracer's stratified sample table even?
+// Any mode: --haze=0.01 puts a true haze volume in the tracer (off by default, see the README).
 //
 // Frames that already exist are skipped, so an interrupted run can simply be started again.
 //
@@ -84,8 +87,9 @@ async function shoot(opts, file) {
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       await quiet();
-      // a GPU that hangs instead of failing: give up on the attempt after three minutes
-      const res = await limit(page.evaluate((o) => window.corridor.frame(o), opts), 180000);
+      // a GPU that hangs instead of failing: give up on the attempt after three minutes (longer
+      // for a still: about half a second a sample at full size)
+      const res = await limit(page.evaluate((o) => window.corridor.frame(o), opts), Math.max(180000, (opts.samples ?? 32) * 2000 * (opts.scale ?? 1) ** 2 + 60000));
       const data = await limit(page.evaluate(() => window.corridor.png()), 150000);
       if (data === lastPng) throw new Error('the canvas did not change (stale frame)');
       lastPng = data;
@@ -101,7 +105,7 @@ async function shoot(opts, file) {
 
 // The scare frames must be rendered exactly like the walk frame they are laid over (same seed,
 // same sample count): then they differ from it only where the door moved.
-const WALK_SAMPLES = 48;
+const WALK_SAMPLES = 64;
 const STILL_SAMPLES = 320;
 const SCARE_SAMPLES = WALK_SAMPLES;
 const samples = Number(flag('samples', mode === 'stills' ? STILL_SAMPLES : mode === 'scare' ? SCARE_SAMPLES : mode === 'full' || mode === 'all' ? WALK_SAMPLES : 32));
@@ -111,7 +115,10 @@ const sets = which === 'both' ? ['desktop', 'mobile'] : [which];
 await boot();
 const started = Date.now();
 
-if (mode === 'stills') {
+if (mode === 'strat') {
+  await page.evaluate((o) => window.corridor.frame(o), { set: 'desktop', index: 0, scale: 0.1, samples: 2 });
+  console.log(JSON.stringify(await page.evaluate(() => window.corridor.strat(200)), null, 1).slice(0, 3000));
+} else if (mode === 'stills') {
   // The review keyframes: real frames of the walk, through the whole pipeline exactly as a
   // shipped frame goes, only with more samples. stills.json fixes them for every review round.
   const { readFile } = await import('node:fs/promises');
@@ -134,24 +141,9 @@ if (mode === 'stills') {
   }
   if (flag('publish', null)) {
     // PNG, JPEG (quality 92) and a 2 x 3 contact sheet, for the reviewers
-    const { default: sharp } = await import('sharp');
-    const { copyFile } = await import('node:fs/promises');
-    const pub = String(flag('publish'));
-    await mkdir(pub, { recursive: true });
-    const names = list.map((st) => st.name);
-    for (const n of names) {
-      if (!(await exists(join(dir, `${n}.png`)))) continue;
-      await copyFile(join(dir, `${n}.png`), join(pub, `${n}.png`));
-      await sharp(join(dir, `${n}.png`)).jpeg({ quality: 92, chromaSubsampling: '4:4:4' }).toFile(join(pub, `${n}.jpg`));
-    }
-    const cw = 800;
-    const ch = 450;
-    const cells = await Promise.all(names.map((n) => sharp(join(dir, `${n}.png`)).resize(cw, ch, { fit: 'fill' }).toBuffer()));
-    await sharp({ create: { width: 3 * cw, height: 2 * ch, channels: 3, background: '#000' } })
-      .composite(cells.map((input, k) => ({ input, left: (k % 3) * cw, top: Math.floor(k / 3) * ch })))
-      .jpeg({ quality: 92 })
-      .toFile(join(pub, 'sheet.jpg'));
-    console.log(`published ${names.length} stills and sheet.jpg to ${pub}`);
+    const { publish } = await import('./publish-stills.mjs');
+    const names = await publish(dir, String(flag('publish')));
+    console.log(`published ${names.length} stills and sheet.jpg to ${flag('publish')}`);
   }
 } else if (mode === 'tex') {
   // look at a baked texture: --mat=paperL4,carpet2,door313 [--slot=map]

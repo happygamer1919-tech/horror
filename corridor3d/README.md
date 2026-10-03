@@ -8,22 +8,25 @@ dev dependency of the render pipeline only and never reaches the browser bundle.
 
 | File | What it does |
 |------|--------------|
-| `assets.json`, `fetch-textures.mjs` | The CC0 sources (Poly Haven) and the script that downloads them into `textures/` (gitignored). See `CREDITS.md`. |
+| `assets.json`, `fetch-textures.mjs` | The CC0 sources (Poly Haven, ambientCG) and the script that downloads them into `textures/` (gitignored). See `CREDITS.md`. |
 | `src/layout.js` | Dimensions, door and lamp positions, and the timeline: camera path, which lamp dies when, exposure, the scare. Pure maths, shared by the browser harness and the node scripts. |
 | `src/shell.js`, `doors.js`, `lamps.js`, `props.js`, `figure.js` | The scene: walls, joinery, doors with panels and furniture, pendant lamps, and the props (clawed door, dried blood, boarded door, the shoe, peeling paper, trolley, exit sign, the figure behind door 308). |
-| `src/surfaces.js` | The hero surfaces at true scale: the regency-stripe wallpaper (53 cm lengths), the book-matched walnut wainscot, the woven runner (colour heathered tuft by tuft). Albedo, emboss and sheen for each. |
+| `src/surfaces.js` | The hero surfaces, baked panel by panel from scans laid at true scale: walls (wallpaper over a boarded wainscot), the carpet runner, the door leaves. Seams, water, nicotine, picture ghosts, scuffs and wear are functions of the position in the corridor, so nothing repeats over its 29 m. |
 | `src/textures.js`, `materials.js` | Texture loading and the other authored canvas textures (decal atlas, the clawed door, number plates, signs). |
-| `src/pipeline.js` | One frame: path tracing, G-buffers, denoise, dust in the lamp cones, bloom, lens, tone mapping, grain. |
+| `src/pipeline.js` | One frame: path tracing through a thin lens, G-buffers through the same lens, denoise, dust in the lamp cones, bloom and halation, lens, tone mapping, grain. |
 | `index.html`, `src/main.js` | The harness page. Exposes `window.corridor.frame(opts)`. |
 | `render.mjs`, `server.mjs` | The driver: opens the harness in Playwright Chromium and writes PNGs to `out/` (gitignored). |
 | `encode.mjs` | PNGs to the shipped AVIF/WebP frames, the scare patches, the posters and `manifest.json`. |
+| `stills.json` | The six review keyframes (real frames of the desktop walk). Fixed for every review round. |
+| `publish-stills.mjs` | Copies the stills for the reviewers: PNG, JPEG (quality 92) and a 2 x 3 contact sheet. |
 | `shots.json`, `crop.mjs`, `sheet.mjs` | Review shots of each prop, a crop-and-enlarge helper and a contact-sheet helper for looking at them. |
 
 ## Run it
 
 ```
-npm run corridor:fetch      # once: about 16 MB of CC0 textures at 1k (-- --res=2k for sharper wood up close)
-npm run corridor:render     # both walks and the scare frames, about 2 h 45 min on an Apple M5 (nothing else on the GPU)
+npm run corridor:fetch      # once: about 75 MB of CC0 scans (the hero ones at 2k)
+node corridor3d/render.mjs stills   # the six review keyframes at final quality, about 3 min each, to out/stills/
+npm run corridor:render     # both walks and the scare frames (see "The two sets" for the time)
 npm run corridor:encode     # writes public/corridor/
 ```
 
@@ -34,50 +37,138 @@ For a quick look at one frame or one prop:
 node corridor3d/render.mjs preview --set=mobile --frames=0,40,80 --scale=0.5 --samples=24
 node corridor3d/render.mjs shots --file=corridor3d/shots.json --scale=0.6 --only=a-shoe,a-claw
 node corridor3d/render.mjs preview --scare=8:face --fig='{"y":1.2,"k":1.08}'   # try a pose for the figure
+node corridor3d/render.mjs stills --samples=64 --scale=0.5 --only=1-start,6-last-door --out=corridor3d/out/try
+node corridor3d/render.mjs stills --publish=../stills/r2    # final quality, then PNG, JPEG (q 92) and sheet.jpg for the reviewers
+node corridor3d/publish-stills.mjs ../stills/r2             # the same hand-over, from the stills already in out/stills/
+node corridor3d/render.mjs tex --mat=paperL4,carpet2,door313,claw   # look at a baked texture
 node corridor3d/encode.mjs --dummy    # numbered placeholder frames, no GPU needed
 ```
+
+## Stills first
+
+The owner's ruling: no full render until six stills pass review (two independent reviewers,
+8 of 10 or more each for photographic realism, four rounds at most). `stills.json` names the
+six: the first frame, mid walk, the glance at the clawed inside of door 305, the held frame at
+door 308, the scare at its peak (stand-in face, variant `f`) and the last door. They are real
+frames of the desktop walk, 1600 x 900, through the whole pipeline exactly as a shipped frame
+goes, only with more samples (320 against the walk's 48 to 96). One command renders them:
+`node corridor3d/render.mjs stills`.
 
 ## How a frame is made
 
 1. **Path tracing** with `three-gpu-pathtracer` (WebGL2, real GPU through ANGLE Metal; the
-   driver logs the `UNMASKED_RENDERER` string). Real global illumination: the upper walls and the
-   ceiling are lit only by light bounced off the carpet and by the glow of the opal shades.
-   Each lamp is a small disc light under its shade (soft penumbra), 48 samples per pixel, 5 bounces.
-   The camera moves a little during the exposure (an eighth of the step to the next frame), so
-   frames carry a trace of motion blur. More than that and a frame looked soft when the scroll stops on it.
-2. **Denoise.** The traced image is split into two independent halves to estimate noise, divided
-   by an albedo buffer (so texture detail is never blurred), filtered with a variance-guided
-   edge-avoiding a-trous filter, and multiplied back. Pixels on silhouettes are filtered among
-   themselves so antialiasing survives.
+   driver logs the `UNMASKED_RENDERER` string). Real global illumination, 7 bounces. Each lamp
+   is a small disc light under its shade (soft penumbra); the opal glass glows as an emissive
+   surface and is what lights the ceiling. The camera is a thin lens (f/2.2, about 25 mm): what
+   is close to it, the walls at the edge of the frame, is soft, and the focus follows what the
+   walker looks at (`focusDistance` in `layout.js`). It also moves a little during the exposure
+   (an eighth of the step to the next frame).
+2. **Denoise.** The traced image is split into two independent halves to estimate noise. Each
+   half is first held to a few times what the other half sees in the 5 x 5 pixels round it (a
+   firefly lands in one half only). Then the image is divided by an albedo buffer (so texture
+   detail is never blurred), filtered with a variance-guided edge-avoiding a-trous filter, and
+   multiplied back. The albedo and normal buffers are rastered through the same lens, 64 taps
+   over the aperture, so they carry the same depth of field as the traced image. Pixels on
+   silhouettes are filtered among themselves in plain radiance, never divided by albedo: on a
+   pixel that straddles an edge the traced coverage and the rastered albedo never agree exactly
+   and the quotient spikes. A last pass removes lone pixels several times brighter than
+   everything round them.
 3. **Dust.** The lamp cones are ray-marched against the depth buffer: thin haze, thicker in the
    light, with slow density noise. The inverse square is held flat within about 60 cm of each
-   bulb (`fogCore`): with a hard core the air right under the last lamp glowed like a frosted
-   pane in front of door 313.
-4. **Lens and film.** Bloom, slight barrel distortion, a little lateral chromatic aberration,
-   vignette, ACES filmic tone mapping, 12 % of the saturation taken out after the curve (a
-   photograph's colour, not a renderer's), grain (stronger and coarser in the shadows, where the
-   encoders would otherwise flatten them into blocks; dark frames are also encoded at a higher
-   quality). Exposure follows the walk: the eye opens up by
-   three stops when the lamps are gone.
+   bulb (`fogCore`).
+4. **Lens and film** (`LOOK` in `pipeline.js`). Bloom, a wide red-orange halation round the
+   bulbs, slight barrel distortion, lateral chromatic aberration, a softness that grows towards
+   the corners, vignette, a half-corrected tungsten white balance (the paper stays cream, the
+   runner red, the exit sign green), ACES filmic tone mapping, 16 % of the saturation taken out
+   after the curve, a toe that lets what is dark go black, and grain matched to the film layer
+   the site lays over its hero (`.grain` in `global.css`: fine, a little clumped, nearly
+   monochrome), stronger where the exposure has been opened up. Exposure is set for the pools of
+   light under the lamps and follows the walk.
 
 Everything is deterministic: progress in, pixels out. `Math.random` is replaced by a seeded
 generator, there is no wall clock, and a frame's seed depends only on its set and index. The
-tracer's stratified sampler is rebuilt from that seed for every frame: it keeps its shuffle from
-one frame to the next otherwise, and a frame then depends on the frames rendered before it in the
-same browser (the held walk frame and the scare frames stopped matching outside the door).
-Rendering the same frame twice now gives the same pixels to within 3/255.
+tracer's stratified sampler is rebuilt from that seed for every frame.
 
-Things the tracer needed:
+### Light
+
+The corridor is pools of light with black between them from the first frame. No two lamps are
+the same lamp (`LAMP_KIND` in `layout.js`): different bulbs, flex, dust on the glass; lamp 1 is
+a weak orange bulb; lamp 3 burnt out long ago and its shade is gone (a bare dead bulb), so there
+is always a black gap in the middle of the corridor; lamp 4, over door 308, is tired. The far
+lamps fail as before, and only the lamp over door 313 stays.
+
+### Surfaces
+
+The tracer keeps every texture in one array at one size, and a WebGL texture cannot be larger
+than 2 GB here: at 2048 px that is about 120 layers, at 4096 px only 30 (the scene needs about
+75, so 4k fails; `textureSize` stays 2048). Resolution therefore comes from cutting the hero
+surfaces into panels, each with its own albedo layer, over the scans' own normal and roughness
+maps (one layer each, a texture transform per panel):
+
+- **Walls**: 12 panels a side and one for the end wall, 2.53 x 2.62 m each (1.2 mm a texel).
+  Wallpaper from the `decrepit_wallpaper` scan at its true 2.5 m, laid twice (the second lay
+  turned over, let through in slow patches) so no repeat shows, under a faded print (sprigs in a
+  half drop, 53 cm lengths, each from its own roll). On top, as functions of the position on
+  the wall: nicotine towards the ceiling, soot under the cornice, the band of dirt above the
+  rail, water that came down from the cornice (a brown field, tide lines, runs, mould), damp
+  patches, hand grime beside every door, the paler rectangles where pictures hung with the dust
+  line and the nail hole, seams that open and close on the way up with a corner come away here
+  and there, scratches and spots. Below the rail a boarded wainscot from the
+  `wood_cabinet_worn_long` scan (real wear: scratches, nails, rubbed edges), the boards
+  shuffled over a 20 board period, each stained its own tone, kicked and mopped grey at the
+  bottom, with the long skipping scrapes of a trolley.
+- **Carpet**: 8 panels along the runner. The `Carpet015` scan (a woven red runner, 40 cm) with
+  a dark stripe down each side, a pale path worn down the middle, a bald patch in front of
+  every door, dirt at the edges, stains, lint. The mesh lies in shallow waves with two rucks and
+  its edge is not a ruled line.
+- **Doors**: a skin per leaf (four hero doors have their own, the rest share four), framed the
+  way a door is (stiles upright, rails across, two panels, from the `wood_table_001` scan):
+  joints full of dirt, grease round the handle and along the lock edge, varnish rubbed through
+  where hands push, moulding edges rubbed pale in broken lines, the bottom rail kicked, chips,
+  key scratches round the lock. One shared roughness map: glossy where nothing touches it, dull
+  at the handle, the bottom and on every ledge where dust lies.
+- **Joinery**: skirting and dado rail carry their wear in vertex colours (rubbed nose, dust on
+  what faces up).
+
+### The haze
+
+A true volume in the tracer (`FogVolumeMaterial`, a box round the corridor) is built and can be
+turned on with `--haze=0.01`. It is off. What it cost, measured on this machine:
+
+- about 40 % more trace time;
+- with the volume in the scene and this round's denoiser, the lit walls of the finished frame
+  come out far too dark: the same patch of wall reads 207 of 255 without the volume and 48 with
+  it, at any density down to 1e-6 per metre, so it is not the haze absorbing light. The cause
+  was not found in round 1. It is not the sampler patches below, not the firefly clamp and not
+  the edge path (each was taken out in turn); the denoiser of the commit before did not show it;
+- paths that scatter beside a bulb leave fireflies (white specks in the dark above the last door);
+- a box that ends just inside the room made the carpet render black wherever its waves came
+  within the tracer's ray offset of the box's floor; the box must be larger than the room.
+
+The stills therefore use the ray-marched pass (step 3), thin. The volume stays in the code,
+off, for a later round if the reviewers ask for more air.
+
+### Things the tracer needed
 
 - `RAY_OFFSET` in its shader is 1e-4 times the largest coordinate, which is 3 mm at the far end
   of a 29 m corridor: more than a decal floats above its wall. The pipeline patches it to 3e-5.
+- It focuses on a sphere round the lens; a lens focuses on a plane, and the rastered buffers do.
+  The pipeline patches the focal point to a plane.
+- Its stratified sample table is `bounces + transmissiveBounces + 5` wide and the shader reads
+  columns 0 to 16. With the former 5 + 4 bounces the table was 14 wide: the lobe choice of every
+  surface (column 15) and two more were read out of range, and returned the same number for
+  every sample of a pixel. Now 7 + 8 (20 wide), and the reads are wrapped into the table.
+- It gives every pixel one fixed offset for all its random numbers (a 64 px blue-noise tile).
+  With the haze volume that showed above about 90 samples as a lattice of bright dots, one per
+  tile. The pipeline patches in an offset per pixel, sample, bounce and dimension.
 - `clearcoat` renders black in this version, so varnish is plain low roughness.
 - Emissive surfaces that are small and bright make fireflies. The bulbs are therefore drawn in a
   separate raster overlay and do their lighting through an explicit light.
 - One GPU client at a time. With a second render (or a browser test run) on the GPU, the canvas
-  sometimes comes back as the previous frame, with no error, or a frame hangs. `render.mjs` treats
-  a frame identical to the one before it, or one that takes over three minutes, as a failure and
-  restarts the browser.
+  sometimes comes back as the previous frame, with no error, or a frame hangs. `render.mjs`
+  waits while a Playwright test run is alive (before the browser starts and before every frame),
+  treats a frame identical to the one before it, or one that takes over three minutes, as a
+  failure and restarts the browser.
 - The decal painters address pixels as `y * C + x`: the atlas is sized to whole-pixel cells
   (5 x 5 cells of 409 px). A fractional cell size striped every image-data decal.
 - Every material is made double sided in `scene.js`, so two coincident surfaces fight under that
@@ -91,10 +182,15 @@ Things the tracer needed:
 | Frame | 1600 x 900 | 900 x 1800 (a 2x phone shows about 780 x 1690 of it, so it is barely upscaled) |
 | Lens | 43.5 degrees vertical, about 26 mm | 72 degrees vertical, so floor, both walls and the lamps fit a phone |
 | Frames | 168 | 112 |
-| Render time | about 27 s a frame, 76 min | about 31 s a frame, 58 min |
+| Render time (estimate, 64 samples) | about 33 s a frame, 1 h 50 min with its scare frames | about 37 s a frame, 1 h 25 min with its scare frames |
 | Format | AVIF, quality 56 (up to 68 for dark frames) | WebP, quality 56 (up to 68 for dark frames) |
 
-They are two renders with their own cameras, not one render cropped.
+They are two renders with their own cameras, not one render cropped. Neither has been
+rendered with this pipeline yet (stills first). The estimate comes from the stills: 320 samples
+of a 1600 x 900 frame take 138 to 165 s on an Apple M5, which is 0.3 to 0.36 s per megapixel
+and sample; a set is its walk plus 27 scare frames (the held frame and 13 frames of each of
+the two variants). 64 samples for both sets is about 3 h 15 min, inside the budget of 3 to 4 h;
+96 samples would be about 4 h 50 min.
 
 Choosing the formats (measured on rendered frames, sharp encoders, decode timed with
 `createImageBitmap` in desktop Chromium):

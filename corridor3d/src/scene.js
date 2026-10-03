@@ -35,9 +35,11 @@ function room(bag, side, s0) {
   front(s0, s0 + DOOR.w, DOOR.h + 0.02, CH);
 }
 
-// The air: forty years of dust and smoke, a thin homogeneous haze the tracer scatters light in.
-// density is per metre: thin, a quarter of the light from the far end is lost on the way.
-export const HAZE = { density: 0.01, color: [0.9, 0.86, 0.8] };
+// The air as a true volume in the tracer: a homogeneous haze it scatters light in. density is
+// per metre. OFF by default (0): with the volume in the scene the lit walls of the finished
+// frame come out far too dark at any density (cause not found in round 1), and paths that
+// scatter beside a bulb leave fireflies (README, "The haze"). `--haze=0.01` turns it on.
+export const HAZE = { density: 0, color: [0.9, 0.86, 0.8] };
 
 // Which skin each door wears: the ones the walker stops at have their own.
 const OWN_SKIN = { 301: 'door301', 306: 'door306', 308: 'door308', 313: 'door313' };

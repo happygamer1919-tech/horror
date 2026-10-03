@@ -548,14 +548,14 @@ export function buildFigure(materials, { hingeSide = 1 } = {}) {
     key.position.set(kp.x ?? -0.42, kp.y ?? 0.3, kp.z ?? 0.36).applyMatrix4(headGroup.matrix);
     const eyeAt = H.eyes[P.glintEye ?? 0].clone().applyMatrix4(headGroup.matrix);
     keyTarget.position.copy(eyeAt).add(new THREE.Vector3(kp.ox ?? 0, kp.oy ?? -0.012, kp.oz ?? 0));
-    key.intensity = kp.cd ?? 3;
+    key.intensity = kp.cd ?? 1.3; // deep shadow: the stand-in is a presence, not a portrait
     key.angle = kp.angle ?? 0.11;
     key.penumbra = kp.pen ?? 0.8;
     // the rim: from deeper in the room, behind her on the side away from the door
     const rp = P.rim ?? {};
     rim.position.set(pose.x + far * (rp.along ?? 1.25), pose.y + (rp.up ?? 0.25), pose.z - (rp.deep ?? 0.6));
     rimTarget.position.set(pose.x, pose.y + (rp.ty ?? -0.12), pose.z);
-    rim.intensity = rp.cd ?? 1.1;
+    rim.intensity = rp.cd ?? 0.6;
     rim.angle = rp.angle ?? 0.22;
 
     // the catchlight: on the cornea of the eye nearer the gap, where the key is mirrored towards

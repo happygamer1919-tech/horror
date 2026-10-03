@@ -1,10 +1,5 @@
 {
   "textures": {
-    "dirty_carpet": [
-      "Diffuse",
-      "nor_gl",
-      "Rough"
-    ],
     "dark_wood": [
       "Diffuse",
       "nor_gl",
@@ -30,16 +25,6 @@
       "nor_gl",
       "Rough"
     ],
-    "oak_veneer_01": [
-      "Diffuse",
-      "nor_gl",
-      "Rough"
-    ],
-    "walnut_veneer": [
-      "Diffuse",
-      "nor_gl",
-      "Rough"
-    ],
     "decrepit_wallpaper": [
       "Diffuse",
       "nor_gl",
@@ -60,13 +45,10 @@
     "korean_fire_extinguisher_01": "1k"
   },
   "res": {
-    "dirty_carpet": "2k",
-    "walnut_veneer": "2k",
     "decrepit_wallpaper": "2k",
     "wood_cabinet_worn_long": "2k",
     "wood_table_001": "2k",
-    "dark_wood": "2k",
-    "oak_veneer_01": "2k"
+    "dark_wood": "2k"
   },
   "ambientcg": {
     "Carpet015": {

@@ -96,7 +96,7 @@ export function lampLevel(k, s) {
   // not a clean fade: a dip, a short recovery, then out. Monotone enough that nothing strobes.
   const level = t <= 0 ? 1 : t >= 1 ? 0 : (1 - t) * (1 - t) * (0.55 + 0.45 * Math.cos(t * 5.2)) * (1 - smooth(0.75, 1, t));
   // lamp 4 is already tired when the walker reaches it
-  const tired = k === 4 ? 1 - 0.3 * smooth(11.5, 15.8, s) : 1;
+  const tired = k === 4 ? 1 - 0.18 * smooth(11.5, 15.8, s) : 1;
   return Math.max(0, level) * tired * base;
 }
 
@@ -111,7 +111,7 @@ export function swing(s) {
 }
 
 // Exposure in stops relative to the lit corridor: the eye opens up when the lamps are gone.
-export const exposureStops = (s) => 0.3 * smooth(5, 8, s) + 0.5 * smooth(11.5, 14.5, s) + 2.3 * smooth(17.3, 19.5, s) - 2.3 * smooth(20.6, 25.7, s);
+export const exposureStops = (s) => 0.3 * smooth(5, 8, s) + 0.85 * smooth(11.5, 14.5, s) + 1.7 * smooth(17.3, 19.5, s) - 2.45 * smooth(20.6, 25.7, s);
 
 // The lens: where it is focused (metres from the camera) for a walker at s. A corridor shot at
 // night is taken nearly wide open, so what is close to the camera, the walls at the edge of the

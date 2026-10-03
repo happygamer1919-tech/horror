@@ -10,9 +10,10 @@ let pipe;
 let world;
 let camera;
 let built = false;
+let volume = false; // a true haze volume is in the tracer (init({ haze }))
 
 // Exposed for the pools of light under the lamps: what they do not reach is left to go black.
-const BASE_EXPOSURE = 0.72;
+const BASE_EXPOSURE = 0.56;
 
 function setPose(s, set) {
   const p = cameraPose(s, set);
@@ -40,6 +41,7 @@ window.corridor = {
     pipe = new Pipeline(canvas);
     pipe.pt.textureSize.set(textureSize, textureSize);
     world = await buildScene({ textureSize, haze });
+    volume = (haze ?? 0) > 0;
     camera = new PhysicalCamera(45, 16 / 9, 0.08, 80);
     world.scene.add(camera);
     return { gpu: pipe.gpu, triangles: Math.round(world.triangles) };
@@ -84,10 +86,11 @@ window.corridor = {
       seed,
       exposure: BASE_EXPOSURE * Math.pow(2, exposureStops(at)) * (opts.exposureScale ?? 1),
       grainGain: 1 + 0.22 * Math.max(0, exposureStops(at)),
-      bounces: opts.bounces ?? 7,
+      bounces: opts.bounces,
       lamps: world.fogLamps(state.lamps),
       shutter: shutterLen > 0 && !free ? (u) => setPose(at + (u - 0.5) * shutterLen, set) : null,
       halfWidth: HW,
+      volume,
       scatter: opts.scatter,
       extinction: opts.extinction,
       fogAmbient: opts.fogAmbient,
@@ -99,6 +102,28 @@ window.corridor = {
       debug: opts.debug,
     });
     return { ...res, scene: tScene, s: at, w, h, lamps: state.lamps.length, focus: camera.focusDistance };
+  },
+
+  // Debug: how evenly the tracer's stratified sample table covers [0, 1) over n samples.
+  strat(n = 200) {
+    const t = pipe.pt._pathTracer.material.stratifiedTexture;
+    const w = t.image.width;
+    const h = t.image.height;
+    const st = Array.from({ length: w * h * 4 }, () => ({ min: 1, max: 0, sum: 0 }));
+    for (let i = 0; i < n; i++) {
+      t.next();
+      const d = t.image.data;
+      for (let k = 0; k < st.length; k++) {
+        st[k].min = Math.min(st[k].min, d[k]);
+        st[k].max = Math.max(st[k].max, d[k]);
+        st[k].sum += d[k];
+      }
+    }
+    const bad = [];
+    st.forEach((x, k) => {
+      if (x.max - x.min < 0.8 || Math.abs(x.sum / n - 0.5) > 0.1) bad.push({ texel: k >> 2, col: (k >> 2) % w, row: Math.floor((k >> 2) / w), comp: k & 3, min: x.min, max: x.max, mean: x.sum / n });
+    });
+    return { w, h, len: t.image.data.length, bad: bad.slice(0, 40), nbad: bad.length };
   },
 
   // Debug: the meshes whose name matches, with their vertex count and bounds.

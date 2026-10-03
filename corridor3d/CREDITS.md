@@ -1,36 +1,45 @@
 # Credits: source assets for the corridor render
 
-Every downloaded asset is from Poly Haven (https://polyhaven.com) and is licensed CC0 1.0
-(public domain, https://creativecommons.org/publicdomain/zero/1.0/). No attribution is required;
-it is given here anyway. The files are not committed: `npm run corridor:fetch` downloads them
-into `corridor3d/textures/`. The list the script reads is `assets.json`.
+Every downloaded asset is licensed CC0 1.0 (public domain,
+https://creativecommons.org/publicdomain/zero/1.0/). No attribution is required; it is given
+here anyway. The files are not committed: `npm run corridor:fetch` downloads them into
+`corridor3d/textures/`. The list the script reads is `assets.json`.
 
-## Textures (diffuse, normal, roughness)
+## Textures from Poly Haven (https://polyhaven.com, CC0): diffuse, normal, roughness
+
+| Asset | Size, real scale | Used for | URL |
+|-------|------------------|----------|-----|
+| decrepit_wallpaper | 2k, 2.5 m | The wallpaper: base of every wall panel, its normal and roughness under all of them, and the peeling strips | https://polyhaven.com/a/decrepit_wallpaper |
+| wood_cabinet_worn_long | 2k, 1.0 x 0.5 m (laid at 1.86 x 0.93 m) | The boarded wainscot: albedo, normal and roughness, the boards shuffled | https://polyhaven.com/a/wood_cabinet_worn_long |
+| wood_table_001 | 2k, 1.5 m | Door leaves (stiles, rails, panels cut from it), the clawed inside of door 305, the grain normal of every leaf | https://polyhaven.com/a/wood_table_001 |
+| dark_wood | 2k, 2.0 m | Skirting, dado rail, architraves, door linings, leaf edges | https://polyhaven.com/a/dark_wood |
+| wood_floor_worn | 1k, 2.0 m | Floorboards beside the runner | https://polyhaven.com/a/wood_floor_worn |
+| painted_plaster_wall | 1k, 2.0 m | Ceiling and cornice | https://polyhaven.com/a/painted_plaster_wall |
+| worn_plaster_wall | 1k, 1.8 m | Bare plaster where the wallpaper has come away (decals) | https://polyhaven.com/a/worn_plaster_wall |
+| rough_wood | 1k, 0.9 m | The boards nailed across door 312 | https://polyhaven.com/a/rough_wood |
+
+## Texture from ambientCG (https://ambientcg.com, CC0): colour, normal, roughness
+
+| Asset | Size, real scale | Used for | URL |
+|-------|------------------|----------|-----|
+| Carpet015 | 2K, 0.4 m (photogrammetry) | The woven runner: base of every carpet panel, its normal and roughness under all of them | https://ambientcg.com/a/Carpet015 |
+
+## Model from Poly Haven (CC0)
 
 | Asset | Used for | URL |
 |-------|----------|-----|
-| dirty_carpet (2k) | Pile of the carpet runner (normal and roughness) | https://polyhaven.com/a/dirty_carpet |
-| oak_veneer_01 | Door leaves, and the base of the clawed door face | https://polyhaven.com/a/oak_veneer_01 |
-| dark_wood | Skirting, dado rail, architraves, door linings | https://polyhaven.com/a/dark_wood |
-| walnut_veneer (2k) | Wainscot: book-matched straight-grain walnut panels | https://polyhaven.com/a/walnut_veneer |
-| wood_floor_worn | Floorboards beside the runner | https://polyhaven.com/a/wood_floor_worn |
-| painted_plaster_wall | Ceiling and cornice | https://polyhaven.com/a/painted_plaster_wall |
-| worn_plaster_wall | Bare plaster where the wallpaper has come away | https://polyhaven.com/a/worn_plaster_wall |
-| rough_wood | The boards nailed across door 312 | https://polyhaven.com/a/rough_wood |
-
-## Model
-
-| Asset | Used for | URL |
-|-------|----------|-----|
-| korean_fire_extinguisher_01 | The fire extinguisher by the right wall | https://polyhaven.com/a/korean_fire_extinguisher_01 |
+| korean_fire_extinguisher_01 | The fire extinguisher by the right wall (its moulded plastic stand is cut away) | https://polyhaven.com/a/korean_fire_extinguisher_01 |
 
 ## Authored here (no outside source)
 
-Drawn in code in `src/surfaces.js`: the regency-stripe wallpaper (albedo, emboss, sheen), the
-walnut panel layout of the wainscot (from the scan above), the woven carpet runner. In
-`src/textures.js`: the decal atlas (dried blood, water stains, grime, gouges, carpet stains,
-ghosts of removed pictures, scuffs, rubbed varnish), the clawed face of door 305, the brass
-number plates, the exit sign, the do-not-disturb card, the framed prints.
+Baked in code in `src/surfaces.js`, on top of the scans above: every wall panel (the faded
+print, the lengths and their seams, nicotine, soot, water and tide lines, mould, damp, hand
+grime, the ghosts of removed pictures, scratches, the wear of the wainscot), every carpet panel
+(the stripes, the worn path, bald patches, dirt, stains, lint), every door skin (how the leaf
+is framed, joints, grease, rubbed varnish, kicked bottom rail, chips) and the door sheen map.
+In `src/textures.js`: the decal atlas (dried blood, water stains, grime, gouges, carpet stains,
+rubbed varnish), the gouges on the clawed face of door 305, the brass number plates, the exit
+sign, the do-not-disturb card, the framed prints, the mottled glow of the lamp shades.
 Modelled in code: the corridor, the doors and their furniture, the lamps, the child's shoe, the
 housekeeping trolley, the peeling wallpaper, and the figure behind door 308.
 

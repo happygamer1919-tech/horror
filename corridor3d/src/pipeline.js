@@ -4,11 +4,11 @@
 //   3. denoise: demodulate by albedo, variance-guided edge-avoiding a-trous, remodulate
 //   4. bloom and halation, lens distortion, chromatic aberration, softness towards the corners,
 //      vignette, exposure, ACES, film grain, sRGB
-// The haze is real: a homogeneous volume inside the tracer (scene.js), so the lamp cones and the
-// loss of contrast with distance come from scattering. The ray-marched dust pass is still here
-// for comparison (opts.scatter > 0), off by default. The lens is real too: a thin lens with an
-// aperture in the tracer (PhysicalCamera), and the raster G-buffers are accumulated through the
-// same lens so the denoiser is guided by what the tracer saw.
+// The lens is real: a thin lens with an aperture in the tracer (PhysicalCamera), and the raster
+// G-buffers are accumulated through the same lens so the denoiser is guided by what the tracer
+// saw. The haze is a thin ray-marched in-scatter pass against the depth buffer. A true volume in
+// the tracer (FogVolumeMaterial, scene.js, `--haze=<density>`) is built and was tried: see the
+// README for what it cost and why it is off.
 // Everything is deterministic for a given seed: Math.random is replaced by a seeded generator.
 import * as THREE from 'three';
 import { WebGLPathTracer } from 'three-gpu-pathtracer';
@@ -57,19 +57,30 @@ const GBUF_FRAG = /* glsl */ `
 `;
 
 const DEMOD = /* glsl */ `
-  uniform sampler2D a; uniform sampler2D b; uniform sampler2D albedo; varying vec2 vUv;
+  uniform sampler2D a; uniform sampler2D b; uniform sampler2D albedo; uniform float demod; uniform vec2 px; varying vec2 vUv;
   float lum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
   void main() {
-    vec3 al = max(texture2D(albedo, vUv).rgb, vec3(0.03));
-    vec3 ia = max(texture2D(a, vUv).rgb, 0.0) / al;
-    vec3 ib = max(texture2D(b, vUv).rgb, 0.0) / al;
-    // A firefly (a path that scattered in the haze a hand's width from a bulb) lands in one half
-    // only: neither half may be more than a few times the other. On an edge pixel, where the
-    // filter finds few neighbours to average it away, this is what removes it.
-    float la = lum(ia); float lb = lum(ib);
-    float ca = lb * 2.5 + 0.03; float cb = la * 2.5 + 0.03;
-    if (la > ca) ia *= ca / la;
-    if (lb > cb) ib *= cb / lb;
+    // demod 0 leaves the radiance as it is (the edge path, see REMOD)
+    vec3 al = mix(vec3(1.0), max(texture2D(albedo, vUv).rgb, vec3(0.03)), demod);
+    vec3 ra = max(texture2D(a, vUv).rgb, 0.0);
+    vec3 rb = max(texture2D(b, vUv).rgb, 0.0);
+    // A firefly (one path that found a bulb by a freak bounce) lands in one half only. Each half
+    // is held to a few times what the OTHER half sees in the 5 x 5 pixels round
+    // it: a neighbourhood, not the one pixel, because with a dozen lights and one picked per
+    // sample the two halves of a single honest pixel can differ by more than that.
+    float ma = 0.0; float mb = 0.0;
+    for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) {
+      vec2 uv = vUv + vec2(float(x), float(y)) * px;
+      ma += lum(max(texture2D(a, uv).rgb, 0.0));
+      mb += lum(max(texture2D(b, uv).rgb, 0.0));
+    }
+    ma /= 25.0; mb /= 25.0;
+    float la = lum(ra); float lb = lum(rb);
+    float ca = 6.0 * mb + 0.004; float cb = 6.0 * ma + 0.004;
+    if (la > ca) ra *= ca / la;
+    if (lb > cb) rb *= cb / lb;
+    vec3 ia = ra / al;
+    vec3 ib = rb / al;
     float d = 0.5 * (lum(ia) - lum(ib));
     gl_FragColor = vec4(0.5 * (ia + ib), d * d);
   }
@@ -178,8 +189,32 @@ const REMOD = /* glsl */ `
     float step_ = abs(a.a - c.a) / max(c.a, 0.1);
     float edge = clamp(max(bend * 14.0, step_ * 60.0), 0.0, 1.0);
     if (c.a <= 0.0) edge = 1.0;
-    vec3 irr = mix(texture2D(tex, vUv).rgb, texture2D(raw, vUv).rgb, edge);
-    gl_FragColor = vec4(irr * al + texture2D(overlay, vUv).rgb, 1.0);
+    // The filtered image is irradiance (divided by albedo, multiplied back here). The edge path
+    // is plain radiance, never divided: on a pixel that straddles an edge the traced coverage and
+    // the rastered albedo never agree exactly, and their quotient spikes.
+    vec3 rad = mix(texture2D(tex, vUv).rgb * al, texture2D(raw, vUv).rgb, edge);
+    gl_FragColor = vec4(rad, 1.0);
+  }
+`;
+
+// A lone pixel (or two) several times brighter than everything round it is a path that found a
+// bulb through the haze, not a highlight: a real glint has neighbours along its edge. Replace
+// it by its surroundings. The glowing things (bulbs) are laid over afterwards, so a distant bulb
+// two pixels wide is never taken for a speck.
+const DESPECK = /* glsl */ `
+  uniform sampler2D tex; uniform sampler2D overlay; uniform vec2 px; varying vec2 vUv;
+  float lum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+  void main() {
+    vec3 c = texture2D(tex, vUv).rgb;
+    float l = lum(c);
+    float mx = 0.0; vec3 mean = vec3(0.0); float n = 0.0;
+    for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) {
+      if ((x < 0 ? -x : x) < 2 && (y < 0 ? -y : y) < 2) continue;
+      vec3 s = texture2D(tex, vUv + vec2(float(x), float(y)) * px).rgb;
+      mx = max(mx, lum(s)); mean += s; n += 1.0;
+    }
+    if (l > 2.5 * mx + 0.0015) c = mean / n;
+    gl_FragColor = vec4(c + texture2D(overlay, vUv).rgb, 1.0);
   }
 `;
 
@@ -369,8 +404,15 @@ export class Pipeline {
     pt.dynamicLowRes = false;
     pt.rasterizeScene = false;
     pt.renderToCanvas = false;
-    pt.bounces = 5;
-    pt.transmissiveBounces = 4;
+    // The tracer's stratified sample table is (bounces + transmissiveBounces + 5) wide and 20
+    // high; the shader reads columns 0 to 16 of it and one row per ray of a path. Outside the
+    // table a read returns nothing, and every sample of a pixel then gets the same "random"
+    // number (its blue-noise offset): the russian roulette of a long path never fires on the
+    // pixels whose offset is small, and with the haze (long paths, a column 16 read) that showed
+    // as a lattice of bright dots, one per 64 px tile. So: a table 20 wide (7 + 8 + 5), and the
+    // reads wrapped into it.
+    pt.bounces = 7;
+    pt.transmissiveBounces = 8;
     pt.filterGlossyFactor = 0.5;
     pt.multipleImportanceSampling = true;
     pt.tiles.set(1, 1);
@@ -388,6 +430,26 @@ export class Pipeline {
     tracing.fragmentShader = tracing.fragmentShader.replace(
       sphere,
       'vec3 camFwd = normalize( ( cameraWorldMatrix * vec4( 0.0, 0.0, - 1.0, 0.0 ) ).xyz ); vec3 focalPoint = ray.origin + normalize( ray.direction ) * ( physicalCamera.focusDistance / max( dot( normalize( ray.direction ), camFwd ), 0.05 ) );',
+    );
+    // (see the note at pt.bounces above: reads of the stratified table are wrapped into it)
+    const table = 'ivec2 uv = ivec2( v, sobolBounceIndex );';
+    if (!tracing.fragmentShader.includes(table)) throw new Error('stratified table read not found in the tracing shader');
+    tracing.fragmentShader = tracing.fragmentShader.replace(table, 'ivec2 tsz = textureSize( stratifiedTexture, 0 ); ivec2 uv = ivec2( v % tsz.x, int( sobolBounceIndex ) % tsz.y );');
+    // The tracer gives every pixel one fixed offset (a 64 px blue-noise tile) for all its random
+    // numbers, for the whole frame. Give every pixel, sample, bounce and dimension its own.
+    const swap = (from, to) => {
+      if (!tracing.fragmentShader.includes(from)) throw new Error(`not found in the tracing shader: ${from}`);
+      tracing.fragmentShader = tracing.fragmentShader.replace(from, to);
+    };
+    swap('vec4 pixelSeed = vec4( 0 );', 'vec4 pixelSeed = vec4( 0 ); uint frameSeed = 0u;');
+    swap('pixelSeed = texture( stratifiedOffsetTexture, uv );', 'pixelSeed = texture( stratifiedOffsetTexture, uv ); frameSeed = uint( frame );');
+    swap(
+      'return fract( stratifiedSample + pixelSeed.r );',
+      `uint hh = uint( gl_FragCoord.x ) * 1973u + uint( gl_FragCoord.y ) * 9277u + frameSeed * 26699u + uint( v ) * 7919u + sobolBounceIndex * 104729u;
+      hh ^= hh >> 16u; hh *= 0x7feb352du; hh ^= hh >> 15u; hh *= 0x846ca68bu; hh ^= hh >> 16u;
+      uint h2 = hh * 0x9e3779b9u + 0x7f4a7c15u; h2 ^= h2 >> 15u; h2 *= 0x2c1b3c6du; h2 ^= h2 >> 12u;
+      vec4 off = vec4( float( hh & 0xffffu ), float( hh >> 16u ), float( h2 & 0xffffu ), float( h2 >> 16u ) ) / 65536.0;
+      return fract( stratifiedSample + off );`,
     );
     tracing.needsUpdate = true;
     this.pt = pt;
@@ -416,10 +478,11 @@ export class Pipeline {
     this.q = {
       copy: fsq(COPY, { tex: { value: null }, scale: { value: 1 } }),
       acc: fsq(COPY4, { tex: { value: null }, scale: { value: 1 } }, { blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, transparent: true }),
-      demod: fsq(DEMOD, { a: { value: null }, b: { value: null }, albedo: { value: null } }),
+      demod: fsq(DEMOD, { a: { value: null }, b: { value: null }, albedo: { value: null }, demod: { value: 1 }, px: { value: new THREE.Vector2() } }),
       prep: fsq(PREP, { tex: { value: null }, px: { value: new THREE.Vector2() } }),
       atrous: fsq(ATROUS, { tex: { value: null }, gbuf: { value: null }, px: { value: new THREE.Vector2() }, stepSize: { value: 1 }, invProj: { value: new THREE.Matrix4() }, sigmaL: { value: 4 } }),
       atrousEdge: fsq(ATROUS_EDGE, { tex: { value: null }, gbufAA: { value: null }, px: { value: new THREE.Vector2() }, stepSize: { value: 1 }, sigmaL: { value: 6 } }),
+      despeck: fsq(DESPECK, { tex: { value: null }, overlay: { value: null }, px: { value: new THREE.Vector2() } }),
       remod: fsq(REMOD, { tex: { value: null }, raw: { value: null }, albedo: { value: null }, overlay: { value: null }, gbuf: { value: null }, gbufAA: { value: null } }),
       fog: fsq(FOG, {
         tex: { value: null },
@@ -609,7 +672,8 @@ export class Pipeline {
   render(opts) {
     const { renderer, pt, rt, q, scene, w, h } = this;
     const { camera, samples = 32, seed = 1, exposure = 1, lamps = [], shutter } = opts;
-    if (opts.bounces && pt.bounces !== opts.bounces) pt.bounces = opts.bounces;
+    if (opts.bounces && pt.bounces !== opts.bounces) pt.bounces = Math.max(4, opts.bounces);
+    if (pt.bounces + pt.transmissiveBounces + 5 < 17) throw new Error('stratified table too narrow: raise bounces or transmissiveBounces');
     const taps = (camera.bokehSize ?? 0) > 0 ? 64 : 12;
     const t0 = performance.now();
     seedRandom(seed);
@@ -695,13 +759,17 @@ export class Pipeline {
     q.demod.material.uniforms.a.value = rt.a.texture;
     q.demod.material.uniforms.b.value = rt.b.texture;
     q.demod.material.uniforms.albedo.value = rt.albedo.texture;
+    q.demod.material.uniforms.px.value = px;
+    // the edge path first: radiance, firefly clamped, into rt.raw
+    q.demod.material.uniforms.demod.value = 0;
     this.pass(q.demod, rt.p0);
     q.prep.material.uniforms.tex.value = rt.p0.texture;
     q.prep.material.uniforms.px.value = px;
+    this.pass(q.prep, rt.raw);
+    // then the irradiance for the filter
+    q.demod.material.uniforms.demod.value = 1;
+    this.pass(q.demod, rt.p0);
     this.pass(q.prep, rt.p1);
-    q.copy.material.uniforms.tex.value = rt.p1.texture;
-    q.copy.material.uniforms.scale.value = 1;
-    this.pass(q.copy, rt.raw);
     let src = rt.p1;
     let dst = rt.p0;
     const iterations = opts.denoise === false ? 0 : (opts.iterations ?? 5);
@@ -722,13 +790,13 @@ export class Pipeline {
     // edge pixels: filtered among themselves
     let esrc = rt.raw;
     let edst = rt.e0;
-    for (let i = 0; i < (opts.denoise === false ? 0 : 4); i++) {
+    for (let i = 0; i < (opts.denoise === false ? 0 : 5); i++) {
       const u = q.atrousEdge.material.uniforms;
       u.tex.value = esrc.texture;
       u.gbufAA.value = rt.gbufAA.texture;
       u.px.value = px;
       u.stepSize.value = 1 << i;
-      u.sigmaL.value = 6;
+      u.sigmaL.value = 9;
       this.pass(q.atrousEdge, edst);
       esrc = edst;
       edst = edst === rt.e0 ? rt.e1 : rt.e0;
@@ -736,7 +804,12 @@ export class Pipeline {
     q.remod.material.uniforms.raw.value = esrc.texture;
     q.remod.material.uniforms.gbuf.value = rt.gbuf.texture;
     q.remod.material.uniforms.gbufAA.value = rt.gbufAA.texture;
-    this.pass(q.remod, rt.hdr);
+    // (the filter's result is in src: write into the other of the pair)
+    this.pass(q.remod, dst);
+    q.despeck.material.uniforms.tex.value = dst.texture;
+    q.despeck.material.uniforms.overlay.value = rt.overlay.texture;
+    q.despeck.material.uniforms.px.value = px;
+    this.pass(q.despeck, rt.hdr);
 
     // 4. dust in the light
     {
@@ -753,8 +826,9 @@ export class Pipeline {
         u.lampCol.value[i].copy(l.color);
         u.lampCone.value[i].set(l.cone[0], l.cone[1], l.omni ? 1 : 0, 0);
       });
-      u.scatterK.value = opts.scatter ?? 0;
-      u.extinction.value = opts.extinction ?? 0;
+      // with a real volume in the tracer (opts.volume) this pass stays out of the way
+      u.scatterK.value = opts.scatter ?? (opts.volume ? 0 : LOOK.dust);
+      u.extinction.value = opts.extinction ?? (opts.volume ? 0 : LOOK.extinction);
       u.halfWidth.value = opts.halfWidth ?? 1;
       u.seed.value = seed % 977;
       u.ambient.value.set(...(opts.fogAmbient ?? [0, 0, 0]));
@@ -814,6 +888,12 @@ export class Pipeline {
       u.zoom.value = lensZoom(w / h, u.k1.value + Math.abs(u.ca.value));
       this.pass(q.final, null);
     }
+    if (opts.debug === 'trace' || opts.debug === 'hdr') {
+      // one traced half, or the image after the denoiser, straight to the canvas (no lens, no film)
+      this.q.copy.material.uniforms.tex.value = opts.debug === 'trace' ? rt.a.texture : rt.hdr.texture;
+      this.q.copy.material.uniforms.scale.value = 0.5 * exposure;
+      this.pass(this.q.copy, null);
+    }
     if (opts.debug === 'albedo') {
       this.q.copy.material.uniforms.tex.value = rt.albedo.texture;
       this.q.copy.material.uniforms.scale.value = 1;
@@ -837,6 +917,8 @@ export class Pipeline {
 export const LENS = { k1: 0.055, ca: 0.0032 };
 // The look of the film and the lens, in one place.
 export const LOOK = {
+  dust: 0.00032, // in-scatter of the lamp cones, thin
+  extinction: 0.004, // per metre: the far end loses a tenth of its contrast
   bloom: 0.05,
   halo: 0.045,
   soft: 3.2, // radius of the corner softness, pixels at the corner of a 900 px high frame
