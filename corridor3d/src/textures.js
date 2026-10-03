@@ -403,8 +403,9 @@ function decalAtlas(plaster, S) {
       }
     }
   };
-  inCell(DECAL.gouge1, () => gouges(51, 16, 'rgba(196,170,128,0.92)'));
-  inCell(DECAL.gouge2, () => gouges(67, 12, 'rgba(205,196,176,0.9)'));
+  // the cut is pale but not white: raw wood, grey plaster dust, in the shade of its own lip
+  inCell(DECAL.gouge1, () => gouges(51, 16, 'rgba(168,140,104,0.85)'));
+  inCell(DECAL.gouge2, () => gouges(67, 12, 'rgba(166,152,128,0.85)'));
 
   // Bare plaster where the paper came away: the photographed plaster, ragged alpha.
   const bare = (seed) => {
@@ -817,10 +818,12 @@ function paperBack(S) {
       const n = fbm(x / S * 8, y / S * 8, 61, 4);
       const p = fbm(x / S * 40, y / S * 3, 62, 3);
       const i = (y * S + x) * 4;
-      const k = 0.78 + 0.3 * n - 0.16 * smooth(0.55, 0.8, p);
-      img.data[i] = 186 * k;
-      img.data[i + 1] = 168 * k;
-      img.data[i + 2] = 128 * k;
+      // off-white lining paper gone yellow, faint tide marks of old paste
+      const k = 0.9 + 0.12 * n - 0.07 * smooth(0.55, 0.85, p);
+      const paste = smooth(0.6, 0.9, n);
+      img.data[i] = 174 * k - 8 * paste;
+      img.data[i + 1] = 161 * k - 14 * paste;
+      img.data[i + 2] = 130 * k - 20 * paste;
       img.data[i + 3] = 255;
     }
   }

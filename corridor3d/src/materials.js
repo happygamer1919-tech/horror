@@ -70,7 +70,7 @@ export function makeMaterials(T) {
     P({
       map: T.oak_veneer_01.map,
       normalMap: T.oak_veneer_01.normalMap,
-      color: new THREE.Color(0.62, 0.55, 0.48),
+      color: new THREE.Color(0.55, 0.48, 0.41), // forty years of varnish and hands
       roughness: 0.56,
       vertexColors: true,
     }),
@@ -154,9 +154,9 @@ export function makeMaterials(T) {
   m.sole = P({ color: new THREE.Color(0.3, 0.2, 0.12), roughness: 0.8, vertexColors: true });
 
   // The figure behind the door.
-  m.skin = P({ color: new THREE.Color(0.52, 0.5, 0.48), roughness: 0.52, sheen: 0.35, sheenRoughness: 0.5, sheenColor: new THREE.Color(0.7, 0.45, 0.4), vertexColors: true });
+  m.skin = P({ color: new THREE.Color(0.36, 0.355, 0.35), roughness: 0.46, sheen: 0.35, sheenRoughness: 0.5, sheenColor: new THREE.Color(0.7, 0.45, 0.4), vertexColors: true });
   m.eye = P({ color: new THREE.Color(1, 1, 1), roughness: 0.08, vertexColors: true });
-  m.hair = P({ color: new THREE.Color(0.018, 0.015, 0.013), roughness: 0.45, sheen: 0.4, sheenRoughness: 0.4, sheenColor: new THREE.Color(0.12, 0.1, 0.08), side: THREE.DoubleSide, vertexColors: true });
+  m.hair = P({ color: new THREE.Color(0.018, 0.015, 0.013), roughness: 0.78, side: THREE.DoubleSide, vertexColors: true });
   m.nail = P({ color: new THREE.Color(0.7, 0.62, 0.55), roughness: 0.25, vertexColors: true });
   m.gown = P({ color: new THREE.Color(0.5, 0.48, 0.44), roughness: 1, side: THREE.DoubleSide, vertexColors: true });
 

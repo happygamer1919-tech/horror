@@ -26,30 +26,31 @@ function headSurface(d) {
   let dark = 0;
   let lips = 0;
   // eye sockets and the brow over them
-  const socket = g2(ax, fy, 0.03, 0.013, 0.0165, 0.0125);
-  disp -= 0.0095 * socket;
-  dark += 0.75 * g2(ax, fy, 0.03, 0.01, 0.02, 0.016);
-  disp += 0.0042 * g2(ax, fy, 0.03, 0.031, 0.026, 0.007);
-  disp += 0.002 * g2(fx, fy, 0, 0.034, 0.012, 0.01);
+  // a child's proportions: the eyes sit low on the head, under a big forehead
+  const socket = g2(ax, fy, 0.031, 0.004, 0.017, 0.0125);
+  disp -= 0.009 * socket;
+  dark += 0.75 * g2(ax, fy, 0.031, 0.002, 0.021, 0.016);
+  disp += 0.0034 * g2(ax, fy, 0.031, 0.022, 0.026, 0.007);
+  disp += 0.0015 * g2(fx, fy, 0, 0.025, 0.012, 0.01);
   // nose: bridge, tip, wings
-  disp += 0.0065 * Math.exp(-Math.pow(fx / 0.0075, 2)) * smooth(0.034, 0.012, fy) * smooth(-0.036, -0.02, fy);
-  disp += 0.0125 * g2(fx, fy, 0, -0.021, 0.0098, 0.011);
-  disp += 0.0048 * g2(ax, fy, 0.0115, -0.0265, 0.0055, 0.0055);
-  dark += 0.5 * g2(ax, fy, 0.0075, -0.0315, 0.0035, 0.0025);
+  disp += 0.0045 * Math.exp(-Math.pow(fx / 0.0075, 2)) * smooth(0.024, 0.004, fy) * smooth(-0.036, -0.02, fy);
+  disp += 0.0098 * g2(fx, fy, 0, -0.024, 0.0095, 0.0095);
+  disp += 0.004 * g2(ax, fy, 0.0105, -0.028, 0.005, 0.005);
+  dark += 0.3 * g2(ax, fy, 0.007, -0.0325, 0.003, 0.0022);
   // cheeks, hollow under the eyes
-  disp += 0.0028 * g2(ax, fy, 0.04, -0.008, 0.016, 0.014);
-  disp -= 0.0016 * g2(ax, fy, 0.027, -0.006, 0.012, 0.006);
-  dark += 0.3 * g2(ax, fy, 0.027, -0.004, 0.014, 0.007);
+  disp += 0.004 * g2(ax, fy, 0.039, -0.024, 0.018, 0.018);
+  disp -= 0.0014 * g2(ax, fy, 0.028, -0.013, 0.012, 0.005);
+  dark += 0.3 * g2(ax, fy, 0.028, -0.011, 0.014, 0.006);
   // mouth: two lips and the line between them, corners turned down
   const my = -0.0495 - 0.004 * Math.pow(ax / 0.02, 2);
   disp += 0.003 * g2(fx, fy, 0, my + 0.005, 0.017, 0.0036);
   disp += 0.0034 * g2(fx, fy, 0, my - 0.0055, 0.014, 0.0045);
   disp -= 0.0034 * g2(fx, fy, 0, my, 0.02, 0.0016);
   lips = clamp(g2(fx, fy, 0, my + 0.004, 0.017, 0.0045) + g2(fx, fy, 0, my - 0.005, 0.014, 0.005), 0, 1);
-  dark += 0.6 * g2(fx, fy, 0, my, 0.02, 0.0014);
+  dark += 0.25 * g2(fx, fy, 0, my, 0.018, 0.0012);
   disp -= 0.0018 * g2(fx, fy, 0, -0.038, 0.004, 0.005); // philtrum
   // chin
-  disp += 0.004 * g2(fx, fy, 0, -0.076, 0.018, 0.012);
+  disp += 0.003 * g2(fx, fy, 0, -0.076, 0.018, 0.012);
   disp -= 0.002 * g2(fx, fy, 0, -0.064, 0.02, 0.004);
   // temples
   disp -= 0.002 * g2(ax, fy, 0.058, 0.03, 0.012, 0.02);
@@ -58,7 +59,7 @@ function headSurface(d) {
   // mottled, bloodless skin; darker in every hollow
   const n = 0.92 + 0.16 * fbm(d.x * 9 + 3, d.y * 9 + d.z * 7, 77, 3);
   const k = n * (1 - 0.62 * dark);
-  const col = [k * (1 - 0.18 * lips * front), k * (0.97 - 0.3 * lips * front - 0.06 * dark), k * (0.95 - 0.22 * lips * front - 0.02 * dark)];
+  const col = [k * (1 - 0.06 * lips * front), k * (0.97 - 0.13 * lips * front - 0.06 * dark), k * (0.95 - 0.09 * lips * front - 0.02 * dark)];
   return { r, col };
 }
 
@@ -88,24 +89,25 @@ function head() {
       const v = new THREE.Vector3().fromBufferAttribute(ep, i).normalize();
       const ang = Math.acos(clamp(v.z, -1, 1));
       let c;
-      if (ang < 0.3) c = [0.004, 0.004, 0.004];
-      else if (ang < 0.5) c = [0.05, 0.035, 0.025];
-      else if (ang < 0.56) c = [0.02, 0.016, 0.014];
+      if (ang < 0.26) c = [0.004, 0.004, 0.004];
+      else if (ang < 0.5) c = [0.06 + 0.03 * Math.sin(ang * 60), 0.05 + 0.02 * Math.sin(ang * 60), 0.04];
+      else if (ang < 0.56) c = [0.03, 0.026, 0.022];
       else {
-        const red = smooth(0.7, 1.4, ang);
-        c = [0.62 - 0.1 * red, 0.58 - 0.3 * red, 0.55 - 0.32 * red];
+        // the white gone yellow-grey, bloodshot towards the lids
+        const red = smooth(0.62, 1.3, ang);
+        c = [0.4 - 0.04 * red, 0.36 - 0.17 * red, 0.31 - 0.18 * red];
       }
       ec.set(c, i * 3);
     }
     eg.setAttribute('color', new THREE.BufferAttribute(ec, 3));
     // looking up from under the brow, slightly inwards
-    const place = M(rotX(-0.2), rotY(-sx * 0.05), move(sx * 0.03, 0.0125, 0.0548));
+    const place = M(rotX(-0.2), rotY(-sx * 0.05), move(sx * 0.031, 0.004, 0.0552));
     b.add('eye', eg, place);
     // lids: upper heavy, lower slack, a wide dead stare between them
-    const up = new THREE.SphereGeometry(0.0141, 28, 10, 0, Math.PI * 2, 0, 1.0);
-    b.add('skin', up, M(rotX(0.06), move(sx * 0.03, 0.0125, 0.0546)), [0.52, 0.42, 0.42]);
-    const lo = new THREE.SphereGeometry(0.014, 28, 8, 0, Math.PI * 2, 2.3, Math.PI - 2.3);
-    b.add('skin', lo, M(rotX(-0.1), move(sx * 0.03, 0.0125, 0.0546)), [0.5, 0.38, 0.4]);
+    const up = new THREE.SphereGeometry(0.0141, 28, 10, 0, Math.PI * 2, 0, 1.22);
+    b.add('skin', up, M(rotX(0.1), move(sx * 0.031, 0.004, 0.055)), [0.46, 0.38, 0.39]);
+    const lo = new THREE.SphereGeometry(0.014, 28, 8, 0, Math.PI * 2, 2.12, Math.PI - 2.12);
+    b.add('skin', lo, M(rotX(-0.1), move(sx * 0.031, 0.004, 0.055)), [0.42, 0.33, 0.36]);
   }
 
   // hair: a cap over the skull and wet strands hanging past the shoulders, some across the face
@@ -125,7 +127,9 @@ function head() {
     const c = new THREE.Vector3();
     for (let k = 0; k < 3; k++) c.add(d.fromBufferAttribute(cp, ci[i + k]));
     c.multiplyScalar(1 / 3).normalize();
-    const hairline = c.y > 0.6 - 0.1 * Math.abs(c.x) || c.z < 0.3 - 0.5 * Math.max(0, c.y) || Math.abs(c.x) > 0.62;
+    // an uneven hairline, so the hair never frames the face like a hood
+    const jag = 0.14 * (fbm(c.x * 7 + 2, c.y * 7, 31, 2) - 0.5);
+    const hairline = c.y > 0.5 - 0.1 * Math.abs(c.x) + jag || c.z < 0.3 - 0.5 * Math.max(0, c.y) || Math.abs(c.x) > 0.56 + jag;
     if (hairline) keep.push(ci[i], ci[i + 1], ci[i + 2]);
   }
   cap.setIndex(keep);
@@ -168,14 +172,16 @@ function head() {
     const k = 0.6 + 0.8 * r();
     b.add('hair', smoothNormals(sg, 0.1), null, [k, k, k]);
   };
-  // all round the back and sides
-  for (let i = 0; i < 46; i++) {
-    const ang = lerp(0.95, 2 * Math.PI - 0.95, i / 45) + (r() - 0.5) * 0.08;
-    strand(ang, 0.014 + 0.012 * r(), 0.22 + 0.1 * r(), r());
+  // all round the back and sides: thin, wet, clumped strands
+  for (let i = 0; i < 150; i++) {
+    const ang = lerp(0.9, 2 * Math.PI - 0.9, i / 149) + (r() - 0.5) * 0.06;
+    strand(ang, 0.005 + 0.006 * r(), 0.24 + 0.12 * r(), r() * 1.5);
   }
-  // and across the face: a curtain over the figure's left side, thin strands over the right
-  for (let i = 0; i < 7; i++) strand(-0.2 - i * 0.11 + (r() - 0.5) * 0.04, 0.016 + 0.01 * r(), 0.2 + 0.1 * r(), 1 + r());
-  for (const ang of [0.62, 0.84]) strand(ang + (r() - 0.5) * 0.05, 0.012 + 0.004 * r(), 0.17 + 0.08 * r(), 1.4);
+  // across the face: a curtain over the figure's right side, a few loose strands over the
+  // left, so that only one eye looks out between them
+  for (let i = 0; i < 40; i++) strand(-0.42 - i * 0.014 + (r() - 0.5) * 0.03, 0.005 + 0.006 * r(), 0.2 + 0.12 * r(), 1 + 1.2 * r());
+  for (let i = 0; i < 6; i++) strand(-0.12 - i * 0.05 + (r() - 0.5) * 0.03, 0.003 + 0.003 * r(), 0.2 + 0.1 * r(), 1.6 + r());
+  for (let i = 0; i < 7; i++) strand(0.5 + i * 0.07 + (r() - 0.5) * 0.04, 0.0035 + 0.003 * r(), 0.16 + 0.1 * r(), 1.3 + r());
 
   return b;
 }
@@ -204,7 +210,7 @@ function body() {
     gp.setZ(i, gp.getZ(i) * fold * 0.62);
   }
   gown.computeVertexNormals();
-  b.add('gown', gown, null, [0.035, 0.033, 0.032]);
+  b.add('gown', gown, null, [0.022, 0.021, 0.02]);
   return b;
 }
 
@@ -223,7 +229,7 @@ function hand(edgeX, dirX, y0) {
     b.add(mat, g, m, tint);
   };
   const ball = (p, rad, tint) => b.add('skin', new THREE.SphereGeometry(rad, 14, 10), move(p.x, p.y, p.z), tint);
-  const widths = [0.0068, 0.0074, 0.007, 0.0058];
+  const widths = [0.0058, 0.0063, 0.006, 0.005];
   const reach = [0.03, 0.036, 0.033, 0.024];
   for (let f = 0; f < 4; f++) {
     const w = widths[f];
@@ -236,8 +242,8 @@ function hand(edgeX, dirX, y0) {
     const dip = new THREE.Vector3(edgeX + out * (w * 0.4), y + 0.001, w * 1.05 + 0.002);
     const mid = new THREE.Vector3(edgeX + dirX * reach[f] * 0.5, y + Math.sin(tilt) * reach[f] * 0.5, w * 0.95);
     const tip = new THREE.Vector3(edgeX + dirX * reach[f], y + Math.sin(tilt) * reach[f], w * 0.8);
-    const pale = [0.96, 0.92, 0.9];
-    const knuckle = [0.82, 0.66, 0.64]; // pressed white-red where they grip
+    const pale = [0.72, 0.71, 0.71];
+    const knuckle = [0.64, 0.55, 0.56]; // pressed white-red where they grip
     seg(mcp, pip, w * 1.08, w, 'skin', pale);
     ball(pip, w * 1.12, knuckle);
     seg(pip, dip, w, w * 0.98, 'skin', pale);
@@ -253,7 +259,7 @@ function hand(edgeX, dirX, y0) {
     const centre = new THREE.Vector3().lerpVectors(mid, tip, 0.72);
     centre.z += w * 0.62;
     const nm = new THREE.Matrix4().compose(centre, q, new THREE.Vector3(w * 0.72, w * 0.62, w * 0.22));
-    b.add('nail', ng, nm, [0.85 + 0.1 * r(), 0.8, 0.76]);
+    b.add('nail', ng, nm, [0.72 + 0.1 * r(), 0.66, 0.58]);
     b.add('void', new THREE.SphereGeometry(1, 8, 6), new THREE.Matrix4().compose(centre.clone().addScaledVector(nd, w * 0.62), q, new THREE.Vector3(w * 0.12, w * 0.5, w * 0.16)));
   }
   // the back of the hand and the wrist, going back into the dark
@@ -272,7 +278,7 @@ export function buildFigure(materials, { hingeSide = 1 } = {}) {
   const lw = DOOR.w - 0.007;
   // leaf coordinates: the free edge is on the side away from the hinge
   const edgeX = -hingeSide * (lw / 2);
-  const handGroup = hand(edgeX, hingeSide, 0.8).build(materials, 'hand');
+  const handGroup = hand(edgeX, hingeSide, (globalThis.__fig ?? {}).hy ?? 1.31).build(materials, 'hand');
 
   // where the head ends up, in door coordinates
   const far = -hingeSide; // x direction of the far jamb
@@ -284,22 +290,26 @@ export function buildFigure(materials, { hingeSide = 1 } = {}) {
     // comes round the door as it opens: from behind the leaf into the gap
     // The lamp shines through the gap past the jamb: only a strip next to the door edge is lit.
     // Leaning in carries one eye out of the jamb's shadow into that strip.
-    pose.x = far * lerp(0.585, 0.57, lean);
-    pose.z = -WALL_T - lerp(0.112, 0.152, lean);
-    pose.y = 1.085 - 0.012 * lean;
+    const T = (globalThis.__fig ?? {});
+    pose.x = far * lerp(T.x0 ?? 0.6, T.x1 ?? 0.585, lean);
+    pose.z = -WALL_T - lerp(T.z0 ?? 0.13, T.z1 ?? 0.165, lean);
+    pose.y = (T.y ?? 1.2) - 0.012 * lean;
     headGroup.position.set(pose.x, pose.y, pose.z);
+    headGroup.scale.setScalar(T.k ?? 1.08);
     // face the walker, chin down, head on one side
     headGroup.rotation.set(0.16, far * -1.02, far * (0.12 + 0.1 * lean), 'YXZ');
-    bodyGroup.position.set(pose.x - far * 0.02, pose.y, pose.z - 0.02);
+    bodyGroup.position.set(pose.x - far * 0.03, pose.y, pose.z - 0.05);
     bodyGroup.rotation.set(0, far * -0.8, 0);
+    bodyGroup.scale.set(1.08, 1.15, 1.08);
   }
   set('none', 0, 0);
 
   // The rectangle a photo is drawn into (door coordinates, facing the walker) and the two
   // edges of the gap between the jamb and the leaf, over the height of the head.
   function headQuad(leafGroup, frameGroup) {
-    const w = 0.2;
-    const h = 0.27;
+    const k = headGroup.scale.x;
+    const w = 0.2 * k;
+    const h = 0.27 * k;
     const c = new THREE.Vector3(pose.x, pose.y, pose.z);
     const yaw = far * -1.02;
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));

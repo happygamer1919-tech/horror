@@ -39,26 +39,33 @@ function decal(bag, name, matrix, cx, cy, w, h, { rot = 0, zFn = null, lift = 0.
 // ends up facing the wall, the paper back faces the corridor.
 function peel(bag, frame, side, sOfX, x0, y0, w, len, { seed = 1, curl = 2.9, turn = 0, plasterTint = [1, 1, 1] } = {}) {
   const r = mulberry(seed);
-  const NU = 14;
-  const NT = 30;
+  const NU = 22;
+  const NT = 34;
   const P = [];
-  const lenAt = (u) => len * (0.55 + 0.45 * Math.pow(u, 0.8) + 0.08 * Math.sin(u * 5 + seed));
+  // It has come away on the slant: one side barely lifted, the other flopped right over, so the
+  // flap is a ragged triangle and not a tidy roll. The torn top edge is jagged.
+  const lean = r() < 0.5 ? 1 : -1;
+  const lift = (u) => (lean > 0 ? u : 1 - u);
+  const tear = (u) => 0.82 + 0.18 * fbm(u * 9 + seed, seed * 0.37, seed + 5, 3) + 0.06 * Math.sin(u * 37 + seed);
+  const lenAt = (u) => len * (0.35 + 0.65 * Math.pow(lift(u), 0.7)) * tear(u);
   for (let iu = 0; iu <= NU; iu++) {
     const u = iu / NU;
     const L = lenAt(u);
-    const yAttach = y0 + 0.05 * Math.sin(u * 3.1 + seed) + 0.1 * (1 - u) * (r() * 0 + 0.3);
+    const yAttach = y0 + 0.04 * Math.sin(u * 3.1 + seed) - 0.12 * (1 - lift(u));
     let y = yAttach;
     let z = 0.0015;
     const row = [];
-    const k = curl * (0.8 + 0.4 * u); // total turn, radians
+    const k = curl * (0.25 + 0.85 * Math.pow(lift(u), 1.3)); // total turn, radians
     for (let it = 0; it <= NT; it++) {
       const t = it / NT;
       // tangent angle from "up the wall": turns over outwards and then hangs
-      const a = k * (1 - Math.pow(1 - t, 1.7));
-      row.push([x0 + u * w + 0.02 * Math.sin(t * 2.2 + u * 2) * t, y, z + 0.004 * Math.sin(u * 9 + t * 4) * t]);
+      const a = k * (1 - Math.pow(1 - t, 1.6));
+      // creases and the cockle of old paper that has been wet
+      const crinkle = 0.007 * (fbm(u * 7 + seed, t * 5, seed + 11, 3) - 0.5) * t + 0.0025 * Math.sin(u * 23 + t * 9 + seed) * t;
+      row.push([x0 + u * w + 0.015 * Math.sin(t * 2.2 + u * 2) * t, y, z + crinkle]);
       const ds = L / NT;
       y += Math.cos(a) * ds;
-      z = Math.max(t > 0.08 ? 0.006 : 0.0015, z + Math.sin(a) * ds * (0.55 + 0.45 * u));
+      z = Math.max(t > 0.06 ? 0.005 : 0.0015, z + Math.sin(a) * ds * (0.5 + 0.3 * lift(u)));
     }
     P.push(row);
   }
@@ -74,8 +81,10 @@ function peel(bag, frame, side, sOfX, x0, y0, w, len, { seed = 1, curl = 2.9, tu
       const sx = x0 + u * w;
       const sy = y0 + (it / NT) * lenAt(u);
       uv.push(sx, sy);
-      const k = 0.75 + 0.25 * fbm(sx * 3, sy * 3, seed, 2);
-      col.push(k, k * 0.96, k * 0.86);
+      // grimy towards the torn edge, paste-stained near where it still holds
+      const t = it / NT;
+      const k = (0.72 + 0.28 * fbm(sx * 3, sy * 3, seed, 2)) * (1 - 0.35 * smooth(0.7, 1, t)) * (1 - 0.18 * smooth(0.15, 0, t));
+      col.push(k, k * 0.95, k * 0.84);
     };
     for (let iu = 0; iu < NU; iu++) {
       for (let it = 0; it < NT; it++) {
@@ -88,7 +97,13 @@ function peel(bag, frame, side, sOfX, x0, y0, w, len, { seed = 1, curl = 2.9, tu
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     g.computeVertexNormals();
-    return smoothNormals(g, 0.2);
+    const sm = smoothNormals(g, 0.2);
+    // Paper has a thickness: the print and the back are two layers 1.4 mm apart. Coincident
+    // layers would fight in the tracer (its ray offset is about a millimetre down here).
+    const sp = sm.attributes.position;
+    const sn = sm.attributes.normal;
+    for (let i = 0; i < sp.count; i++) sp.setXYZ(i, sp.getX(i) + sn.getX(i) * 0.0007, sp.getY(i) + sn.getY(i) * 0.0007, sp.getZ(i) + sn.getZ(i) * 0.0007);
+    return sm;
   };
   const place = M(rotZ(turn), frame);
   bag.add('wallpaperPeel', build(false), place);

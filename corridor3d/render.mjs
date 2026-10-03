@@ -44,6 +44,7 @@ async function boot() {
   page.on('pageerror', (e) => console.log('[page error]', e.message));
   await page.goto(`http://127.0.0.1:${port}/corridor3d/index.html`);
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
+  if (flag('fig', null)) await page.evaluate((f) => (window.__fig = f), JSON.parse(String(flag('fig'))));
   const info = await page.evaluate((o) => window.corridor.init(o), { textureSize: Number(flag('tex', 2048)) });
   console.log(`renderer: ${info.gpu}`);
   console.log(`triangles (static): ${info.triangles}`);
