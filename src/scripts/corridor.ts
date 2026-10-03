@@ -1,351 +1,552 @@
-// The corridor. A one-point-perspective hotel corridor drawn on a 2D canvas and driven by
-// scroll progress: you walk forward, the ceiling lamps fail one after another from the far
-// end towards you, and only the lamp over the last door stays on.
+// The corridor. A walk down the third floor, rendered offline (see corridor3d/) and shipped as
+// an image sequence: scroll progress picks the frame, a 2D canvas shows it. Two sets, landscape
+// and portrait, chosen by the viewport and never by the user agent.
 //
-// Once per browser session a child's silhouette stands in the corridor for about 400ms.
-// Safety: lamps only fade out (or back in when scrolling up), nothing strobes.
+// What keeps it off the main thread:
+//   - frames are fetched as blobs and decoded with createImageBitmap, off the main thread
+//   - only a small window of decoded frames around the walker is kept; the rest stay compressed
+//   - the canvas is drawn only when the frame to show changes, inside requestAnimationFrame
+//   - the backing store is never larger than the part of the frame it shows
+//   - nothing of the sequence is requested until the first input, or until the page has been
+//     idle well after load (and then only every 8th frame). One small poster loads with the page.
+//
+// Once per browser session, on the first pass, door 308 opens a hand's width while the walk
+// holds still for 625 ms. Afterwards it is a closed door like the others.
 import { ScrollTrigger } from './scroll';
 import { still, once } from './env';
+import { doorCreak } from './audio';
 
-type RGB = [number, number, number];
-
-const W = 1.5; // half width
-const H = 2.7; // ceiling height
-const EYE = 1.42;
-const END = 42; // z of the end wall
-const TRAVEL = 39.9; // how far the camera walks
-const DZ = 0.5; // shading slice depth
-const AMBIENT = 0.075;
-
-const LAMPS = Array.from({ length: 10 }, (_, k) => 2.5 + 4 * k);
-const LAST = LAMPS.length - 1;
-// Lamp k dies at this progress. Far lamps first, the wave reaches the walker near the middle.
-const failAt = (k: number) => 0.1 + (LAST - 1 - k) * 0.072;
-
-interface Door {
-  z: number;
-  side: -1 | 1;
-  no: number;
-  ajar?: boolean;
+interface Quad {
+  quad: number[][];
+  clip: number[][];
 }
-const DOORS: Door[] = [];
-for (let i = 0; i < 6; i++) {
-  DOORS.push({ z: 3 + 6.4 * i, side: -1, no: 301 + i * 2 });
-  DOORS.push({ z: 6.2 + 6.4 * i, side: 1, no: 302 + i * 2, ajar: i === 3 });
+interface ScareInfo {
+  frame: number;
+  fps: number;
+  count: number;
+  rect: [number, number, number, number];
+  has: number[];
+  quads: (Quad | null)[];
 }
-const LAST_ROOM = 313;
+interface SetInfo {
+  dir: string;
+  ext: string;
+  w: number;
+  h: number;
+  frames: number;
+  poster: string;
+  scare: ScareInfo | null;
+}
+type SetName = 'desktop' | 'mobile';
+interface Manifest {
+  sets: Partial<Record<SetName, SetInfo>>;
+}
+type Drawable = ImageBitmap | HTMLImageElement;
+interface Pick {
+  bmp: Drawable;
+  idx: number;
+  q: 'full' | 'near' | 'coarse' | 'poster';
+}
 
-const C = {
-  wallA: [98, 70, 53] as RGB,
-  wallB: [88, 62, 47] as RGB,
-  wainscot: [54, 37, 28] as RGB,
-  rail: [128, 99, 56] as RGB,
-  floor: [38, 27, 21] as RGB,
-  carpet: [124, 27, 23] as RGB,
-  carpetEdge: [150, 118, 64] as RGB,
-  motif: [82, 15, 14] as RGB,
-  ceiling: [56, 46, 40] as RGB,
-  frame: [34, 23, 17] as RGB,
-  leaf: [70, 44, 30] as RGB,
-  brass: [196, 160, 92] as RGB,
-};
-
-const SIL_AT = 0.62;
-const SIL_Z = 35.2;
-const SIL_MS = 400;
+const SCARE_KEY = 'hotel:scare';
+const KEY = 8; // every 8th frame is fetched first and kept as a small stand-in
+const STILL_AT = 0.1; // the frame shown to visitors who asked for reduced motion
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 const smooth = (a: number, b: number, v: number) => {
   const t = clamp((v - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
 };
-const shade = (c: RGB, l: number) => {
-  const k = clamp(l, 0, 1.15);
-  return `rgb(${(c[0] * k) | 0},${(c[1] * k * 0.96) | 0},${(c[2] * k * 0.9) | 0})`;
-};
+const pad = (n: number, w = 3) => String(n).padStart(w, '0');
+
+// Frame order for progressive loading: every 8th, then every 4th, every 2nd, the rest.
+function coarseOrder(n: number): number[] {
+  const seen = new Set<number>();
+  const out: number[] = [];
+  const add = (i: number) => {
+    if (i >= 0 && i < n && !seen.has(i)) {
+      seen.add(i);
+      out.push(i);
+    }
+  };
+  for (const step of [KEY, KEY / 2, KEY / 4, 1]) {
+    for (let i = 0; i < n; i += step) add(i);
+    add(n - 1);
+  }
+  return out;
+}
+
+// One image sequence: what has been fetched, what is decoded, what to show for a frame.
+class Sequence {
+  private blobs: (Blob | undefined)[];
+  private state: Uint8Array; // 0 not asked, 1 on its way, 2 here, 3 failed
+  private full = new Map<number, ImageBitmap>();
+  private small = new Map<number, ImageBitmap>();
+  private decoding = new Set<number>();
+  private order: number[];
+  private cursor = 0;
+  private active = 0;
+  private running = false;
+  private everything = false;
+  private only: number[] | null = null;
+  private centre = 0;
+  private dir = 1;
+  private dead = false;
+  loaded = 0;
+
+  constructor(
+    readonly info: SetInfo,
+    private base: string,
+    private mobile: boolean,
+    private onChange: () => void,
+    private onBroken: () => void,
+  ) {
+    this.blobs = new Array(info.frames);
+    this.state = new Uint8Array(info.frames);
+    this.order = coarseOrder(info.frames);
+  }
+
+  url(i: number) {
+    return `${this.base}${this.info.dir}/${pad(i)}.${this.info.ext}`;
+  }
+  private get ahead() {
+    return this.mobile ? 8 : 10;
+  }
+  private get behind() {
+    return this.mobile ? 3 : 5;
+  }
+
+  // Start fetching. `only`: just these frames (the still, or the idle head start).
+  start(everything: boolean, only: number[] | null = null) {
+    if (this.dead) return;
+    this.only = only;
+    if (everything) this.everything = true;
+    this.running = true;
+    this.pump();
+  }
+
+  private next(): number {
+    if (this.only) {
+      for (const i of this.only) if (this.state[i] === 0) return i;
+      if (!this.everything) return -1;
+    }
+    // 1. the coarse pass: every 8th frame, so there is always something near to show
+    while (this.cursor < this.order.length) {
+      const i = this.order[this.cursor];
+      if (this.state[i] !== 0) {
+        this.cursor++;
+        continue;
+      }
+      if (i % KEY !== 0 && i !== this.info.frames - 1) break;
+      return i;
+    }
+    if (!this.everything) return -1;
+    // 2. what the walker is about to need
+    for (let d = 0; d <= this.ahead; d++) {
+      for (const i of d === 0 ? [this.centre] : [this.centre + d * this.dir, this.centre - d * this.dir]) {
+        if (this.wanted(i) && this.state[i] === 0) return i;
+      }
+    }
+    // 3. the rest: every 4th, every 2nd, every frame
+    while (this.cursor < this.order.length) {
+      const i = this.order[this.cursor];
+      if (this.state[i] === 0) return i;
+      this.cursor++;
+    }
+    return -1;
+  }
+
+  private pump() {
+    const limit = this.mobile ? 4 : 6;
+    while (this.running && !this.dead && this.active < limit) {
+      const i = this.next();
+      if (i < 0) return;
+      this.load(i);
+    }
+  }
+
+  private load(i: number) {
+    this.state[i] = 1;
+    this.active++;
+    fetch(this.url(i))
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.blob();
+      })
+      .then((blob) => {
+        if (this.dead) return;
+        this.blobs[i] = blob;
+        this.state[i] = 2;
+        this.loaded++;
+        if (i % KEY === 0 || i === this.info.frames - 1) this.decodeSmall(i);
+        this.fill();
+        this.onChange();
+      })
+      .catch(() => {
+        this.state[i] = 3;
+      })
+      .finally(() => {
+        this.active--;
+        this.pump();
+      });
+  }
+
+  private decodeSmall(i: number) {
+    const blob = this.blobs[i];
+    if (!blob || this.small.has(i)) return;
+    createImageBitmap(blob, { resizeWidth: Math.round(this.info.w / 4), resizeHeight: Math.round(this.info.h / 4), resizeQuality: 'low' })
+      .then((bmp) => {
+        if (this.dead) return bmp.close();
+        this.small.set(i, bmp);
+        this.onChange();
+      })
+      .catch(() => {
+        // no resize option, or the format cannot be decoded here: the full-size window still works
+      });
+  }
+
+  // Tell the sequence where the walker is. Decodes around that frame, drops what fell behind.
+  focus(i: number, dir: number) {
+    this.centre = i;
+    if (dir) this.dir = dir;
+    this.fill();
+    for (const [k, bmp] of this.full) {
+      const d = (k - i) * this.dir;
+      if (d > this.ahead + 3 || d < -this.behind - 3) {
+        bmp.close();
+        this.full.delete(k);
+      }
+    }
+    this.pump();
+  }
+
+  private wanted(k: number) {
+    const d = (k - this.centre) * this.dir;
+    return k >= 0 && k < this.info.frames && d <= this.ahead && d >= -this.behind;
+  }
+
+  private fill() {
+    const limit = this.mobile ? 2 : 3;
+    for (let d = 0; d <= this.ahead && this.decoding.size < limit; d++) {
+      for (const k of d === 0 ? [this.centre] : [this.centre + d * this.dir, this.centre - d * this.dir]) {
+        if (this.decoding.size >= limit) break;
+        if (!this.wanted(k) || this.full.has(k) || this.decoding.has(k) || !this.blobs[k]) continue;
+        this.decode(k);
+      }
+    }
+  }
+
+  private decode(k: number) {
+    this.decoding.add(k);
+    createImageBitmap(this.blobs[k] as Blob)
+      .then((bmp) => {
+        this.decoding.delete(k);
+        if (this.dead || !this.wanted(k)) return bmp.close();
+        this.full.set(k, bmp);
+        this.fill();
+        this.onChange();
+      })
+      .catch(() => {
+        this.decoding.delete(k);
+        this.state[k] = 3;
+        this.onBroken();
+      });
+  }
+
+  has(i: number) {
+    return this.full.has(i);
+  }
+
+  // The best thing to show for frame i right now.
+  pick(i: number): Pick | null {
+    const exact = this.full.get(i);
+    if (exact) return { bmp: exact, idx: i, q: 'full' };
+    for (let d = 1; d <= 3; d++) {
+      for (const k of [i - d * this.dir, i + d * this.dir]) {
+        const b = this.full.get(k);
+        if (b) return { bmp: b, idx: k, q: 'near' };
+      }
+    }
+    let best: Pick | null = null;
+    for (const [k, b] of this.small) {
+      if (!best || Math.abs(k - i) < Math.abs(best.idx - i)) best = { bmp: b, idx: k, q: 'coarse' };
+    }
+    return best;
+  }
+
+  // Free the decoded window (the compressed frames stay).
+  release() {
+    for (const bmp of this.full.values()) bmp.close();
+    this.full.clear();
+  }
+
+  destroy() {
+    this.dead = true;
+    this.release();
+    for (const bmp of this.small.values()) bmp.close();
+    this.small.clear();
+  }
+}
 
 export function initCorridor() {
-  const canvas = document.querySelector<HTMLCanvasElement>('[data-corridor]');
+  const found = document.querySelector<HTMLCanvasElement>('[data-corridor]');
   const section = document.getElementById('corridor');
-  if (!canvas || !section) return;
-  const ctx = canvas.getContext('2d', { alpha: false });
-  if (!ctx) return;
+  if (!found || !section) return;
+  const canvas: HTMLCanvasElement = found;
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) return;
+  const ctx: CanvasRenderingContext2D = context;
+  let manifest: Manifest;
+  try {
+    manifest = JSON.parse(canvas.dataset.manifest ?? '');
+  } catch {
+    return;
+  }
+  const base = canvas.dataset.base ?? '';
+  // A supplied photograph of the face (build time), or the test hook that stands in for it.
+  const faceUrl = (window as unknown as { __corridorFace?: string }).__corridorFace ?? canvas.dataset.face ?? '';
   const caps = Array.from(section.querySelectorAll<HTMLElement>('[data-cap]'));
 
-  let w = 0;
-  let h = 0;
-  let f = 1;
-  let cx = 0;
-  let cy = 0;
-  let cam = 0;
-  let bobY = 0;
-  let swayX = 0;
+  const narrow = window.matchMedia('(orientation: portrait), (max-width: 760px)');
+  let avifBroken = false;
+  const choose = (): SetName => {
+    const want: SetName = narrow.matches ? 'mobile' : 'desktop';
+    if (want === 'desktop' && (avifBroken || !manifest.sets.desktop)) return 'mobile';
+    if (want === 'mobile' && !manifest.sets.mobile) return 'desktop';
+    return want;
+  };
 
-  const lamp = LAMPS.map(() => 1); // current intensity per lamp
-  let progress = still ? 0.06 : 0;
-  let drawnP = -1;
-  let silStart = 0;
-  let silDone = false;
-  let lastT = 0;
+  let setName: SetName = choose();
+  let info = manifest.sets[setName] as SetInfo;
+  if (!info) return;
+
+  // --- canvas geometry: set on resize, never read while drawing ---
+  let cw = 0;
+  let ch = 0;
+  let cssW = 0;
+  let cssH = 0;
+  let crop = { x: 0, y: 0, w: 1, h: 1 }; // the part of the frame the canvas shows, in frame pixels
+  const layout = () => {
+    if (!cssW || !cssH) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // device pixels the canvas would need, capped at the frame's own resolution
+    const s = Math.max((cssW * dpr) / info.w, (cssH * dpr) / info.h);
+    const k = Math.min(1, 1 / s);
+    cw = Math.max(1, Math.round(cssW * dpr * k));
+    ch = Math.max(1, Math.round(cssH * dpr * k));
+    if (canvas.width !== cw) canvas.width = cw;
+    if (canvas.height !== ch) canvas.height = ch;
+    const sc = Math.max(cw / info.w, ch / info.h);
+    crop = { w: cw / sc, h: ch / sc, x: (info.w - cw / sc) / 2, y: (info.h - ch / sc) / 2 };
+    drawn.idx = -2;
+  };
+
+  // --- state ---
+  let progress = 0;
+  let prevTarget = -1;
+  let shownTarget = -1; // the frame the walk is at (differs from the scroll target while catching up)
+  let dir = 1;
   let inView = false;
   let raf = 0;
+  let started = false;
+  let capsAt = -1;
+  let poster: HTMLImageElement | null = null;
+  const drawn = { idx: -2, q: '', patch: -1 };
+  let draws = 0;
 
-  const resize = () => {
-    const r = canvas.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    w = Math.round(r.width * dpr);
-    h = Math.round(r.height * dpr);
-    canvas.width = w;
-    canvas.height = h;
-    f = Math.min(w * 0.95, h * 0.78);
-    cx = w / 2;
-    cy = h * 0.5;
-    drawnP = -1;
-    kick();
+  const kick = () => {
+    if (!raf) raf = requestAnimationFrame(frame);
+  };
+  const broken = () => {
+    // a frame that would not decode: an AVIF set on a browser without AVIF. Use the other set.
+    if (info.ext !== 'avif' || avifBroken) return;
+    avifBroken = true;
+    switchSet();
+  };
+  let seq = new Sequence(info, base, setName === 'mobile', kick, broken);
+
+  // --- the scare ---
+  let scareDone = false;
+  try {
+    scareDone = Boolean(sessionStorage.getItem(SCARE_KEY));
+  } catch {
+    scareDone = false;
+  }
+  let scarePlays = 0;
+  let scareState: 'idle' | 'arming' | 'playing' = 'idle';
+  let scareStart = 0;
+  let armedAt = 0;
+  let catchUp = false;
+  let patches: (ImageBitmap | null)[] = [];
+  let patchState: 'none' | 'loading' | 'ready' | 'failed' = 'none';
+  let face: HTMLCanvasElement | null = null;
+  let faceDraws = 0;
+  canvas.dataset.scare = 'idle';
+  canvas.dataset.scarePlays = '0';
+  canvas.dataset.faceMode = faceUrl ? 'photo' : 'stand-in';
+
+  const loadPatches = () => {
+    const sc = info.scare;
+    if (!sc || patchState !== 'none') return;
+    patchState = 'loading';
+    const mine = seq;
+    const variant = faceUrl ? 'g' : 'f';
+    const jobs: Promise<ImageBitmap | null>[] = sc.has.map((has, j) =>
+      has
+        ? fetch(`${base}${info.dir}/s/${variant}-${pad(j, 2)}.${info.ext}`)
+            .then((r) => {
+              if (!r.ok) throw new Error(String(r.status));
+              return r.blob();
+            })
+            .then((b) => createImageBitmap(b))
+        : Promise.resolve(null),
+    );
+    if (faceUrl) jobs.push(prepareFace(faceUrl).then(() => null));
+    Promise.all(jobs)
+      .then((list) => {
+        if (mine !== seq) return list.forEach((b) => b?.close());
+        patches = list.slice(0, sc.count);
+        patchState = 'ready';
+        canvas.dataset.scareReady = '1';
+        kick();
+      })
+      .catch(() => {
+        patchState = 'failed';
+      });
   };
 
-  const px = (x: number, z: number) => cx + (f * (x - swayX)) / Math.max(z - cam, 0.08);
-  const py = (y: number, z: number) => cy - (f * (y - EYE - bobY)) / Math.max(z - cam, 0.08);
+  // The supplied photograph, prepared once: dark, tinted to the lamp, lit on one side only,
+  // with grain. Drawn with "lighter", so everything that is black in it stays the dark of the gap.
+  const prepareFace = (url: string) =>
+    new Promise<void>((resolve, reject) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => {
+        const W = 240;
+        const H = 324;
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        const g = c.getContext('2d');
+        if (!g) return reject(new Error('no 2d context'));
+        // cover fit
+        const s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+        const dw = img.naturalWidth * s;
+        const dh = img.naturalHeight * s;
+        if ('filter' in g) g.filter = 'grayscale(0.55) contrast(1.15) brightness(0.9)';
+        g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        if ('filter' in g) g.filter = 'none';
+        // the corridor's tungsten
+        g.globalCompositeOperation = 'multiply';
+        g.fillStyle = 'rgb(214, 170, 120)';
+        g.fillRect(0, 0, W, H);
+        // light reaches the gap past the jamb: a strip on the door-edge side, dark beyond it
+        const fall = g.createLinearGradient(0, 0, W, 0);
+        fall.addColorStop(0, 'rgb(6, 5, 4)');
+        fall.addColorStop(0.42, 'rgb(34, 28, 22)');
+        fall.addColorStop(0.62, 'rgb(170, 160, 150)');
+        fall.addColorStop(1, 'rgb(235, 230, 225)');
+        g.fillStyle = fall;
+        g.fillRect(0, 0, W, H);
+        // and falls off towards the top and the bottom of the head
+        const vert = g.createRadialGradient(W * 0.7, H * 0.45, H * 0.1, W * 0.7, H * 0.45, H * 0.62);
+        vert.addColorStop(0, 'rgb(255, 255, 255)');
+        vert.addColorStop(1, 'rgb(20, 18, 16)');
+        g.fillStyle = vert;
+        g.fillRect(0, 0, W, H);
+        g.globalCompositeOperation = 'source-over';
+        // grain, matched to the frames: fine, a little stronger in the dark
+        const data = g.getImageData(0, 0, W, H);
+        let seed = 9173;
+        for (let i = 0; i < data.data.length; i += 4) {
+          seed = (seed * 1664525 + 1013904223) >>> 0;
+          const n = ((seed >>> 16) / 65535 - 0.5) * 14;
+          data.data[i] = clamp(data.data[i] + n, 0, 255);
+          data.data[i + 1] = clamp(data.data[i + 1] + n * 0.97, 0, 255);
+          data.data[i + 2] = clamp(data.data[i + 2] + n * 0.92, 0, 255);
+        }
+        g.putImageData(data, 0, 0);
+        face = c;
+        resolve();
+      };
+      img.onerror = () => reject(new Error('face'));
+      img.src = url;
+    });
 
-  const light = (z: number) => {
-    let l = AMBIENT;
-    for (let k = 0; k < LAMPS.length; k++) {
-      const i = lamp[k];
-      if (i < 0.01) continue;
-      const reach = k === LAST ? 3.4 : 1.9;
-      const d = (z - LAMPS[k]) / reach;
-      l += (i * (k === LAST ? 1.25 : 1)) / (1 + d * d);
-    }
-    return l;
-  };
+  // frame coordinates (0..1) to canvas pixels
+  const fx = (x: number) => ((x * info.w - crop.x) * cw) / crop.w;
+  const fy = (y: number) => ((y * info.h - crop.y) * ch) / crop.h;
 
-  // A quad on a side wall: x fixed, spans z0..z1 and y0..y1.
-  const wallQuad = (x: number, z0: number, z1: number, y0: number, y1: number, fill: string) => {
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    ctx.moveTo(px(x, z0), py(y0, z0));
-    ctx.lineTo(px(x, z0), py(y1, z0));
-    ctx.lineTo(px(x, z1), py(y1, z1));
-    ctx.lineTo(px(x, z1), py(y0, z1));
-    ctx.fill();
-  };
-  // A quad on the floor or ceiling: y fixed, spans x0..x1 and z0..z1.
-  const flatQuad = (y: number, x0: number, x1: number, z0: number, z1: number, fill: string) => {
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    ctx.moveTo(px(x0, z0), py(y, z0));
-    ctx.lineTo(px(x1, z0), py(y, z0));
-    ctx.lineTo(px(x1, z1), py(y, z1));
-    ctx.lineTo(px(x0, z1), py(y, z1));
-    ctx.fill();
-  };
-
-  const drawEnd = () => {
-    const z = END;
-    const l = light(z - 0.4);
-    ctx.fillStyle = shade(C.wallA, l);
-    ctx.fillRect(px(-W, z), py(H, z), px(W, z) - px(-W, z), py(0, z) - py(H, z));
-    ctx.fillStyle = shade(C.wainscot, l);
-    ctx.fillRect(px(-W, z), py(0.9, z), px(W, z) - px(-W, z), py(0, z) - py(0.9, z));
-    // the last door
-    ctx.fillStyle = shade(C.frame, l);
-    ctx.fillRect(px(-0.62, z), py(2.18, z), px(0.62, z) - px(-0.62, z), py(0, z) - py(2.18, z));
-    ctx.fillStyle = shade(C.leaf, l);
-    ctx.fillRect(px(-0.52, z), py(2.08, z), px(0.52, z) - px(-0.52, z), py(0, z) - py(2.08, z));
-    ctx.strokeStyle = shade(C.frame, l);
-    ctx.lineWidth = Math.max(1, (f * 0.015) / (z - cam));
-    ctx.strokeRect(px(-0.36, z), py(1.92, z), px(0.36, z) - px(-0.36, z), py(1.1, z) - py(1.92, z));
-    ctx.strokeRect(px(-0.36, z), py(0.94, z), px(0.36, z) - px(-0.36, z), py(0.16, z) - py(0.94, z));
-    // plate
-    const pw = px(0.17, z) - px(-0.17, z);
-    const ph = py(1.56, z) - py(1.72, z);
-    ctx.fillStyle = shade(C.brass, Math.max(l, 0.3));
-    ctx.fillRect(px(-0.17, z), py(1.72, z), pw, ph);
-    if (ph > 5) {
-      ctx.fillStyle = '#1a120a';
-      ctx.font = `700 ${ph * 0.78}px "Playfair Display Variable", Georgia, serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(LAST_ROOM), px(0, z), py(1.64, z) + ph * 0.04);
-    }
-    // knob
-    ctx.fillStyle = shade(C.brass, Math.max(l, 0.2));
-    ctx.beginPath();
-    ctx.arc(px(0.42, z), py(1.02, z), Math.max(1, (f * 0.035) / (z - cam)), 0, Math.PI * 2);
-    ctx.fill();
-  };
-
-  const drawDoor = (d: Door) => {
-    const near = cam + 0.12;
-    const b = d.z + 1.0;
-    if (b + 0.07 <= near) return;
-    const x = d.side * (W - 0.004);
-    const l = light(d.z + 0.5);
-    const a0 = Math.max(d.z - 0.07, near);
-    const a = Math.max(d.z, near);
-    wallQuad(x, a0, b + 0.07, 0, 2.17, shade(C.frame, l));
-    if (d.ajar) {
-      // left open a hand's width: nothing but dark behind it
-      const gap = Math.max(d.z + 0.16, near);
-      wallQuad(x, a, gap, 0, 2.08, '#010101');
-      wallQuad(x, gap, b, 0, 2.08, shade(C.leaf, l * 0.8));
-    } else {
-      wallQuad(x, a, b, 0, 2.08, shade(C.leaf, l));
-    }
-    if (d.z < near) return;
-    // panels
-    ctx.strokeStyle = shade(C.frame, l);
-    ctx.lineWidth = clamp((f * 0.012) / (d.z + 0.5 - cam), 1, 6);
-    for (const [y0, y1] of [
-      [0.16, 0.94],
-      [1.1, 1.92],
-    ]) {
-      ctx.beginPath();
-      ctx.moveTo(px(x, d.z + 0.16), py(y0, d.z + 0.16));
-      ctx.lineTo(px(x, d.z + 0.16), py(y1, d.z + 0.16));
-      ctx.lineTo(px(x, b - 0.16), py(y1, b - 0.16));
-      ctx.lineTo(px(x, b - 0.16), py(y0, b - 0.16));
-      ctx.closePath();
-      ctx.stroke();
-    }
-    // knob
-    ctx.fillStyle = shade(C.brass, Math.max(l, 0.18));
-    ctx.beginPath();
-    ctx.arc(px(x, b - 0.12), py(1.02, b - 0.12), clamp((f * 0.035) / (b - 0.12 - cam), 1, 40), 0, Math.PI * 2);
-    ctx.fill();
-
-    // Number plate, mounted on the wall on the far side of the door (visible while approaching).
-    const p0 = b + 0.16;
-    const p1 = b + 0.5;
-    const top = 1.74;
-    const bot = 1.56;
-    wallQuad(x, p0, p1, bot, top, shade(C.brass, Math.max(l, 0.24)));
-    // Text: an affine fit of the plate. Near edge is on the outside of the screen.
-    const nearX = px(x, p0);
-    const farX = px(x, p1);
-    const nearTop = py(top, p0);
-    const farTop = py(top, p1);
-    const nearBot = py(bot, p0);
-    const hpx = nearBot - nearTop;
-    if (hpx < 7) return;
-    const leftIsNear = d.side < 0;
-    const ox = leftIsNear ? nearX : farX;
-    const oy = leftIsNear ? nearTop : farTop;
-    const ux = (leftIsNear ? farX - nearX : nearX - farX) / 100;
-    const uy = (leftIsNear ? farTop - nearTop : nearTop - farTop) / 100;
-    const vh = (leftIsNear ? hpx : py(bot, p1) - farTop) / 50;
+  // Draw the prepared photograph into the head quad, clipped to the gap between jamb and door.
+  // Two affine triangles stand in for the perspective: at this size the difference cannot be seen.
+  const drawFace = (q: Quad, alpha: number) => {
+    if (!face || alpha <= 0) return;
+    const P = q.quad.map(([x, y]) => [fx(x), fy(y)]);
+    const W = face.width;
+    const H = face.height;
     ctx.save();
-    ctx.transform(ux, uy, 0, vh, ox, oy);
-    ctx.fillStyle = '#1a120a';
-    ctx.font = '700 38px "Playfair Display Variable", Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(d.no), 50, 27);
+    ctx.beginPath();
+    q.clip.forEach(([x, y], i) => (i ? ctx.lineTo(fx(x), fy(y)) : ctx.moveTo(fx(x), fy(y))));
+    ctx.closePath();
+    ctx.clip();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = alpha;
+    const tri = (a: number[], b: number[], c: number[], ua: number[], ub: number[], uc: number[]) => {
+      // affine map taking the source triangle (ua, ub, uc) to (a, b, c)
+      const d = (ub[0] - ua[0]) * (uc[1] - ua[1]) - (uc[0] - ua[0]) * (ub[1] - ua[1]);
+      if (!d) return;
+      const m11 = ((b[0] - a[0]) * (uc[1] - ua[1]) - (c[0] - a[0]) * (ub[1] - ua[1])) / d;
+      const m12 = ((c[0] - a[0]) * (ub[0] - ua[0]) - (b[0] - a[0]) * (uc[0] - ua[0])) / d;
+      const m21 = ((b[1] - a[1]) * (uc[1] - ua[1]) - (c[1] - a[1]) * (ub[1] - ua[1])) / d;
+      const m22 = ((c[1] - a[1]) * (ub[0] - ua[0]) - (b[1] - a[1]) * (uc[0] - ua[0])) / d;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.lineTo(c[0], c[1]);
+      ctx.closePath();
+      ctx.clip();
+      ctx.transform(m11, m21, m12, m22, a[0] - m11 * ua[0] - m12 * ua[1], a[1] - m21 * ua[0] - m22 * ua[1]);
+      ctx.drawImage(face as HTMLCanvasElement, 0, 0);
+      ctx.restore();
+    };
+    tri(P[0], P[1], P[2], [0, 0], [W, 0], [W, H]);
+    tri(P[0], P[2], P[3], [0, 0], [W, H], [0, H]);
     ctx.restore();
+    faceDraws++;
+    canvas.dataset.faceDraws = String(faceDraws);
   };
 
-  const drawLamp = (k: number) => {
-    const z = LAMPS[k];
-    const d = z - cam;
-    if (d < 0.25) return;
-    const x = px(0, z);
-    const y = py(H - 0.03, z);
-    const rx = (f * 0.2) / d;
-    const ry = rx * clamp((H - EYE) / d, 0.1, 0.8);
-    const i = lamp[k];
-    if (i > 0.02) {
-      const g = ctx.createRadialGradient(x, y, 0, x, y, rx * 5);
-      g.addColorStop(0, `rgba(255,214,140,${0.5 * i})`);
-      g.addColorStop(0.3, `rgba(255,190,110,${0.14 * i})`);
-      g.addColorStop(1, 'rgba(255,190,110,0)');
-      ctx.fillStyle = g;
-      ctx.fillRect(x - rx * 5, y - rx * 5, rx * 10, rx * 10);
-    }
-    ctx.fillStyle = i > 0.02 ? `rgb(${(70 + 185 * i) | 0},${(60 + 166 * i) | 0},${(48 + 122 * i) | 0})` : '#2a2420';
-    ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#1a1512';
-    ctx.lineWidth = Math.max(1, rx * 0.08);
-    ctx.stroke();
-  };
-
-  // Small, still, backlit by the last lamp. No face, no detail.
-  const drawSilhouette = () => {
-    const z = SIL_Z;
-    // Already walked past where it stood: nothing to draw.
-    if (z - cam < 0.6) return;
-    const s = f / (z - cam);
-    const bx = px(0.12, z);
-    const by = py(0, z);
-    ctx.fillStyle = '#020202';
-    // legs
-    ctx.fillRect(bx - 0.07 * s, by - 0.42 * s, 0.045 * s, 0.42 * s);
-    ctx.fillRect(bx + 0.025 * s, by - 0.42 * s, 0.045 * s, 0.42 * s);
-    // dress
-    ctx.beginPath();
-    ctx.moveTo(bx - 0.19 * s, by - 0.38 * s);
-    ctx.lineTo(bx + 0.19 * s, by - 0.38 * s);
-    ctx.lineTo(bx + 0.1 * s, by - 0.93 * s);
-    ctx.lineTo(bx - 0.1 * s, by - 0.93 * s);
-    ctx.fill();
-    // arms, hanging
-    ctx.fillRect(bx - 0.15 * s, by - 0.92 * s, 0.045 * s, 0.4 * s);
-    ctx.fillRect(bx + 0.105 * s, by - 0.92 * s, 0.045 * s, 0.4 * s);
-    // head and hair
-    ctx.beginPath();
-    ctx.arc(bx, by - 1.05 * s, 0.105 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillRect(bx - 0.105 * s, by - 1.05 * s, 0.21 * s, 0.17 * s);
-  };
-
-  const draw = (now: number) => {
-    const p = progress;
-    cam = (still ? p : p * p * (3 - 2 * p) * 0.35 + p * 0.65) * TRAVEL;
-    bobY = still ? 0 : Math.sin(cam * 2.3) * 0.016;
-    swayX = still ? 0 : Math.sin(cam * 1.15) * 0.014;
-
-    ctx.fillStyle = '#040303';
-    ctx.fillRect(0, 0, w, h);
-
-    drawEnd();
-
-    const near = cam + 0.12;
-    const first = Math.floor(near / DZ);
-    const last = Math.ceil(END / DZ) - 1;
-    for (let i = last; i >= first; i--) {
-      const z0 = Math.max(i * DZ, near);
-      const z1 = (i + 1) * DZ + 0.03;
-      const l = light(i * DZ + DZ / 2);
-      const stripe = i % 2 === 0;
-      flatQuad(H, -W, W, z0, z1, shade(C.ceiling, l));
-      flatQuad(0, -W, W, z0, z1, shade(C.floor, l));
-      flatQuad(0, -0.86, 0.86, z0, z1, shade(C.carpetEdge, l * 0.8));
-      flatQuad(0, -0.78, 0.78, z0, z1, shade(C.carpet, l));
-      for (const sx of [-W, W]) {
-        wallQuad(sx, z0, z1, 0.94, H, shade(stripe ? C.wallA : C.wallB, l));
-        wallQuad(sx, z0, z1, 0, 0.9, shade(C.wainscot, l));
-        wallQuad(sx, z0, z1, 0.9, 0.95, shade(C.rail, l * 0.85));
+  // --- drawing ---
+  const paint = (p: Pick, patch: number) => {
+    const bw = 'naturalWidth' in p.bmp ? p.bmp.naturalWidth : p.bmp.width;
+    const bh = 'naturalHeight' in p.bmp ? p.bmp.naturalHeight : p.bmp.height;
+    const kx = bw / info.w;
+    const ky = bh / info.h;
+    ctx.drawImage(p.bmp, crop.x * kx, crop.y * ky, crop.w * kx, crop.h * ky, 0, 0, cw, ch);
+    const sc = info.scare;
+    if (patch >= 0 && sc) {
+      const bmp = patches[patch];
+      if (bmp) {
+        const [x, y, w, h] = sc.rect;
+        const k = cw / crop.w;
+        ctx.drawImage(bmp, (x - crop.x) * k, (y - crop.y) * k, w * k, h * k);
       }
-      // carpet motif: one diamond per metre
-      if (i % 2 === 0 && i * DZ >= near) {
-        const z = i * DZ;
-        ctx.fillStyle = shade(C.motif, light(z + 0.5));
-        ctx.beginPath();
-        ctx.moveTo(px(0, z + 0.14), py(0, z + 0.14));
-        ctx.lineTo(px(0.4, z + 0.5), py(0, z + 0.5));
-        ctx.lineTo(px(0, z + 0.86), py(0, z + 0.86));
-        ctx.lineTo(px(-0.4, z + 0.5), py(0, z + 0.5));
-        ctx.fill();
+      const q = sc.quads[patch];
+      if (face && q && bmp) {
+        // fades in with the door
+        const t = patch / (sc.count - 1);
+        drawFace(q, smooth(0.08, 0.3, t) * (1 - smooth(0.82, 0.95, t)));
       }
     }
-
-    for (let i = DOORS.length - 1; i >= 0; i--) drawDoor(DOORS[i]);
-    for (let k = LAST; k >= 0; k--) drawLamp(k);
-
-    if (silStart && now - silStart < SIL_MS) drawSilhouette();
-    drawnP = p;
+    drawn.idx = p.idx;
+    drawn.q = p.q;
+    drawn.patch = patch;
+    draws++;
+    canvas.dataset.draws = String(draws);
+    canvas.dataset.frame = String(p.idx);
+    canvas.dataset.quality = p.q;
+    canvas.dataset.patch = String(patch);
   };
 
   const setCaps = (p: number) => {
@@ -361,52 +562,157 @@ export function initCorridor() {
 
   function frame(now: number) {
     raf = 0;
-    if (!inView || document.hidden) return;
-    const dt = Math.min(0.1, (now - lastT) / 1000 || 0.016);
-    lastT = now;
+    if (!cw || (!inView && !still) || document.hidden) return;
+    const last = info.frames - 1;
+    const target = still ? Math.round(STILL_AT * last) : Math.round(progress * last);
+    canvas.dataset.target = String(target);
+    if (prevTarget >= 0 && target !== prevTarget) dir = target > prevTarget ? 1 : -1;
 
-    // lamps ease towards on/off; about 180ms for a full fade
-    let moving = false;
-    for (let k = 0; k < LAMPS.length; k++) {
-      const target = k === LAST || progress < failAt(k) ? 1 : 0;
-      if (Math.abs(lamp[k] - target) > 0.004) {
-        lamp[k] += clamp(target - lamp[k], -dt * 5.5, dt * 5.5);
-        moving = true;
-      } else lamp[k] = target;
+    // the scare: armed when the walker passes the door going forwards, for the first time this session
+    const sc = info.scare;
+    if (sc && !still && !scareDone && started) {
+      if (patchState === 'none' && target > sc.frame - 40 && target < sc.frame + 6) loadPatches();
+      if (scareState === 'idle' && patchState === 'ready' && prevTarget >= 0 && prevTarget < sc.frame && target >= sc.frame && target < last) {
+        scareState = 'arming';
+        armedAt = now;
+      }
+    }
+    let show = target;
+    let patch = -1;
+    if (sc && scareState === 'arming') {
+      show = sc.frame;
+      if (seq.has(sc.frame)) {
+        // sessionStorage decides: one play per session, whatever happens next
+        if (once(SCARE_KEY)) {
+          scareState = 'playing';
+          scareStart = now;
+          scarePlays++;
+          canvas.dataset.scarePlays = String(scarePlays);
+          canvas.dataset.scare = 'playing';
+          doorCreak(sc.count / sc.fps);
+        } else {
+          scareState = 'idle';
+        }
+        scareDone = true;
+      } else if (now - armedAt > 600) {
+        scareState = 'idle'; // the frame never arrived: let it go, the next pass may still get it
+      }
+    }
+    if (sc && scareState === 'playing') {
+      const j = Math.floor(((now - scareStart) * sc.fps) / 1000);
+      if (j >= sc.count) {
+        scareState = 'idle';
+        canvas.dataset.scare = 'done';
+        catchUp = true;
+        shownTarget = sc.frame;
+      } else {
+        show = sc.frame;
+        patch = sc.has[j] ? j : -1;
+      }
+    }
+    if (catchUp && scareState === 'idle') {
+      // walk on to where the scroll has got to, quickly but through every frame
+      const step = clamp(target - shownTarget, -3, 3);
+      shownTarget += step;
+      show = shownTarget;
+      if (shownTarget === target) catchUp = false;
+    } else if (scareState === 'idle') {
+      shownTarget = target;
     }
 
-    if (!silDone && progress >= SIL_AT && progress < SIL_AT + 0.12) {
-      silDone = true;
-      if (once('hotel:child')) silStart = now;
-    }
-    const silActive = silStart > 0 && now - silStart < SIL_MS + 40;
+    if (started) seq.focus(show, show === target ? dir : 1);
+    let p = seq.pick(show);
+    if (scareState === 'playing' && (!p || p.idx !== show)) patch = -1;
+    if (!p && poster) p = { bmp: poster, idx: -1, q: 'poster' };
+    if (p && (p.idx !== drawn.idx || p.q !== drawn.q || patch !== drawn.patch)) paint(p, patch);
 
-    if (moving || silActive || Math.abs(progress - drawnP) > 0.00015) {
-      draw(now);
+    if (!still && progress !== capsAt) {
       setCaps(progress);
+      capsAt = progress;
+    }
+    prevTarget = target;
+    canvas.dataset.loaded = String(seq.loaded);
+    if (scareState !== 'idle' || catchUp) kick();
+  }
+
+  // --- loading: nothing but the poster until the visitor does something ---
+  const loadPoster = () => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => {
+      poster = img;
+      drawn.idx = -2;
+      kick();
+    };
+    img.src = `${base}${info.poster}`;
+  };
+  const stillFrame = () => [Math.round(STILL_AT * (info.frames - 1))];
+  const begin = () => {
+    if (started) return;
+    started = true;
+    events.forEach((ev) => window.removeEventListener(ev, begin));
+    if (still) seq.start(false, stillFrame());
+    else seq.start(true);
+    kick();
+  };
+  const events = ['scroll', 'wheel', 'touchstart', 'pointerdown', 'pointermove', 'keydown'];
+  events.forEach((ev) => window.addEventListener(ev, begin, { passive: true }));
+  // No input at all: once the page has been idle for a while after load, take a head start
+  // with the coarse pass only (or the single still frame).
+  const headStart = () => {
+    if (started) return;
+    if (still) return begin();
+    seq.start(false);
+  };
+  const afterLoad = () => {
+    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    window.setTimeout(() => (ric ? ric(headStart, { timeout: 3000 }) : headStart()), 4000);
+  };
+  if (document.readyState === 'complete') afterLoad();
+  else window.addEventListener('load', afterLoad, { once: true });
+
+  function switchSet() {
+    const name = choose();
+    const next = manifest.sets[name];
+    if (!next || next === info) return;
+    seq.destroy();
+    patches.forEach((b) => b?.close());
+    patches = [];
+    patchState = 'none';
+    delete canvas.dataset.scareReady;
+    scareState = 'idle';
+    catchUp = false;
+    setName = name;
+    info = next;
+    canvas.dataset.set = setName;
+    seq = new Sequence(info, base, setName === 'mobile', kick, broken);
+    poster = null;
+    loadPoster();
+    layout();
+    if (started) {
+      if (still) seq.start(false, stillFrame());
+      else seq.start(true);
     }
     kick();
   }
-  function kick() {
-    if (!raf && !still) raf = requestAnimationFrame(frame);
-  }
+
+  canvas.dataset.set = setName;
+  loadPoster();
+  new ResizeObserver((entries) => {
+    const r = entries[0].contentRect;
+    if (!r.width || !r.height) return;
+    cssW = r.width;
+    cssH = r.height;
+    layout();
+    kick();
+  }).observe(canvas);
+  narrow.addEventListener('change', switchSet);
 
   if (still) {
-    // Static, fully lit frame. No pin, no walking.
-    const ro = new ResizeObserver(() => {
-      resize();
-      draw(0);
-    });
-    ro.observe(canvas);
-    document.fonts?.ready.then(() => draw(0));
+    // one frame, no pin, no walk, no scare
+    canvas.dataset.scare = 'off';
     return;
   }
-
-  new ResizeObserver(resize).observe(canvas);
-  document.fonts?.ready.then(() => {
-    drawnP = -1;
-    kick();
-  });
 
   ScrollTrigger.create({
     trigger: section,
@@ -418,11 +724,11 @@ export function initCorridor() {
     },
     onToggle: () => kick(),
   });
-
   new IntersectionObserver(
     (e) => {
       inView = e[0].isIntersecting;
       if (inView) kick();
+      else seq.release(); // the decoded window goes while the corridor is off screen
     },
     { rootMargin: '20% 0px' },
   ).observe(section);

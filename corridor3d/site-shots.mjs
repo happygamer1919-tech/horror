@@ -19,7 +19,7 @@ const sizes = [
   { w: 390, h: 844, dpr: 2, mobile: true },
   { w: 1440, h: 900, dpr: 1, mobile: false },
 ];
-const POINTS = [0.02, 0.17, 0.36, 0.52, 0.76, 0.99];
+const POINTS = [0.02, 0.17, 0.36, 0.6, 0.86, 0.99]; // each inside a caption, not on a fade
 
 const toFrame = (page, i, n) =>
   page.evaluate(

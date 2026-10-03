@@ -1,16 +1,30 @@
 ---
 import type { Lang } from '../config';
 import { copy } from '../content';
+import manifest from '../../public/corridor/manifest.json';
 
 interface Props {
   lang: Lang;
 }
 const t = copy[Astro.props.lang];
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+// Optional photograph for the face behind door 308: src/assets/scare/face.(avif|webp|png).
+// While there is no file the frames rendered with the stand-in are used. See the README there.
+const faces = import.meta.glob<string>('../assets/scare/face.{avif,webp,png}', { eager: true, query: '?url', import: 'default' });
+const face = Object.values(faces)[0] ?? '';
 ---
 
 <section class="corr" id="corridor" data-dark="0.2" aria-labelledby="corridor-title">
   <div class="corr__pin">
-    <canvas class="corr__canvas" data-corridor role="img" aria-label={t.corridor.alt}></canvas>
+    <canvas
+      class="corr__canvas"
+      data-corridor
+      data-base={`${base}/corridor/`}
+      data-manifest={JSON.stringify(manifest)}
+      data-face={face || undefined}
+      role="img"
+      aria-label={t.corridor.alt}></canvas>
     <div class="corr__head wrap">
       <p class="place"><span class="place__no">02</span><span>{t.places.corridor}</span></p>
       <h2 class="corr__title" id="corridor-title">{t.corridor.title}</h2>
@@ -22,10 +36,11 @@ const t = copy[Astro.props.lang];
 </section>
 
 <style>
-  /* Pinned with position: sticky, which survives mobile address-bar resizes. */
+  /* Pinned with position: sticky, which survives mobile address-bar resizes.
+     The height sets the walking pace: about 25 m of corridor over 4.6 screens of scroll. */
   .corr {
     position: relative;
-    height: 420vh;
+    height: 560vh;
     background: #050404;
   }
   .corr__pin {
@@ -40,15 +55,16 @@ const t = copy[Astro.props.lang];
     inset: 0;
     width: 100%;
     height: 100%;
+    background: #050404;
   }
-  /* Edge darkness, so the corridor never looks like a flat render. */
+  /* Darkness behind the heading and the captions, so the text stays readable over the frames. */
   .corr__pin::after {
     content: '';
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse at center, transparent 35%, rgba(5, 4, 4, 0.78) 100%),
-      linear-gradient(rgba(5, 4, 4, 0.75), transparent 22%, transparent 62%, rgba(5, 4, 4, 0.9));
+      radial-gradient(ellipse at center, transparent 55%, rgba(5, 4, 4, 0.4) 100%),
+      linear-gradient(rgba(5, 4, 4, 0.72), transparent 24%, transparent 56%, rgba(5, 4, 4, 0.86));
     pointer-events: none;
   }
   .corr__head {
@@ -102,7 +118,7 @@ const t = copy[Astro.props.lang];
     overflow: visible;
   }
   :global(html:not(.motion)) .corr__pin::after {
-    display: none;
+    background: linear-gradient(rgba(5, 4, 4, 0.78), transparent 24vh);
   }
   :global(html:not(.motion)) .corr__canvas {
     position: relative;

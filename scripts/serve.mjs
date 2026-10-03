@@ -17,6 +17,9 @@ const types = {
   '.txt': 'text/plain; charset=utf-8',
   '.json': 'application/json',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
 };
 
 createServer(async (req, res) => {

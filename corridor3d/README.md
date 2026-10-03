@@ -22,7 +22,7 @@ dev dependency of the render pipeline only and never reaches the browser bundle.
 
 ```
 npm run corridor:fetch      # once: about 16 MB of CC0 textures at 1k (-- --res=2k for sharper wood up close)
-npm run corridor:render     # both walks and the scare frames, about 2.5 hours on an Apple M5
+npm run corridor:render     # both walks and the scare frames, about 2 hours on an Apple M5 (nothing else on the GPU)
 npm run corridor:encode     # writes public/corridor/
 ```
 
@@ -83,9 +83,25 @@ Things the tracer needed:
 | Frame | 1600 x 900 | 720 x 1440 |
 | Lens | 43.5 degrees vertical, about 26 mm | 80 degrees vertical, so floor, both walls and the lamps fit a phone |
 | Frames | 168 | 112 |
-| Format | AVIF | WebP |
+| Render time | about 25 s a frame, 72 min | about 20 s a frame, 37 min |
+| Format | AVIF, quality 56 | WebP, quality 56 |
 
 They are two renders with their own cameras, not one render cropped.
+
+Choosing the formats (measured on rendered frames, sharp encoders, decode timed with
+`createImageBitmap` in desktop Chromium):
+
+| Frame | AVIF q40 | AVIF q56 | WebP q60 | WebP q70 |
+|---|---|---|---|---|
+| desktop, lit (045) | 24 KB, 37.0 dB | 52 KB, 38.5 dB | 44 KB, 36.9 dB | 51 KB, 37.3 dB |
+| desktop, dark (080) | 18 KB, 38.4 dB | 38 KB, 39.8 dB | 28 KB, 38.0 dB | 34 KB, 38.4 dB |
+| mobile (003) | 16 KB, 37.0 dB | 35 KB, 38.6 dB | 29 KB, 36.8 dB | 34 KB, 37.3 dB |
+
+At the same PSNR AVIF is about 45 % smaller, and up close it keeps the wallpaper and the grain
+where WebP smears them, so the desktop set is AVIF. Decoding took 4 to 5 ms for AVIF and 3 to
+5 ms for WebP here; on a phone the gap is wider, and iOS before 16 cannot decode AVIF at all.
+The phone set is therefore WebP, which every phone decodes, and fast. A desktop browser
+without AVIF gets the phone set (the scrubber switches when a frame fails to decode).
 
 ## The scare
 
@@ -97,10 +113,10 @@ door edge, which is where one eye is.
 The stand-in behind the door is a child of about ten: a displaced head with sunken, half-lidded
 eyes, lank wet hair as about 200 thin strands that hang across one side of the face, a dark
 nightdress that stays in the shadow of the leaf, and four fingers hooked round the free edge of
-the door beside the face, nails bitten short. Only the strip of lamp light that comes through
-the gap reaches it. On screen the face is about 25 px wide on desktop and 35 px on a phone, and it
-is there for half a second: it is built to read as a pale face and one eye in the dark, not to
-survive a close look.
+the door above the face, nails bitten short. Only the strip of lamp light that comes through
+the gap reaches it. On screen the visible part of the face is about 35 px wide on a desktop and
+20 px on a phone, and it is there for half a second: it is built to read as a pale face and one
+eye in the dark, not to survive a close look.
 
 The scare plays in real time (15 frames at 24 fps, 625 ms) over a walk frame that is held
 still. The scare frames are full renders from that held camera with the same seed and sample

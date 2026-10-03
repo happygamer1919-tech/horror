@@ -25,7 +25,7 @@ const exists = (p) => stat(p).then(() => true, () => false);
 // than WebP at the same quality). Mobile: WebP, which phones decode faster.
 const FORMAT = {
   desktop: { ext: 'avif', encode: (img) => img.avif({ quality: 56, effort: 7, chromaSubsampling: '4:2:0' }) },
-  mobile: { ext: 'webp', encode: (img) => img.webp({ quality: 60, effort: 6, smartSubsample: true }) },
+  mobile: { ext: 'webp', encode: (img) => img.webp({ quality: 56, effort: 6, smartSubsample: true }) },
 };
 const POSTER = { desktop: [640, 360], mobile: [360, 720] };
 
@@ -106,9 +106,19 @@ async function patchRect(dir, w, h) {
   return { x: x0, y: y0, w: x1 - x0 + ((x1 - x0) % 2), h: y1 - y0 + ((y1 - y0) % 2), hold };
 }
 
+// The patch is laid over the shipped walk frame, so its feathered edge must blend into that
+// frame and not into the held render. The two are the same picture, but they need not carry
+// exactly the same noise (they come from different runs), and a patch edge that changes the
+// grain would show as a rectangle while the door moves.
+async function withBase(rect, file) {
+  if (!(await exists(file))) return rect;
+  return { ...rect, base: await sharp(file).removeAlpha().raw().toBuffer() };
+}
+
 async function patch(dir, file, rect, w, h) {
   const img = await sharp(join(dir, file)).removeAlpha().raw().toBuffer();
-  const { x, y, hold } = rect;
+  const { x, y } = rect;
+  const hold = rect.base ?? rect.hold;
   const pw = Math.min(rect.w, w - x);
   const ph = Math.min(rect.h, h - y);
   const out = Buffer.alloc(pw * ph * 3);
@@ -172,7 +182,8 @@ for (const [set, def] of Object.entries(SETS)) {
   let scount = 0;
   if (await exists(join(sdir, 'meta.json'))) {
     const meta = JSON.parse(await readFile(join(sdir, 'meta.json'), 'utf8'));
-    const rect = await patchRect(sdir, def.w, def.h);
+    const found = await patchRect(sdir, def.w, def.h);
+    const rect = found && (await withBase(found, join(src, `${pad(meta.index)}.png`)));
     if (rect) {
       const has = { face: [], gap: [] };
       for (const variant of ['face', 'gap']) {

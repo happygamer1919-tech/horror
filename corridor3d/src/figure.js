@@ -1,5 +1,5 @@
-// Whoever is behind door 308: a child's face low in the gap, hair hanging over half of it,
-// and four fingers round the edge of the door. This is the stand-in used until a real photo
+// Whoever is behind door 308: a child's face in the gap, lank hair hanging over one side of it,
+// and four fingers round the edge of the door just above it. This is the stand-in used until a real photo
 // is supplied in src/assets/scare/ (see the README there): mostly darkness on purpose.
 //
 // The head lives in door coordinates (x along the wall, y up, z out into the corridor);
