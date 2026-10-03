@@ -45,8 +45,8 @@ export const LAMP_Y = CH - LAMP_DROP;
 
 // Camera position (s) at which each lamp dies. Far lamps first; the wave reaches the walker
 // just after the scare door (lamp 4 hangs in front of it and is still alight while the door
-// opens), then runs on behind him.
-export const FAIL_AT = { 6: 2.4, 5: 5.2, 4: 16.95, 3: 17.4, 2: 17.8, 1: 18.2, 0: 18.6 };
+// opens, and while the walker turns back to the corridor), then runs on behind him.
+export const FAIL_AT = { 6: 2.4, 5: 5.2, 4: 17.35, 3: 17.7, 2: 18.05, 1: 18.4, 0: 18.75 };
 export const FADE_LEN = 0.55; // metres of walking a lamp takes to die
 
 export const WALK_FROM = 0.35;
@@ -62,6 +62,8 @@ const bump = (c, w, v) => {
   const t = clamp(1 - Math.abs(v - c) / w, 0, 1);
   return t * t * (3 - 2 * t);
 };
+// The same, with its own width on either side of the peak.
+const bump2 = (c, before, after, v) => bump(c, v < c ? before : after, v);
 
 // Walk progress 0..1 to distance. Constant pace, slowing to a stop in front of the last door.
 const KNEE = 0.8;
@@ -91,7 +93,7 @@ export function swing(s) {
 }
 
 // Exposure in stops relative to the lit corridor: the eye opens up when the lamps are gone.
-export const exposureStops = (s) => 0.25 * smooth(5, 8, s) + 3.0 * smooth(16.95, 19.3, s) - 2.45 * smooth(20.6, 25.7, s);
+export const exposureStops = (s) => 0.25 * smooth(5, 8, s) + 3.0 * smooth(17.3, 19.5, s) - 2.3 * smooth(20.6, 25.7, s);
 
 // Camera pose. Slow sway and bob (long periods: frames are 15 to 25 cm apart, a real 0.7 m
 // stride would alias into a shake), and small glances at the things worth seeing.
@@ -109,12 +111,16 @@ export function cameraPose(s, set) {
   // the scratched door hanging open on the left: look at it, then walk round it
   yaw += 0.1 * bump(9.0, 1.6, s);
   x += 0.4 * bump(10.7, 2.7, s);
-  // drift left and turn the head to door 308 before it moves: the gap must be near the middle
-  // of the picture when it opens. The tall phone frame is narrow, so it turns further.
+  // drift towards the right wall and turn the head to door 308 before it moves. On the wide
+  // frame the door stays at the side and the corridor stays the subject; the tall phone frame is
+  // narrow, so it turns further and the gap is near the middle. After the door has shut the head
+  // comes back to the corridor quickly, before the lamp over it dies: never a dark wall filling
+  // the picture.
   const L = globalThis.__look308 ?? {};
-  x += (L.x ?? 0.22) * bump(L.xc ?? 16.6, L.xw ?? 2.6, s);
-  yaw -= (mobile ? (L.ym ?? 0.74) : (L.yd ?? 0.46)) * bump(L.c ?? 16.75, L.w ?? 2.4, s);
-  pitch -= (mobile ? (L.pm ?? 0.06) : (L.pd ?? 0.03)) * bump(L.c ?? 16.75, L.w ?? 2.4, s);
+  x += (L.x ?? 0.22) * bump2(L.xc ?? 16.6, L.xw ?? 2.6, L.xa ?? 1.4, s);
+  const look = bump2(L.c ?? 16.75, L.w ?? 2.4, L.wa ?? 1.0, s);
+  yaw -= (mobile ? (L.ym ?? 0.74) : (L.yd ?? 0.25)) * look;
+  pitch -= (mobile ? (L.pm ?? 0.06) : (L.pd ?? 0.03)) * look;
   // the line of light under 311, low on the left
   yaw += 0.05 * bump(21.6, 1.5, s);
   pitch -= 0.03 * bump(21.6, 1.5, s);
@@ -159,4 +165,4 @@ export const scareLean = (j) => smooth(0.12, 0.55, j / (SCARE_FRAMES - 1));
 // from this in figure.js, to aim the face and put the catchlight in the eye).
 export const scareEye = (set) => cameraPose(frameS(set, scareFrameIndex(set)), set);
 
-export { clamp, smooth, bump };
+export { clamp, smooth, bump, bump2 };

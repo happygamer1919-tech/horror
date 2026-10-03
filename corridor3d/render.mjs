@@ -99,7 +99,7 @@ if (mode === 'preview') {
     const scare = flag('scare', null);
     const written = new Set();
     for (const index of list) {
-      const opts = { set, index, scale, samples };
+      const opts = { set, index, scale, samples, ...JSON.parse(String(flag('opts', '{}'))) };
       if (flag('nodenoise', false)) opts.denoise = false;
       if (flag('cam', null)) {
         // --cam=x,y,s,tx,ty,ts[,fov] --at=<walker s for the lamp state> --name=<file>

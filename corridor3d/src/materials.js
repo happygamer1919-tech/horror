@@ -18,14 +18,14 @@ export function makeMaterials(T) {
   };
   const m = {};
 
-  // Wallpaper: printed tile 1.06 m; the embossed, bubbled surface comes from the photographed wall (2.5 m).
+  // Wallpaper: a regency stripe, two 53 cm lengths to the tile (surfaces.js).
   m.wallpaper = sized(
     P({
       map: T.wallpaper,
-      normalMap: rep(T.decrepit_wallpaper.normalMap, 1.06 / 2.5),
-      roughnessMap: rep(T.decrepit_wallpaper.roughnessMap, 1.06 / 2.5),
-      normalScale: new THREE.Vector2(0.9, 0.9),
-      roughness: 0.92,
+      normalMap: T.wallpaperNormal,
+      roughnessMap: T.wallpaperRough,
+      normalScale: new THREE.Vector2(1, 1),
+      roughness: 1,
       vertexColors: true,
     }),
     [1.06, 1.06],
@@ -40,25 +40,26 @@ export function makeMaterials(T) {
     [1.8, 1.8],
   );
 
-  // Wainscot: worn vertical boards, 1.0 x 0.5 m tile.
+  // Wainscot: book-matched walnut veneer panels under amber lacquer, two to the 1.2 m tile.
+  // (Clearcoat renders black in this tracer: the lacquer is a low roughness on the wood itself.)
   m.wainscot = sized(
     P({
-      map: T.wood_cabinet_worn_long.map,
-      normalMap: T.wood_cabinet_worn_long.normalMap,
-      roughnessMap: T.wood_cabinet_worn_long.roughnessMap,
-      color: new THREE.Color(0.4, 0.47, 0.56),
-      roughness: 0.82,
+      map: T.wainscot,
+      normalMap: T.wainscotNormal,
+      roughnessMap: T.wainscotRough,
+      normalScale: new THREE.Vector2(1, 1),
+      roughness: 1,
       vertexColors: true,
     }),
-    [1.0, 0.5],
+    [1.2, 1.2],
   );
   // Trim: skirting, dado rail, architraves, door linings. Grain along the piece.
   m.trim = sized(
     P({
-      map: T.dark_wood.map,
+      map: T.trimWood,
       normalMap: T.dark_wood.normalMap,
       roughnessMap: T.dark_wood.roughnessMap,
-      color: new THREE.Color(0.5, 0.54, 0.6),
+      color: new THREE.Color(0.52, 0.5, 0.5),
       roughness: 0.75,
       vertexColors: true,
     }),
@@ -68,9 +69,9 @@ export function makeMaterials(T) {
   // Door leaves: dark varnished veneer, grain vertical.
   m.door = sized(
     P({
-      map: T.oak_veneer_01.map,
+      map: T.doorWood,
       normalMap: T.oak_veneer_01.normalMap,
-      color: new THREE.Color(0.25, 0.165, 0.12), // walnut veneer under forty years of varnish and hands
+      color: new THREE.Color(0.23, 0.165, 0.125), // walnut veneer under forty years of varnish and hands
       roughness: 0.5,
       vertexColors: true,
     }),
@@ -82,10 +83,10 @@ export function makeMaterials(T) {
   );
   m.floor = sized(
     P({
-      map: T.wood_floor_worn.map,
+      map: T.floorWood,
       normalMap: T.wood_floor_worn.normalMap,
       roughnessMap: T.wood_floor_worn.roughnessMap,
-      color: new THREE.Color(0.36, 0.3, 0.26),
+      color: new THREE.Color(0.4, 0.36, 0.32),
       roughness: 1,
       vertexColors: true,
     }),

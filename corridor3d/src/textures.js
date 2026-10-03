@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { mulberry, fbm, noise2, clamp, smooth } from './util.js';
 import { DOORS, LAST_ROOM } from './layout.js';
+import { wallpaper, wainscot, runner, graded } from './surfaces.js';
 
 const BASE = '/corridor3d/textures';
 
@@ -65,212 +66,16 @@ function heightToNormal(src, strength = 2, wrap = true) {
   return out;
 }
 
-// Draw an image tiled n times over a canvas.
-function tile(ctx, img, n, size) {
-  const d = size / n;
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) ctx.drawImage(img, x * d, y * d, d, d);
-}
-
-// --- wallpaper: two 53 cm lengths of striped paper with a small printed ornament ------------
-function wallpaper(grunge, S) {
-  const c = canvas(S);
-  const g = c.getContext('2d');
-  g.fillStyle = 'rgb(154,146,112)';
-  g.fillRect(0, 0, S, S);
-  // a woven ground: faint vertical ribbing
-  for (let x = 0; x < S; x += 4) {
-    g.fillStyle = `rgba(90,82,52,${0.03 + 0.03 * ((x / 4) % 3)})`;
-    g.fillRect(x, 0, 1.5, S);
-  }
-  // damask: tone on tone, a half-drop repeat of 26.5 x 35 cm
-  const k = S / 2048;
-  const motif = (cx, cy) => {
-    g.save();
-    g.translate(cx, cy);
-    g.scale(k * 1.5, k * 1.5);
-    const body = 'rgba(112,104,70,0.62)';
-    const line = 'rgba(196,184,134,0.4)';
-    g.fillStyle = body;
-    g.strokeStyle = line;
-    g.lineWidth = 2;
-    const leaf = (sx, sy) => {
-      g.beginPath();
-      g.moveTo(0, sy * 20);
-      g.bezierCurveTo(sx * 26, sy * 30, sx * 62, sy * 48, sx * 66, sy * 92);
-      g.bezierCurveTo(sx * 46, sy * 74, sx * 30, sy * 70, sx * 12, sy * 84);
-      g.bezierCurveTo(sx * 18, sy * 60, sx * 10, sy * 40, 0, sy * 20);
-      g.fill();
-      g.stroke();
-      // the curl at the tip
-      g.beginPath();
-      g.arc(sx * 60, sy * 100, 9, 0, Math.PI * 2);
-      g.fill();
-    };
-    // central pointed oval with a pale heart
-    g.beginPath();
-    g.moveTo(0, -112);
-    g.bezierCurveTo(40, -62, 40, 62, 0, 112);
-    g.bezierCurveTo(-40, 62, -40, -62, 0, -112);
-    g.fill();
-    g.stroke();
-    for (const sx of [-1, 1]) for (const sy of [-1, 1]) leaf(sx, sy);
-    g.fillStyle = 'rgba(176,166,124,0.7)';
-    g.beginPath();
-    g.moveTo(0, -58);
-    g.bezierCurveTo(17, -26, 17, 26, 0, 58);
-    g.bezierCurveTo(-17, 26, -17, -26, 0, -58);
-    g.fill();
-    g.fillStyle = body;
-    g.beginPath();
-    g.arc(0, 0, 7, 0, Math.PI * 2);
-    g.fill();
-    // crown and foot
-    for (const sy of [-1, 1]) {
-      g.beginPath();
-      g.moveTo(0, sy * 112);
-      g.lineTo(9, sy * 130);
-      g.lineTo(0, sy * 152);
-      g.lineTo(-9, sy * 130);
-      g.closePath();
-      g.fill();
-    }
-    g.restore();
-  };
-  const cols = 4;
-  const rows = 3;
-  for (let i = 0; i < cols; i++) {
-    for (let j = -1; j <= rows; j++) motif((i + 0.5) * (S / cols), (j + 0.5 + (i % 2 ? 0.5 : 0)) * (S / rows));
-  }
-  // small diamonds between the motifs
-  g.fillStyle = 'rgba(112,104,70,0.5)';
-  for (let i = 0; i < cols; i++) {
-    for (let j = -1; j <= rows; j++) {
-      const x = i * (S / cols);
-      const y = (j + 0.5 + (i % 2 ? 0 : 0.5)) * (S / rows) + S / rows / 4;
-      g.beginPath();
-      g.moveTo(x, y - 14 * k);
-      g.lineTo(x + 9 * k, y);
-      g.lineTo(x, y + 14 * k);
-      g.lineTo(x - 9 * k, y);
-      g.fill();
-    }
-  }
-  // age: the photographed wall, multiplied in
-  g.globalCompositeOperation = 'multiply';
-  g.filter = 'brightness(1.7) contrast(1.1) saturate(0.7)';
-  tile(g, grunge, 1, S);
-  g.filter = 'none';
-  g.globalCompositeOperation = 'source-over';
-  // seams between the lengths of paper: the butt joint has opened a little and one edge has
-  // lifted, so it catches the light on one side and holds dirt on the other
-  for (const x of [0, S / 2]) {
-    g.fillStyle = 'rgba(34,28,16,0.55)';
-    g.fillRect(x - 1.5, 0, 3 * k + 1.5, S);
-    g.fillStyle = 'rgba(214,202,160,0.28)';
-    g.fillRect(x + 3 * k, 0, 4 * k, S);
-    g.fillStyle = 'rgba(60,50,30,0.16)';
-    g.fillRect(x - 14 * k, 0, 12 * k, S);
-  }
-  return c;
-}
-
-// --- carpet runner: 1.2 m wide, borders on both edges, a lattice in the field ----------------
-function runner(pile, S) {
-  const c = canvas(S);
-  const g = c.getContext('2d');
-  g.fillStyle = 'rgb(86,33,31)';
-  g.fillRect(0, 0, S, S);
-  const u = S / 1.2; // pixels per metre
-  g.filter = `blur(${S / 1400}px)`; // dye bleeds into the pile, nothing printed stays crisp
-  // field lattice: 20 cm diamonds with a small flower
-  const step = S / 6;
-  for (let j = -1; j <= 6; j++) {
-    for (let i = 1; i <= 5; i++) {
-      const off = i % 2 ? step / 2 : 0;
-      const cx = i * step;
-      const cy = j * step + off + step / 2;
-      g.save();
-      g.translate(cx, cy);
-      g.strokeStyle = 'rgba(52,12,16,0.85)';
-      g.lineWidth = 0.012 * u;
-      g.beginPath();
-      g.moveTo(0, -step / 2);
-      g.lineTo(step / 2, 0);
-      g.lineTo(0, step / 2);
-      g.lineTo(-step / 2, 0);
-      g.closePath();
-      g.stroke();
-      g.fillStyle = 'rgba(150,120,66,0.75)';
-      for (let p = 0; p < 4; p++) {
-        g.rotate(Math.PI / 2);
-        g.beginPath();
-        g.ellipse(0, -0.022 * u, 0.009 * u, 0.02 * u, 0, 0, Math.PI * 2);
-        g.fill();
-      }
-      g.fillStyle = 'rgba(40,10,14,0.9)';
-      g.beginPath();
-      g.arc(0, 0, 0.008 * u, 0, Math.PI * 2);
-      g.fill();
-      g.restore();
-    }
-  }
-  // borders
-  for (const side of [0, 1]) {
-    g.save();
-    if (side) {
-      g.translate(S, 0);
-      g.scale(-1, 1);
-    }
-    const bw = 0.135 * u;
-    g.fillStyle = 'rgb(38,14,20)';
-    g.fillRect(0, 0, bw, S);
-    g.fillStyle = 'rgb(138,110,60)';
-    g.fillRect(0.012 * u, 0, 0.007 * u, S);
-    g.fillRect(bw - 0.019 * u, 0, 0.007 * u, S);
-    g.fillStyle = 'rgb(86,33,31)';
-    g.fillRect(0.03 * u, 0, bw - 0.06 * u, S);
-    // running key in the border
-    g.strokeStyle = 'rgb(138,110,60)';
-    g.lineWidth = 0.007 * u;
-    const n = 12;
-    const d = S / n;
-    for (let j = 0; j < n; j++) {
-      const y = j * d;
-      const x0 = 0.045 * u;
-      const x1 = bw - 0.045 * u;
-      g.beginPath();
-      g.moveTo(x0, y);
-      g.lineTo(x0, y + d * 0.7);
-      g.lineTo(x1, y + d * 0.7);
-      g.lineTo(x1, y + d * 0.25);
-      g.lineTo((x0 + x1) / 2, y + d * 0.25);
-      g.stroke();
-    }
-    // bound edge
-    g.fillStyle = 'rgb(24,10,12)';
-    g.fillRect(0, 0, 0.008 * u, S);
-    g.restore();
-  }
-  // pile and dirt from the photographed carpet, desaturated so it only carries the weave
-  g.filter = 'none';
-  g.globalCompositeOperation = 'multiply';
-  g.filter = 'grayscale(1) brightness(3.1) contrast(1.15)';
-  tile(g, pile, 2, S);
-  g.filter = 'none';
-  g.globalCompositeOperation = 'source-over';
-  return c;
-}
-
 // --- decal atlas ----------------------------------------------------------------------------------
-// 4 x 4 cells. Each entry returns the UV rectangle of its cell.
-export const ATLAS = { n: 4 };
+// 5 x 5 cells. Each entry returns the UV rectangle of its cell.
+export const ATLAS = { n: 5 };
 export const cell = (i) => {
   const n = ATLAS.n;
   const x = i % n;
   const y = Math.floor(i / n);
   return { u0: x / n, v0: 1 - (y + 1) / n, u1: (x + 1) / n, v1: 1 - y / n };
 };
-export const DECAL = { blood1: 0, blood2: 1, blood3: 2, water1: 3, water2: 4, water3: 5, grime1: 6, grime2: 7, gouge1: 8, gouge2: 9, plaster1: 10, plaster2: 11, stain1: 12, stain2: 13, drip1: 14, paste: 15 };
+export const DECAL = { blood1: 0, blood2: 1, blood3: 2, water1: 3, water2: 4, water3: 5, grime1: 6, grime2: 7, gouge1: 8, gouge2: 9, plaster1: 10, plaster2: 11, stain1: 12, stain2: 13, drip1: 14, paste: 15, ghost: 16, scuff: 17, rub: 18 };
 
 function blob(g, R, cx, cy, r, rough, seed, fill) {
   // an irregular closed shape
@@ -289,10 +94,12 @@ function blob(g, R, cx, cy, r, rough, seed, fill) {
   g.fill();
 }
 
-function decalAtlas(plaster, S) {
+function decalAtlas(plaster, size) {
+  // whole pixels per cell: the painters below address pixels as y * C + x
+  const C = Math.floor(size / ATLAS.n);
+  const S = C * ATLAS.n;
   const c = canvas(S);
   const g = c.getContext('2d');
-  const C = S / ATLAS.n;
   const R = mulberry(4021);
   const inCell = (i, fn) => {
     const x = (i % ATLAS.n) * C;
@@ -554,6 +361,78 @@ function decalAtlas(plaster, S) {
     }
     g.filter = 'none';
   });
+
+  // Where a picture hung for twenty years: the paper under it kept its colour, the paper round
+  // it went brown; dust settled along the top of the frame; the nail is gone, its hole is not.
+  inCell(DECAL.ghost, () => {
+    const x0 = C * 0.14;
+    const y0 = C * 0.2;
+    const w = C * 0.72;
+    const h = C * 0.56;
+    g.filter = `blur(${C * 0.006}px)`;
+    g.fillStyle = 'rgba(188,176,136,0.42)';
+    g.fillRect(x0, y0, w, h);
+    g.fillStyle = 'rgba(40,32,20,0.35)';
+    g.fillRect(x0 - C * 0.004, y0 - C * 0.012, w + C * 0.008, C * 0.014);
+    g.fillStyle = 'rgba(40,32,20,0.16)';
+    g.fillRect(x0 - C * 0.006, y0, C * 0.01, h);
+    g.fillRect(x0 + w - C * 0.004, y0, C * 0.01, h);
+    g.filter = 'none';
+    g.fillStyle = 'rgba(16,12,8,0.9)';
+    g.beginPath();
+    g.arc(C * 0.5, y0 - C * 0.07, C * 0.0055, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(120,108,80,0.5)';
+    g.beginPath();
+    g.arc(C * 0.5, y0 - C * 0.07, C * 0.011, 0, Math.PI * 2);
+    g.fill();
+  });
+
+  // Scuffs on lacquered wood at shoe and suitcase height: black rubber streaks, and pale
+  // scratches where the lacquer has been cut and the wood under it shows.
+  inCell(DECAL.scuff, () => {
+    const r = mulberry(1717);
+    g.lineCap = 'round';
+    for (let i = 0; i < 26; i++) {
+      const x = C * (0.05 + 0.75 * r());
+      const y = C * (0.3 + 0.55 * r());
+      const len = C * (0.05 + 0.2 * r());
+      const tilt = (r() - 0.5) * 0.25;
+      const pale = r() < 0.35;
+      g.strokeStyle = pale ? `rgba(150,124,96,${0.35 + 0.3 * r()})` : `rgba(10,8,7,${0.25 + 0.4 * r()})`;
+      g.lineWidth = C * (pale ? 0.002 + 0.003 * r() : 0.004 + 0.012 * r());
+      g.beginPath();
+      g.moveTo(x, y);
+      g.quadraticCurveTo(x + len * 0.5, y + len * tilt + (r() - 0.5) * C * 0.01, x + len, y + len * tilt * 1.6);
+      g.stroke();
+    }
+  });
+
+  // Varnish rubbed through by forty years of hands: paler, greyer wood in a soft patch, streaked
+  // the way a hand moves, with a greasy dark rim where the dirt collects at its edge.
+  inCell(DECAL.rub, () => {
+    const img = g.createImageData(C, C);
+    for (let y = 0; y < C; y++) {
+      for (let x = 0; x < C; x++) {
+        const dx = x / C - 0.5;
+        const dy = y / C - 0.5;
+        const n = fbm(x / C * 4, y / C * 4, 1801, 4);
+        const d = Math.hypot(dx * 1.2, dy) * 2 + 0.5 * (n - 0.5);
+        const streak = 0.85 + 0.15 * fbm(x / C * 3, y / C * 22, 1805, 3);
+        const core = clamp((1 - d) * 1.4, 0, 1) * streak;
+        const rim = smooth(0.35, 0.8, d) * smooth(1.1, 0.8, d) * smooth(0.45, 0.7, fbm(x / C * 9, y / C * 9, 1803, 3));
+        const i = (y * C + x) * 4;
+        const t = core / Math.max(1e-3, core + rim * 0.6);
+        img.data[i] = 156 * t + 26 * (1 - t);
+        img.data[i + 1] = 124 * t + 19 * (1 - t);
+        img.data[i + 2] = 94 * t + 13 * (1 - t);
+        img.data[i + 3] = clamp(core * 0.6 + rim * 0.22, 0, 0.75) * 255;
+      }
+    }
+    const tmp = canvas(C);
+    tmp.getContext('2d').putImageData(img, 0, 0);
+    g.drawImage(tmp, 0, 0);
+  });
   return c;
 }
 
@@ -603,17 +482,19 @@ function clawedDoor(wood, W, H) {
     hg.lineCap = 'round';
     for (let i = 0; i < N; i++) {
       const b = bite(i / N) * depth;
-      // crushed varnish either side, raw wood in the groove, its far wall in shadow
-      seg(g, i, w * 2.6, `rgba(40,20,8,${0.22 * b})`);
-      seg(g, i, w * (0.6 + 0.6 * b), `rgba(${178 + 22 * b},${146 + 18 * b},${104 + 14 * b},${0.35 + 0.5 * b})`);
-      seg(g, i, w * 0.35, `rgba(36,18,7,${0.55 * b})`, w * 0.4);
+      // crushed, dirty varnish either side; the walls of the groove raw wood, pale and grey, not
+      // gold; the bottom of the cut in its own shadow; a thin torn lip catching the light
+      seg(g, i, w * 2.6, `rgba(30,18,10,${0.26 * b})`);
+      seg(g, i, w * (0.55 + 0.5 * b), `rgba(${146 + 14 * b},${128 + 12 * b},${104 + 10 * b},${0.3 + 0.45 * b})`);
+      seg(g, i, w * 0.32, `rgba(24,15,9,${0.7 * b})`);
+      seg(g, i, w * 0.18, `rgba(198,182,156,${0.3 * b})`, -w * 0.42);
       seg(hg, i, w * (0.8 + 0.6 * b), `rgba(0,0,0,${0.35 + 0.6 * b})`);
     }
     // a splinter or two torn up at the deepest point
     for (let i = 0; i < 3; i++) {
       const t = 0.2 + 0.5 * r();
       const k = Math.floor(t * N);
-      g.strokeStyle = `rgba(214,186,140,${0.45 + 0.3 * r()})`;
+      g.strokeStyle = `rgba(184,166,136,${0.4 + 0.3 * r()})`;
       g.lineWidth = Math.max(1, w * 0.3);
       g.beginPath();
       g.moveTo(pts[k][0], pts[k][1]);
@@ -951,7 +832,7 @@ function paperBack(S) {
 }
 
 export async function loadTextures({ size = 2048, small = 1024 } = {}) {
-  const ids = ['dirty_carpet', 'decrepit_wallpaper', 'dark_wood', 'oak_veneer_01', 'wood_cabinet_worn_long', 'wood_floor_worn', 'painted_plaster_wall', 'worn_plaster_wall', 'rough_wood'];
+  const ids = ['dirty_carpet', 'decrepit_wallpaper', 'dark_wood', 'oak_veneer_01', 'walnut_veneer', 'wood_floor_worn', 'painted_plaster_wall', 'worn_plaster_wall', 'rough_wood'];
   const img = {};
   await Promise.all(
     ids.flatMap((id) =>
@@ -968,8 +849,19 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
   const T = {};
   for (const id of ids) T[id] = set(id);
 
-  T.wallpaper = tex(wallpaper(img['decrepit_wallpaper/Diffuse'], size), { srgb: true });
-  T.runner = tex(runner(img['dirty_carpet/Diffuse'], size), { srgb: true });
+  const wp = wallpaper(size);
+  T.wallpaper = tex(wp.albedo, { srgb: true });
+  T.wallpaperNormal = tex(heightToNormal(wp.height, 1.6));
+  T.wallpaperRough = tex(wp.rough);
+  const ws = wainscot(img['walnut_veneer/Diffuse'], size);
+  T.wainscot = tex(ws.albedo, { srgb: true });
+  T.wainscotNormal = tex(heightToNormal(ws.height, 1.2));
+  T.wainscotRough = tex(ws.rough);
+  T.runner = tex(runner(size), { srgb: true });
+  // the scanned woods regraded: forty years of varnish and dirt take the orange out of them
+  T.floorWood = tex(graded(img['wood_floor_worn/Diffuse'], 'saturate(0.45) brightness(0.8) contrast(1.05)'), { srgb: true });
+  T.trimWood = tex(graded(img['dark_wood/Diffuse'], 'saturate(0.55) brightness(0.95)'), { srgb: true });
+  T.doorWood = tex(graded(img['oak_veneer_01/Diffuse'], 'saturate(0.7) contrast(1.05)'), { srgb: true });
   T.decals = tex(decalAtlas(img['worn_plaster_wall/Diffuse'], size), { srgb: true, repeat: false });
   const claw = clawedDoor(img['oak_veneer_01/Diffuse'], Math.round(size * 0.5), Math.round((size * 0.5 * 2.03) / 0.86));
   T.claw = tex(claw.albedo, { srgb: true, repeat: false });

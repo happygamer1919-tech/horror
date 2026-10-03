@@ -83,12 +83,36 @@ window.corridor = {
       scatter: opts.scatter,
       extinction: opts.extinction,
       fogAmbient: opts.fogAmbient,
+      fogCore: opts.fogCore,
       denoise: opts.denoise,
       iterations: opts.iterations,
       sigmaL: opts.sigmaL,
       post: opts.post,
+      debug: opts.debug,
     });
     return { ...res, scene: tScene, s: at, w, h, lamps: state.lamps.length };
+  },
+
+  // Debug: the meshes whose name matches, with their vertex count and bounds.
+  meshes(match) {
+    const out = [];
+    world.scene.traverse((o) => {
+      if (!o.isMesh || !o.name.includes(match)) return;
+      o.geometry.computeBoundingBox();
+      const b = o.geometry.boundingBox;
+      out.push({ name: o.name, verts: o.geometry.attributes.position.count, min: b.min.toArray(), max: b.max.toArray() });
+    });
+    return out;
+  },
+
+  // Debug: one of the authored textures as a PNG data URL.
+  texture(mat, slot = 'map') {
+    const img = world.materials[mat][slot].image;
+    const c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    c.getContext('2d').drawImage(img, 0, 0);
+    return c.toDataURL('image/png');
   },
 
   png() {

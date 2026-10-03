@@ -95,7 +95,7 @@ export function setLamp(f, level) {
   f.light.visible = on;
   // a dying filament goes orange as well as dim
   const warm = 0.35 + 0.65 * level;
-  f.light.intensity = LAMP_CD * level * (f.last ? 1.15 : 1);
+  f.light.intensity = LAMP_CD * level * (f.last ? 0.62 : 1); // the last one is a tired old bulb: the end of the walk is no brighter than its start
   f.light.color.setRGB(LAMP_COLOR.r, LAMP_COLOR.g * (0.75 + 0.25 * warm), LAMP_COLOR.b * (0.5 + 0.5 * warm));
   f.shadeMat.emissiveIntensity = SHADE_GLOW * level;
   f.shadeMat.emissive.setRGB(1.0, 0.7 * (0.75 + 0.25 * warm), 0.38 * (0.5 + 0.5 * warm));

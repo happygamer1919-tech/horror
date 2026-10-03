@@ -177,7 +177,7 @@ const FOG = /* glsl */ `
   uniform sampler2D tex; uniform sampler2D gbuf;
   uniform mat4 invProj; uniform mat4 camWorld; uniform vec3 camPos;
   uniform vec3 lampPos[MAX_LAMPS]; uniform vec3 lampDir[MAX_LAMPS]; uniform vec3 lampCol[MAX_LAMPS]; uniform vec4 lampCone[MAX_LAMPS];
-  uniform int lampCount; uniform float scatterK; uniform float extinction; uniform float halfWidth; uniform float seed; uniform vec3 ambient;
+  uniform int lampCount; uniform float scatterK; uniform float extinction; uniform float halfWidth; uniform float seed; uniform vec3 ambient; uniform float nearR2;
   varying vec2 vUv;
   float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
   float vnoise(vec3 x) {
@@ -207,10 +207,12 @@ const FOG = /* glsl */ `
       for (int k = 0; k < MAX_LAMPS; k++) {
         if (k >= lampCount) break;
         vec3 d = p - lampPos[k];
-        float d2 = max(dot(d, d), 0.02);
-        float c = dot(d / sqrt(d2), lampDir[k]);
+        float r2 = dot(d, d);
+        float c = dot(d * inversesqrt(max(r2, 1e-6)), lampDir[k]);
         float cone = lampCone[k].z > 0.5 ? 1.0 : smoothstep(lampCone[k].x, lampCone[k].y, c);
-        l += lampCol[k] * cone / d2;
+        // A soft core: the inverse square is held flat inside about 60 cm of the bulb, so the
+        // air right under a lamp glows a little, not as a hot box over whatever is behind it.
+        l += lampCol[k] * cone / (r2 + nearR2);
       }
       scatter += (l * scatterK * dens + ambient) * exp(-extinction * t) * dt;
     }
@@ -245,7 +247,7 @@ const UP = /* glsl */ `
 const FINAL = /* glsl */ `
   uniform sampler2D tex; uniform sampler2D bloom;
   uniform float exposure; uniform float bloomStrength; uniform float k1; uniform float zoom; uniform float ca;
-  uniform float vignette; uniform float grain; uniform float seed; uniform float aspect; uniform vec2 res;
+  uniform float vignette; uniform float grain; uniform float seed; uniform float aspect; uniform vec2 res; uniform float sat;
   varying vec2 vUv;
   vec3 RRTAndODTFit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
   vec3 aces(vec3 color) {
@@ -273,7 +275,10 @@ const FINAL = /* glsl */ `
     vec2 c = (vUv - 0.5) * vec2(aspect, 1.0);
     float r2 = dot(c, c) / (0.25 * (aspect * aspect + 1.0));
     col *= 1.0 / pow(1.0 + vignette * r2, 2.0);
-    col = toSRGB(aces(col));
+    col = aces(col);
+    // a photograph's colour, not a renderer's: a little of the saturation taken out after the curve
+    col = max(mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, sat), 0.0);
+    col = toSRGB(col);
     // grain: two octaves, stronger in the shadows and midtones than in the highlights
     vec2 p = gl_FragCoord.xy;
     // the coarse octave (2 px clumps) is the one that survives compression in the shadows
@@ -282,6 +287,17 @@ const FINAL = /* glsl */ `
     float amt = grain * (0.35 + 0.65 * (1.0 - smoothstep(0.25, 0.95, l))) * (1.0 + 0.6 * (1.0 - smoothstep(0.02, 0.12, l)));
     col += n * amt * vec3(1.0, 0.97, 0.92);
     gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+  }
+`;
+
+// Debug views: depth (grey = metres / 30, red where the G-buffer is empty) or the fog alone.
+const DEBUG = /* glsl */ `
+  uniform sampler2D gbuf; uniform sampler2D a; uniform sampler2D b; uniform int mode; varying vec2 vUv;
+  void main() {
+    vec4 g = texture2D(gbuf, vUv);
+    if (mode == 0) { gl_FragColor = g.a <= 0.0 ? vec4(1.0, 0.0, 0.0, 1.0) : vec4(vec3(g.a / 30.0), 1.0); return; }
+    vec3 f = texture2D(b, vUv).rgb - texture2D(a, vUv).rgb;
+    gl_FragColor = vec4(sqrt(max(f * 2.0, 0.0)), 1.0);
   }
 `;
 
@@ -365,6 +381,7 @@ export class Pipeline {
         halfWidth: { value: 1 },
         seed: { value: 0 },
         ambient: { value: new THREE.Vector3() },
+        nearR2: { value: 0.36 },
       }),
       down: fsq(DOWN, { tex: { value: null }, px: { value: new THREE.Vector2() }, clampMax: { value: 1e6 } }),
       up: fsq(UP, { tex: { value: null }, prev: { value: null }, px: { value: new THREE.Vector2() }, mixIn: { value: 0.6 } }),
@@ -381,6 +398,7 @@ export class Pipeline {
         seed: { value: 0 },
         aspect: { value: 1 },
         res: { value: new THREE.Vector2() },
+        sat: { value: 0.88 },
       }),
     };
     this.gbufMat = new THREE.ShaderMaterial({ vertexShader: GBUF_VERT, fragmentShader: GBUF_FRAG, side: THREE.DoubleSide });
@@ -643,6 +661,7 @@ export class Pipeline {
       u.halfWidth.value = opts.halfWidth ?? 1;
       u.seed.value = seed % 977;
       u.ambient.value.set(...(opts.fogAmbient ?? [0, 0, 0]));
+      u.nearR2.value = opts.fogCore ?? 0.36;
       this.pass(q.fog, rt.fog);
     }
 
@@ -685,9 +704,24 @@ export class Pipeline {
       u.seed.value = seed % 1000;
       u.aspect.value = w / h;
       u.res.value.set(w, h);
+      u.sat.value = post.sat ?? 0.88;
       // zoom so the barrel-distorted frame still fills its corners
       u.zoom.value = lensZoom(w / h, u.k1.value + Math.abs(u.ca.value));
       this.pass(q.final, null);
+    }
+    if (opts.debug === 'albedo') {
+      this.q.copy.material.uniforms.tex.value = rt.albedo.texture;
+      this.q.copy.material.uniforms.scale.value = 1;
+      this.pass(this.q.copy, null);
+    }
+    if (opts.debug === 'depth' || opts.debug === 'fog') {
+      if (!this.q.dbg) this.q.dbg = fsq(DEBUG, { gbuf: { value: null }, a: { value: null }, b: { value: null }, mode: { value: 0 } });
+      const u = this.q.dbg.material.uniforms;
+      u.gbuf.value = rt.gbuf.texture;
+      u.a.value = rt.hdr.texture;
+      u.b.value = rt.fog.texture;
+      u.mode.value = opts.debug === 'depth' ? 0 : 1;
+      this.pass(this.q.dbg, null);
     }
     renderer.setRenderTarget(null);
     this.gl.finish();

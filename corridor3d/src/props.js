@@ -367,6 +367,22 @@ export async function buildProps(bag, materials, T, doorMeta) {
     decal(bag, 'grime2', leafPlace(no), (R() - 0.5) * 0.2, 0.2, 0.8, 0.36, { zFn: onLeaf, rot: R() * 0.3, n: 20, soft: true });
   }
 
+  // ---- door 313, the last one: the most handled and the least cleaned. Black round the handle,
+  // kicked dark along the bottom rail, a run of old dirt down from the lock ----
+  {
+    const m = doorMeta[LAST_ROOM];
+    const hx = m.handleSide * (DOOR.w / 2 - 0.06);
+    decal(bag, 'rub', leafPlace(LAST_ROOM), hx - m.handleSide * 0.05, 1.04, 0.3, 0.4, { zFn: onLeaf, rot: 0.3, n: 20 });
+    decal(bag, 'rub', leafPlace(LAST_ROOM), hx - m.handleSide * 0.02, 1.36, 0.18, 0.26, { zFn: onLeaf, rot: -0.6, n: 16, lift: 0.0034 });
+    decal(bag, 'scuff', leafPlace(LAST_ROOM), 0.0, 0.14, 0.86, 0.36, { zFn: onLeaf, n: 20, lift: 0.0036 });
+    decal(bag, 'scuff', leafPlace(LAST_ROOM), 0.1, 0.24, 0.6, 0.3, { zFn: onLeaf, n: 20, lift: 0.0038, flip: true });
+    decal(bag, 'drip1', leafPlace(LAST_ROOM), hx - m.handleSide * 0.02, 0.62, 0.16, 0.6, { zFn: onLeaf, n: 16, soft: true });
+    // the end wall: water has come down it from the ceiling, both sides of the door
+    decal(bag, 'drip1', endFrame(), -0.66, CH - 0.11 - 0.55, 0.55, 1.1, { lift: 0.003, n: 8 });
+    decal(bag, 'drip1', endFrame(), 0.7, CH - 0.11 - 0.4, 0.42, 0.8, { lift: 0.003, n: 8, flip: true });
+    decal(bag, 'water3', endFrame(), 0.62, 1.75, 0.5, 0.6, { lift: 0.003, n: 8, rot: 1.2 });
+  }
+
   // ---- old dried blood at handle height: door 306 and the wall beside it ----
   // A hand pressed flat on the door beside the handle and dragged down; three fingers drawn
   // down the panel below; a wipe off the edge onto the architrave and the wall.
@@ -443,8 +459,34 @@ export async function buildProps(bag, materials, T, doorMeta) {
     ['stain2', 0.24, 16.4, 0.5, 0.7, 1.2],
     ['stain1', 0.05, 22.3, 0.8, 0.6, 2.2],
     ['stain2', -0.3, 11.0, 0.4, 0.4, 3.0],
+    // something dark has soaked out under door 313 and dried into the runner
+    ['stain2', 0.04, END - 0.42, 0.95, 0.62, 0.25],
+    ['stain1', 0.3, 14.6, 0.5, 0.36, 4.1],
+    ['stain1', -0.36, 19.6, 0.56, 0.4, 0.7],
+    ['stain2', 0.22, 25.2, 0.46, 0.5, 2.6],
   ];
   for (const [name, x, s, w, h, rot] of cstains) decal(bag, name, floorM, x, s, w, h, { rot, zFn: carpetHeight, lift: 0.003, n: 14, soft: true });
+
+  // ---- pictures that are no longer there, and the scuffs a hotel corridor collects ----
+  for (const [side, s, y, w, h] of [
+    [-1, 9.75, 1.6, 0.6, 0.5],
+    [1, 14.55, 1.58, 0.5, 0.42],
+    [1, 21.05, 1.56, 0.62, 0.48],
+    [-1, 25.0, 1.6, 0.5, 0.42],
+  ]) {
+    const frame = wallFrame(side, s);
+    decal(bag, 'ghost', frame, 0, y, w, h, { zFn: (x, yy) => wallBulge(side, s + (side < 0 ? x : -x), yy), lift: 0.003, n: 8 });
+  }
+  {
+    const r = mulberry(4455);
+    for (const side of [-1, 1]) {
+      for (let s = 0.6; s < END - 0.6; s += 1.1 + 1.6 * r()) {
+        if (DOORS.some((d) => d.side === side && s > d.s - 0.45 && s < d.s + DOOR.w + 0.45)) continue;
+        const frame = wallFrame(side, s);
+        decal(bag, 'scuff', frame, 0, 0.18 + 0.2 * r(), 0.7 + 0.5 * r(), 0.32, { lift: 0.002, n: 2, rot: (r() - 0.5) * 0.1, flip: r() < 0.5 });
+      }
+    }
+  }
 
   // ---- peeling wallpaper: narrow strips coming away at the seams, under the cornice ----
   {
@@ -458,16 +500,19 @@ export async function buildProps(bag, materials, T, doorMeta) {
       const x0 = dir > 0 ? seam : seam - w;
       peel(bag, side < 0 ? left : right, side, null, x0, y0, w, len, { seed, curl });
     };
-    strip(-1, 8.5, 1, 1.95, 0.13, 0.52, 3, 2.6);
-    strip(-1, 8.5, -1, 2.1, 0.08, 0.36, 4, 2.2);
-    strip(-1, 4.1, 1, 2.12, 0.09, 0.34, 6, 2.3);
-    strip(1, 1.9, 1, 2.1, 0.08, 0.36, 12, 2.4);
-    strip(1, 11.3, -1, 2.0, 0.11, 0.48, 9, 2.5);
-    strip(1, 15.8, 1, 1.92, 0.14, 0.56, 8, 2.7);
-    strip(-1, 17.6, 1, 1.85, 0.16, 0.66, 5, 2.8);
-    strip(-1, 17.6, -1, 2.08, 0.07, 0.4, 15, 2.2);
-    strip(1, 23.3, -1, 1.8, 0.15, 0.7, 21, 2.7);
-    strip(-1, 26.4, 1, 2.02, 0.1, 0.44, 14, 2.4);
+    // in the band the lamps light, so the pale back of the paper and its torn edge catch the light
+    strip(-1, 8.5, 1, 1.5, 0.15, 0.56, 3, 2.3);
+    strip(-1, 8.5, -1, 1.66, 0.08, 0.36, 4, 2.0);
+    strip(-1, 4.1, 1, 1.72, 0.09, 0.34, 6, 2.1);
+    strip(1, 1.9, 1, 1.7, 0.08, 0.36, 12, 2.1);
+    strip(1, 11.3, -1, 1.52, 0.13, 0.52, 9, 2.2);
+    strip(1, 15.8, 1, 1.46, 0.15, 0.6, 8, 2.4);
+    strip(-1, 17.6, 1, 1.45, 0.12, 0.6, 5, 2.2);
+    strip(-1, 17.6, -1, 1.62, 0.07, 0.4, 15, 2.0);
+    // past the dead lamps the end lamp is behind every flap, so they hang as narrow tongues of
+    // paper, not wings
+    strip(1, 23.3, -1, 1.5, 0.085, 0.5, 21, 1.7);
+    strip(-1, 26.4, 1, 1.62, 0.08, 0.42, 14, 1.6);
   }
 
   // ---- boards nailed across door 312 ----

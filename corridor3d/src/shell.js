@@ -21,7 +21,9 @@ export const wallBulge = (side, s, y) => 0.006 * (fbm(s * 0.9 + side * 31, y * 1
 
 // Dirt on the wallpaper, as a colour multiplier.
 function wallDirt(side, s, y) {
-  let k = 0.82 + 0.3 * fbm(s * 0.4 + side * 13, y * 0.7, 11, 4);
+  let k = 0.76 + 0.4 * fbm(s * 0.4 + side * 13, y * 0.7, 11, 4);
+  // blotches of damp and fading at the scale of a hand, so no two metres of paper look alike
+  k *= 0.9 + 0.2 * fbm(s * 2.2 + side * 3, y * 2.2, 17, 3);
   k *= 1 - 0.3 * smooth(2.1, CH, y); // soot under the cornice
   k *= 1 - 0.16 * smooth(DADO + 0.3, DADO, y); // above the rail
   // old water runs from the ceiling
@@ -37,7 +39,9 @@ function wallDirt(side, s, y) {
     }
   }
   const warm = 0.9 + 0.1 * noise2(s * 0.8, y * 0.8, 41);
-  return [k, k * (0.95 + 0.03 * warm), k * (0.84 + 0.1 * warm)];
+  // forty years of cigarettes: the paper goes brown-yellow towards the ceiling, unevenly
+  const tar = smooth(1.5, CH, y) * (0.7 + 0.6 * fbm(s * 0.3 + side * 5, 3.1, 43, 3));
+  return [k * (1 - 0.04 * tar), k * (0.95 + 0.03 * warm) * (1 - 0.1 * tar), k * (0.84 + 0.1 * warm) * (1 - 0.3 * tar)];
 }
 
 function wainscotDirt(side, s, y) {
@@ -139,9 +143,9 @@ export function buildShell(bag) {
       const stain = smooth(0.6, 0.82, fbm(x * 1.6 + 9, s * 0.9, 97, 4));
       const grit = smooth(RUNNER - 0.25, RUNNER, Math.abs(x)); // dirt collects along the edges
       const k = (0.72 + 0.5 * fbm(x * 0.9, s * 0.35, 93, 4)) * (1 - 0.55 * stain) * (1 - 0.3 * grit);
-      // worn pile goes pale and grey: lift and desaturate
-      const w = 0.6 * wear;
-      return [k * (1 + 0.2 * w), k * (1 + 1.5 * w), k * (1 + 1.4 * w)];
+      // the traffic path down the middle: the pile crushed flat and holding dirt, darker and browner
+      const w = 0.75 * wear;
+      return [k * (1 - 0.42 * w), k * (1 - 0.22 * w), k * (1 - 0.18 * w)];
     });
     bag.add('carpet', p, rotX(-Math.PI / 2));
     // the bound edges of the slab

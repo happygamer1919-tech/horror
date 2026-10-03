@@ -98,7 +98,7 @@ export async function buildScene({ textureSize = 2048 } = {}) {
   {
     const frame = endFrame();
     buildSurround(bag, frame, { seed: LAST_ROOM });
-    const leaf = buildLeaf({ no: LAST_ROOM, handleSide: -1, seed: LAST_ROOM, plateTilt: 0.012 });
+    const leaf = buildLeaf({ no: LAST_ROOM, handleSide: -1, seed: LAST_ROOM, plateTilt: 0.075 }); // a screw gone: the plate hangs crooked
     bag.addBag(leaf, M(leafMatrix({ hingeSide: 1, angle: 0.004 }), frame));
     doorMeta[LAST_ROOM] = { frame, hingeSide: 1, handleSide: -1, angle: 0.004, outward: false, dynamic: false };
   }
