@@ -94,12 +94,12 @@ export async function buildScene({ textureSize = 2048, haze = HAZE.density } = {
       const pivot = new THREE.Group();
       const lw = DOOR.w - 0.007;
       pivot.position.set(hingeSide * (DOOR.w / 2 - 0.0035), 0, -REC - DOOR.t);
-      // door 308 is the darkest leaf in the corridor: at the scare it is a dark mass beside a lit wall
+      // door 308 is a dark leaf, but it is what the torch is on at the scare: it must show its wood
       for (const [mat, list] of leaf.items) {
         if (!mat.startsWith('door')) continue;
         for (const g of list) {
           const c = g.attributes.color;
-          for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * 0.27, c.getY(i) * 0.26, c.getZ(i) * 0.25);
+          for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * 0.72, c.getY(i) * 0.7, c.getZ(i) * 0.68);
         }
       }
       const leafGroup = leaf.build(materials, 'scareLeaf');

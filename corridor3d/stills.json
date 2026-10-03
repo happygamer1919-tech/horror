@@ -1,29 +1,29 @@
 {
-  "note": "The six review keyframes. Fixed for every review round: real frames of the desktop walk (1600 x 900), rendered by `node corridor3d/render.mjs stills`. `frame` is the walk frame index; \"scare\" is the held frame the scare plays over (layout.js scareFrameIndex).",
+  "note": "The six review keyframes of the torch-lit walk (owner ruling: handheld flashlight point of view). Fixed for both review rounds: real frames of the desktop walk (1600 x 900), rendered by `node corridor3d/render.mjs stills`. `frame` is the walk frame index; \"scare\" is the held frame the scare plays over (layout.js scareFrameIndex).",
   "stills": [
     {
       "name": "1-start",
       "set": "desktop",
       "frame": 0,
-      "why": "the first frame: tight to the left wall in the dark under a dying lamp, the first pool of light and the shoe six metres off"
+      "why": "the first look: the beam on the number of door 301, the corridor a dark depth with embers in it"
     },
     {
-      "name": "2-mid",
+      "name": "2-shoe",
       "set": "desktop",
-      "frame": 44,
-      "why": "mid walk, on the right of the corridor: the swinging lamp half in the frame overhead, the open clawed door, the dark beyond"
+      "frame": 22,
+      "why": "the beam at the foot of the right wall, the child's shoe in its spill; a frame that looks at the floor, the weakest ground of the earlier rounds"
     },
     {
       "name": "3-scratched-door",
       "set": "desktop",
-      "frame": 55,
-      "why": "the walker glances at the inside of door 305: the gouges at hand height, the black room behind the leaf"
+      "frame": 57,
+      "why": "the clawed inside of door 305, raked by the torch from the hand"
     },
     {
       "name": "4-scare-door-closed",
       "set": "desktop",
       "frame": "scare",
-      "why": "the held walk frame at door 308, before it opens"
+      "why": "the held frame at door 308, before it opens"
     },
     {
       "name": "5-scare",
@@ -33,13 +33,58 @@
         "j": 9,
         "variant": "face"
       },
-      "why": "the scare at its peak, stand-in face (variant f), as the patch is laid over the held frame"
+      "why": "the scare at its peak, stand-in face (variant f)"
     },
     {
       "name": "6-last-door",
       "set": "desktop",
       "frame": 167,
-      "why": "the end of the walk: tight to the right wall, door 313 in the one pool of light"
+      "why": "the end: the beam has climbed door 313 and rests on its number"
     }
-  ]
+  ],
+  "rounds1to4": {
+    "note": "The keyframes of review rounds 1 to 4 (ceiling-lamp lighting). They are frames of the walk as it was at commit 372b1ca; check that commit out to render them again.",
+    "stills": [
+      {
+        "name": "1-start",
+        "set": "desktop",
+        "frame": 0,
+        "why": "the first frame: tight to the left wall in the dark under a dying lamp, the first pool of light and the shoe six metres off"
+      },
+      {
+        "name": "2-mid",
+        "set": "desktop",
+        "frame": 44,
+        "why": "mid walk, on the right of the corridor: the swinging lamp half in the frame overhead, the open clawed door, the dark beyond"
+      },
+      {
+        "name": "3-scratched-door",
+        "set": "desktop",
+        "frame": 55,
+        "why": "the walker glances at the inside of door 305: the gouges at hand height, the black room behind the leaf"
+      },
+      {
+        "name": "4-scare-door-closed",
+        "set": "desktop",
+        "frame": "scare",
+        "why": "the held walk frame at door 308, before it opens"
+      },
+      {
+        "name": "5-scare",
+        "set": "desktop",
+        "frame": "scare",
+        "scare": {
+          "j": 9,
+          "variant": "face"
+        },
+        "why": "the scare at its peak, stand-in face (variant f), as the patch is laid over the held frame"
+      },
+      {
+        "name": "6-last-door",
+        "set": "desktop",
+        "frame": 167,
+        "why": "the end of the walk: tight to the right wall, door 313 in the one pool of light"
+      }
+    ]
+  }
 }

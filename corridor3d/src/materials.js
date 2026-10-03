@@ -105,7 +105,7 @@ export function makeMaterials(T) {
       roughnessMap: xf(T.carpetRough, tc),
       normalScale: new THREE.Vector2(3, 3),
       roughness: 1,
-      sheen: 0.75,
+      sheen: 0.12, // (a strong sheen made the runner glow pink at a grazing view, the brightest plane in a torch-lit frame)
       sheenRoughness: 0.6,
       sheenColor: new THREE.Color(0.4, 0.2, 0.16),
       vertexColors: true,
@@ -132,7 +132,7 @@ export function makeMaterials(T) {
   m.brassDull = P({ color: new THREE.Color(0.5, 0.39, 0.2), metalness: 1, roughness: 0.52, vertexColors: true });
   m.iron = P({ color: new THREE.Color(0.1, 0.09, 0.08), metalness: 0.9, roughness: 0.6, vertexColors: true });
   m.steel = P({ color: new THREE.Color(0.55, 0.55, 0.55), metalness: 1, roughness: 0.38, vertexColors: true });
-  m.plate = P({ map: T.plates, metalnessMap: T.platesOrm, roughnessMap: T.platesOrm, metalness: 1, roughness: 1, vertexColors: true });
+  m.plate = P({ map: T.plates, metalnessMap: T.platesOrm, roughnessMap: T.platesOrm, normalMap: T.platesNormal, metalness: 1, roughness: 1, vertexColors: true });
 
   // Lamps.
   m.bulbDead = P({ color: new THREE.Color(0.36, 0.33, 0.27), roughness: 0.3, vertexColors: true });
@@ -157,15 +157,15 @@ export function makeMaterials(T) {
 
   // The shoe.
   // a child's best shoe: pale leather gone cream, scuffed (black patent on a dark runner was a dark capsule)
-  m.leather = P({ color: new THREE.Color(0.2, 0.085, 0.06), roughness: 0.38, side: THREE.DoubleSide, vertexColors: true }); // oxblood, scuffed
+  m.leather = P({ color: new THREE.Color(0.1, 0.075, 0.055), roughness: 0.55, side: THREE.DoubleSide, vertexColors: true }); // oxblood, scuffed
   m.sole = P({ color: new THREE.Color(0.2, 0.13, 0.08), roughness: 0.8, vertexColors: true });
 
   // The figure behind the door.
-  m.skin = P({ color: new THREE.Color(0.3, 0.285, 0.275), roughness: 0.42, sheen: 0.3, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.75, 0.55, 0.5), vertexColors: true });
+  m.skin = P({ color: new THREE.Color(0.075, 0.062, 0.052), roughness: 0.42, sheen: 0.3, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.75, 0.55, 0.5), vertexColors: true });
   m.eye = P({ color: new THREE.Color(1, 1, 1), roughness: 0.03, vertexColors: true });
-  m.hair = P({ color: new THREE.Color(0.016, 0.014, 0.012), roughness: 0.34, side: THREE.DoubleSide, vertexColors: true });
+  m.hair = P({ color: new THREE.Color(0.01, 0.009, 0.008), roughness: 0.62, specularIntensity: 0.3, side: THREE.DoubleSide, vertexColors: true });
   m.nail = P({ color: new THREE.Color(0.72, 0.66, 0.6), roughness: 0.16, vertexColors: true });
-  m.gown = P({ color: new THREE.Color(0.5, 0.48, 0.44), roughness: 1, side: THREE.DoubleSide, vertexColors: true });
+  m.gown = P({ color: new THREE.Color(0.05, 0.046, 0.04), roughness: 1, side: THREE.DoubleSide, vertexColors: true });
 
   for (const [name, mat] of Object.entries(m)) {
     mat.name = name;

@@ -48,27 +48,29 @@ export const LAMP_Y = CH - LAMP_DROP;
 // metres; dust: how much of the glass is dulled. Lamp 3 burnt out long ago and nobody changed it,
 // and its shade is gone: a bare dead bulb. So the corridor is pools of light with black between
 // them from the first frame, and the far end is only ever lit by the last lamp.
+// The corridor is walked by torchlight. The ceiling lamps are dead, or a filament barely glowing:
+// an ember that lights nothing but itself (`ember`: how bright the filament is seen, 0..1).
+// drop: extra flex in metres; dust: how much of the glass is dulled; bare: the shade is gone.
+// The embers are what the depth of the corridor is felt by: orange points receding in the dark.
 export const LAMP_KIND = [
-  { level: 0.09, warm: 1, drop: 0.13, dust: 0.9 }, // the first lamp is all but dead, an orange ember in a dusty shade: the walk starts in the dark
-  { level: 0.75, warm: 0.5, drop: 0.035, dust: 0.7, tilt: 0.09, lean: -0.14 }, // warm, and hanging crooked: the first pool of light, the shoe in it
-  { level: 0.85, warm: 0.2, drop: 0.16, dust: 0.3 },
-  { level: 0, warm: 1, drop: -0.02, dust: 1, dead: true, bare: true },
-  { level: 1.0, warm: 0.35, drop: 0.02, dust: 0.6 },
-  { level: 0.7, warm: 0.2, drop: -0.03, dust: 0.5 },
-  { level: 0.45, warm: 0.45, drop: 0.045, dust: 0.9 },
-  { level: 0.6, warm: 0.22, drop: 0.01, dust: 0.55, aim: [-0.55, -0.9] },
+  { ember: 0, drop: 0.13, dust: 0.9 }, // dead
+  { ember: 0.7, drop: 0.035, dust: 0.7, tilt: 0.09, lean: -0.14 },
+  { ember: 0, drop: 0.16, dust: 0.3 }, // the swinging one: a dead shade that still sways
+  { ember: 0, drop: -0.02, dust: 1, bare: true },
+  { ember: 1.0, drop: 0.02, dust: 0.6 },
+  { ember: 0.55, drop: -0.03, dust: 0.5 },
+  { ember: 0.85, drop: 0.045, dust: 0.9 },
+  { ember: 0.6, drop: 0.01, dust: 0.55 },
 ];
+// Camera position (s) at which each ember goes out: the far ones first, the wave coming towards
+// the walker, all of it inside the third quarter of the walk ("The lights were fine a minute ago.").
+export const FAIL_AT = { 7: 13.0, 6: 13.5, 5: 14.0, 4: 14.6, 1: 15.1 };
+export const FADE_LEN = 0.7; // metres of walking an ember takes to die
 
-// Camera position (s) at which each lamp dies. Far lamps first; the wave reaches the walker
-// just after the scare door (lamp 4 hangs in front of it and is still alight while the door
-// opens, and while the walker turns back to the corridor), then runs on behind him.
-export const FAIL_AT = { 6: 2.4, 5: 5.2, 4: 17.5, 3: 17.8, 2: 18.1, 1: 18.4, 0: 18.75 };
-export const FADE_LEN = 0.55; // metres of walking a lamp takes to die
-
-export const SHOE_AT = { s: 6.7, x: 0.08 }; // the child's shoe: the nearest stretch of runner the first frame shows, lit by the first lamp
+export const SHOE_AT = { s: 5.9, x: 0.76 }; // the child's shoe, on the bare boards against the right wall, past door 302
 export const WALK_FROM = 0.35;
-export const WALK_TO = 25.75;
-export const EYE = 1.55;
+export const WALK_TO = 27.7; // an arm's length and a half from door 313
+export const EYE = 1.4; // a little stooped, as someone creeping with a torch
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const smooth = (a, b, v) => {
@@ -87,111 +89,121 @@ const KNEE = 0.8;
 const pace = (p) => (p < KNEE ? p : KNEE + (p - KNEE) - (0.75 * (p - KNEE) * (p - KNEE)) / (2 * (1 - KNEE)));
 export const camS = (p) => WALK_FROM + (WALK_TO - WALK_FROM) * (pace(clamp(p, 0, 1)) / pace(1));
 
-// Lamp intensity 0..1 for a walker at distance s.
+// How bright the filament of lamp k is seen (0..1) for a walker at distance s.
 export function lampLevel(k, s) {
-  const base = LAMP_KIND[k].level;
-  if (k === LAST_LAMP) return base;
-  if (LAMP_KIND[k].dead) return 0;
-  const f = FAIL_AT[k];
-  const t = clamp((s - f) / FADE_LEN, 0, 1);
-  // not a clean fade: a dip, a short recovery, then out. Monotone enough that nothing strobes.
-  const level = t <= 0 ? 1 : t >= 1 ? 0 : (1 - t) * (1 - t) * (0.55 + 0.45 * Math.cos(t * 5.2)) * (1 - smooth(0.75, 1, t));
-  // lamp 4 is already tired when the walker reaches it
-  const tired = k === 4 ? 1 - 0.08 * smooth(11.5, 15.8, s) : 1;
-  return Math.max(0, level) * tired * base;
+  const base = LAMP_KIND[k].ember;
+  if (!base) return 0;
+  const t = clamp((s - FAIL_AT[k]) / FADE_LEN, 0, 1);
+  // not a clean fade: a dip, a short recovery, then out. Slow enough that nothing strobes.
+  const level = t <= 0 ? 1 : t >= 1 ? 0 : (1 - t) * (1 - t) * (0.6 + 0.4 * Math.cos(t * 4.4)) * (1 - smooth(0.75, 1, t));
+  return Math.max(0, level) * base;
 }
 
-// The swinging lamp: angle in radians around the corridor axis (it swings across the corridor)
-// and along it. Driven by the walk, so it stands still when the visitor stops scrolling.
+// The dead shade that still sways a little: angle in radians across the corridor and along it.
+// Driven by the walk, so it stands still when the visitor stops scrolling.
 export function swing(s) {
-  const env = smooth(0.6, 3.5, s) * (1 - smooth(11, 15, s));
-  return {
-    across: 0.2 * env * Math.sin(s * 1.9 + 0.6),
-    along: 0.07 * env * Math.sin(s * 1.9 * 0.5 + 1.7),
-  };
+  return { across: 0.07 * Math.sin(s * 1.9 + 0.6), along: 0.025 * Math.sin(s * 0.95 + 1.7) };
 }
 
-// Exposure in stops relative to the lit corridor: the eye opens up when the lamps are gone.
-export const exposureStops = (s) => 0.3 * smooth(5, 8, s) + 0.85 * smooth(11.5, 14.5, s) + 1.7 * smooth(17.3, 19.5, s) - 2.95 * smooth(20.6, 25.7, s);
+// ---- the torch ------------------------------------------------------------------------------------
+// The one light of the walk is in the walker's hand. Everything below says where it points; the
+// camera follows it the way a head follows a hand, a little late and never all the way.
+const slow = (s, a, b, c) => Math.sin(s * a + b) * 0.6 + Math.sin(s * a * 2.3 + c) * 0.4; // smooth, seeded by its phases
 
-// The lens: where it is focused (metres from the camera) for a walker at s. A corridor shot at
-// night is taken nearly wide open, so what is close to the camera, the walls at the edge of the
-// frame, is soft, and the focus follows what the walker looks at.
-export const FSTOP = { desktop: 2.2, mobile: 2.4 };
-export function focusDistance(s) {
-  let f = 5.2 + 0.8 * Math.sin(s * 0.37);
-  f += (2.3 - f) * bump(4.4, 1.3, s); // the shoe
-  f += (1.75 - f) * bump(9.45, 1.3, s); // the clawed door
-  f += (1.45 - f) * bump2(16.75, 1.6, 1.0, s); // door 308: the far jamb, where the gap opens
-  f += (3.05 - f) * smooth(23.4, 25.6, s); // the last door
-  return f;
+// What the beam goes to, in order: [centre s, metres before, metres after, point (x, y, s) on a surface].
+const AIMS = [
+  [0.35, 1.0, 2.2, [-0.95, 1.62, 2.72]], // the number on door 301
+  [4.3, 1.8, 1.2, [0.92, 0.24, 6.0]], // the foot of the right wall: the child's shoe lies in the spill
+  [7.7, 1.2, 1.3, [-0.95, 1.78, 9.2]], // paper come away at a seam, under the dead swinging shade
+  [10.5, 1.5, 0.75, [-0.52, 1.02, 11.4]], // the clawed inside of door 305, at the height of a child's hands
+  [12.5, 1.0, 1.3, [0.95, 1.0, 13.35]], // the dried hand on door 306
+  [16.75, 2.1, 0.9, [0.95, 1.32, 17.3]], // door 308, below its number: the edge that will open is at the rim of the hot spot: the edge that will open is out in the spill
+  [21.4, 1.5, 1.5, [-0.95, 0.12, 23.75]], // the line of light under 311
+  [24.4, 1.2, 1.0, [0.95, 1.25, 25.9]], // the boards across 312
+];
+// The point the beam is on for a walker at s.
+export function torchAim(s) {
+  // between the things worth finding the beam is on one wall or the other a few steps ahead,
+  // crossing the dark between them quickly
+  const side = Math.tanh(2.2 * Math.sin(s * 0.5 + 2.2));
+  const p = [0.95 * side, 1.1 + 0.3 * Math.sin(s * 0.83 + 0.5), s + 2.5];
+  let rest = 1;
+  const w = AIMS.map(([c, b, a]) => bump2(c, b, a, s));
+  const sum = w.reduce((x, y) => x + y, 0);
+  const k = sum > 1 ? 1 / sum : 1;
+  const out = [0, 0, 0];
+  AIMS.forEach(([, , , q], i) => {
+    for (let j = 0; j < 3; j++) out[j] += w[i] * k * q[j];
+    rest -= w[i] * k;
+  });
+  for (let j = 0; j < 3; j++) out[j] += rest * p[j];
+  // the last door: the beam comes to its threshold and climbs the leaf, past the kicked bottom
+  // rail and the handle, to the number. The number is the last thing lit.
+  const end = smooth(25.5, 26.5, s);
+  const t = smooth(26.2, 27.62, s);
+  const q = [-0.3 * Math.sin(Math.PI * Math.pow(t, 0.8)) * (1 - 0.2 * t), 0.05 + 1.61 * t, END - 0.09];
+  for (let j = 0; j < 3; j++) out[j] = out[j] * (1 - end) + q[j] * end;
+  // the hand is never still
+  out[0] += 0.05 * slow(s, 1.7, 0.3, 2.1) * (1 - 0.6 * end);
+  out[1] += 0.045 * slow(s, 2.1, 1.9, 0.4) * (1 - 0.6 * end);
+  return out;
 }
+// The torch falters once, when the last ember has gone: a slow dip and a slow recovery (about
+// two metres of walking), never a flicker.
+export const torchLevel = (s) => 1 - 0.82 * bump(15.55, 0.95, s) * (0.8 + 0.2 * Math.cos((s - 15.55) * 5));
+// Where the hand holds it, relative to the camera: right, down, forward (metres). Off the lens
+// axis, so things cast shadows that are seen, and a surface the walker is close to is raked.
+export const TORCH_HAND = [0.27, -0.3, -0.1];
 
-// Camera pose. Slow sway and bob (long periods: frames are 15 to 25 cm apart, a real 0.7 m
-// stride would alias into a shake), and small glances at the things worth seeing.
+// Where the walker is (x across the corridor) at s: never down the middle for long, close to
+// the wall or the door the torch is on.
+function walkerX(s) {
+  let x = 0.035 * Math.sin((s * 2 * Math.PI) / 5.2 + 0.4) + 0.012 * Math.sin(s * 0.53 + 2.0);
+  x += 0.34 * (1 - smooth(0.6, 3.4, s)); // starts on the right, looking across at 301
+  x += 0.2 * bump(4.4, 1.6, s); // keeps to the right, looking down along the foot of the wall
+  x += 0.36 * bump2(11.1, 1.5, 1.6, s); // goes round the open door 305
+  x += 0.3 * bump2(16.6, 2.6, 1.4, s); // close along door 308
+  x -= 0.2 * bump(22.0, 1.6, s);
+  x += 0.22 * bump(24.6, 1.2, s);
+  x += -0.06 * smooth(25.6, 27.2, s);
+  return x;
+}
+const camAt = (s) => [walkerX(s), EYE + 0.011 * Math.sin((s * 2 * Math.PI) / 2.6) - 0.05 * bump(10.6, 1.2, s), s];
+const dist3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+// How far the thing in the beam is from the walker, smoothed over a step.
+function beamDistance(s) {
+  let d = 0;
+  for (const o of [-0.35, 0, 0.35]) d += dist3(torchAim(s + o), camAt(s + o)) / 3;
+  return clamp(d, 0.7, 4.5);
+}
+// Exposure in stops: set for the hot spot, as a camera would. The hot spot of a torch on a wall
+// two metres off is the reference; nearer things are stopped down, not all the way (they burn
+// a little), further things opened up, not all the way (they sink).
+export const exposureStops = (s) => 1.2 * Math.log2(beamDistance(s) / 2);
+
+// The lens: wide open, focused on what the beam is on.
+export const FSTOP = { desktop: 1.8, mobile: 2.0 };
+export const focusDistance = (s) => clamp(dist3(torchAim(s - 0.1), camAt(s)), 0.6, 6);
+
+// Camera pose. The head follows the beam, a little late and not all the way: the hot spot is
+// never dead centre. More of the way on the narrow phone frame, so the beam stays in it.
 export function cameraPose(s, set) {
   const mobile = set === 'mobile';
-  const bob = 0.011 * Math.sin((s * 2 * Math.PI) / 2.6);
-  const sway = 0.035 * Math.sin((s * 2 * Math.PI) / 5.2 + 0.4) + 0.012 * Math.sin(s * 0.53 + 2.0);
-  // hand held: the horizon is never quite level
-  const roll = 0.022 + 0.006 * Math.sin((s * 2 * Math.PI) / 5.2 + 1.2) + 0.004 * Math.sin(s * 1.13 + 0.4) + 0.012 * (1 - smooth(1, 5, s)) + 0.03 * smooth(23.6, 25.7, s);
-  let yaw = 0.012 * Math.sin(s * 0.71 + 0.3) + 0.008 * Math.sin(s * 1.37);
-  // (the head a little up at the start and under the swinging lamp: a lamp sits inside the frame, not on its top edge)
-  // (under the swinging lamp the head stays down: only the lower half of its shade comes into
-  // the top of the frame, and its moving light tells the rest)
-  let pitch = -0.045 + 0.006 * Math.sin(s * 0.9 + 1.1) + 0.015 * (1 - smooth(0.8, 3, s)) - 0.06 * bump(7.6, 1.4, s);
-  // Nobody walks down the middle, and nobody holds a camera square to a corridor. The walk
-  // starts close to the left wall (its near end soft at the edge of the frame), the head turned a
-  // little to the right, so neither the vanishing point nor a lamp sits in the middle of the frame.
-  // (Round 4: tight to it, 40 cm off, so the dark wall takes the left third of the frame.)
-  const start = 1 - smooth(1.2, 6.5, s);
-  let x = sway - 0.6 * start;
-  yaw -= 0.07 * start;
-  // under the swinging lamp the walker is already drifting right, to pass the open door, and
-  // looks across at it: the right wall close at the edge of the frame
-  // (he has crossed to the right wall by then: the frame of door 304 soft at the right edge)
-  x += 0.38 * bump(7.6, 2.6, s);
-  yaw += 0.19 * bump(7.6, 2.0, s);
-  // the shoe on the runner (props.js: s = SHOE_AT), low on the right, in the first pool of light
-  yaw -= 0.05 * bump(4.4, 1.5, s);
-  pitch -= (mobile ? 0.26 : 0.2) * bump(4.5, 1.7, s); // the tall frame has room to look down further
-  // the scratched door hanging open on the left: the head turns to it and drops to the height a
-  // child's hands reach, close enough to read the gouges, then the walker goes round it
-  const claw = bump(9.45, 1.5, s);
-  // (the head turns past the handle: the door and the black room behind it fill the frame, the
-  // corridor floor is a strip at its edge)
-  yaw += (mobile ? 0.3 : 0.47) * claw;
-  pitch -= (mobile ? 0.16 : 0.18) * claw;
-  x += 0.4 * bump(10.7, 2.7, s) - 0.06 * claw;
-  // drift towards the right wall and turn the head to door 308 before it moves. On the wide
-  // frame the door stays at the side and the corridor stays the subject; the tall phone frame is
-  // narrow, so it turns further and the gap is near the middle. After the door has shut the head
-  // comes back to the corridor quickly, before the lamp over it dies: never a dark wall filling
-  // the picture.
-  const L = globalThis.__look308 ?? {};
-  x += (L.x ?? 0.22) * bump2(L.xc ?? 16.6, L.xw ?? 2.6, L.xa ?? 1.4, s);
-  const look = bump2(L.c ?? 16.75, L.w ?? 2.4, L.wa ?? 1.0, s);
-  yaw -= (mobile ? (L.ym ?? 0.74) : (L.yd ?? 0.39)) * look;
-  pitch -= (mobile ? (L.pm ?? 0.06) : (L.pd ?? 0.03)) * look;
-  // the line of light under 311, low on the left
-  yaw += 0.05 * bump(21.6, 1.5, s);
-  pitch -= 0.03 * bump(21.6, 1.5, s);
-  // the boards on the right
-  yaw -= 0.06 * bump(23.9, 1.4, s);
-  // settle on the last door: standing a little right of it, the shoulders not square to it
-  const end = smooth(23.6, 25.7, s);
-  // (well to the right of it, by the boarded door, the head turned left to it: the right wall
-  // close and soft at the edge of the frame, the door off centre and lit from one side)
-  // (Round 4: tight to the right wall, which takes the right third of the frame, dark and soft.)
-  yaw = yaw * (1 - end) + 0.1 * end;
-  x = x * (1 - 0.8 * end) + 0.62 * end;
-  pitch += 0.01 * end;
-  return { x, y: EYE + bob, s, yaw, pitch, roll };
+  const [x, y] = camAt(s);
+  const a = torchAim(s - 0.14);
+  const yawT = Math.atan2(-(a[0] - x), a[2] - s);
+  const pitchT = Math.atan2(a[1] - y, Math.hypot(a[0] - x, a[2] - s));
+  const yaw = (mobile ? 0.95 : 0.74) * yawT + 0.012 * Math.sin(s * 0.71 + 0.3);
+  const pitch = (mobile ? 0.92 : 0.88) * pitchT + 0.006 * Math.sin(s * 0.9 + 1.1);
+  // hand held: the horizon is never level
+  const roll = 0.03 + 0.012 * Math.sin((s * 2 * Math.PI) / 5.2 + 1.2) + 0.008 * Math.sin(s * 1.13 + 0.4);
+  return { x, y, s, yaw, pitch, roll };
 }
 
 // Render sets. fov is vertical, in degrees.
 export const SETS = {
-  desktop: { w: 1600, h: 900, fov: 33, frames: 168, dir: 'd' }, // 55 degrees across: about a 35 mm lens
+  desktop: { w: 1600, h: 900, fov: 28, frames: 168, dir: 'd' }, // 47 degrees across: about a 42 mm lens
   mobile: { w: 900, h: 1800, fov: 72, frames: 112, dir: 'm' },
 };
 export const frameS = (set, i) => camS(i / (SETS[set].frames - 1));

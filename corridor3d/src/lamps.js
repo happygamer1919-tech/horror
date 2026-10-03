@@ -96,6 +96,7 @@ export function buildLamps(materials) {
     shadeMat.name = `shade${l.k}`;
     // forty years of cigarettes and dust on the glass: each a different shade of yellow-brown
     const d = kind.dust;
+    const warmUnused = 0; // (lamps no longer light the corridor: see setLamp)
     shadeMat.color.setRGB(0.62 - 0.22 * d, 0.55 - 0.22 * d, 0.42 - 0.2 * d);
     shadeMat.roughness = 0.45 + 0.4 * d;
     const body = pendant(r, kind).build({ ...materials, shade: shadeMat }, `lamp${l.k}`);
@@ -135,24 +136,21 @@ export function buildLamps(materials) {
   return fixtures;
 }
 
-// Apply a lamp level 0..1 to a fixture. Returns true if it is alight at all.
+// Apply an ember level 0..1 to a fixture: the filament seen glowing in the dark, a breath of orange
+// on the glass round it, and no light on anything else. Returns true if it glows at all.
 export function setLamp(f, level) {
-  const on = level > 0.004 && !f.kind.dead;
-  f.light.visible = on;
-  // a dying filament goes orange as well as dim, and an old bulb is orange to begin with
-  const warm = (0.35 + 0.65 * Math.min(1, level / Math.max(0.05, f.kind.level))) * (1 - 0.5 * f.kind.warm);
-  f.light.intensity = LAMP_CD * level;
-  f.light.color.setRGB(LAMP_COLOR.r, LAMP_COLOR.g * (0.75 + 0.25 * warm), LAMP_COLOR.b * (0.5 + 0.5 * warm));
-  // dusty glass lets less through
-  f.shadeMat.emissiveIntensity = on ? SHADE_GLOW * level * (1 - 0.45 * f.kind.dust) : 0;
-  f.shadeMat.emissive.setRGB(1.0, 0.62 * (0.75 + 0.25 * warm), 0.28 * (0.5 + 0.5 * warm));
-  const b = 60 * level;
-  f.bulb.material.color.setRGB(b * 1.0, b * 0.84 * (0.75 + 0.25 * warm), b * 0.6 * (0.5 + 0.5 * warm));
+  const on = level > 0.004;
+  f.light.visible = false;
+  f.shadeMat.emissiveIntensity = on ? 0.12 * level : 0;
+  f.shadeMat.emissive.setRGB(1.0, 0.42, 0.12);
+  const b = 2.6 * level;
+  f.bulb.material.color.setRGB(b, b * 0.42, b * 0.1);
   f.bulb.visible = on;
+  f.bulb.scale.set(0.5, 0.9, 0.5); // the filament and its support, not the whole bulb
   if (f.glass) {
     f.glass.visible = on;
-    const g = SHADE_SEEN * level * (1 - 0.35 * f.kind.dust);
-    f.glass.material.color.setRGB(g, g * 0.6 * (0.75 + 0.25 * warm), g * 0.26 * (0.5 + 0.5 * warm));
+    const g = 0.16 * level * (1 - 0.35 * f.kind.dust);
+    f.glass.material.color.setRGB(g, g * 0.4, g * 0.12);
   }
   return on;
 }

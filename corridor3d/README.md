@@ -47,15 +47,50 @@ node corridor3d/render.mjs probe [--haze=0.01]                     # float means
 node corridor3d/encode.mjs --dummy    # numbered placeholder frames, no GPU needed
 ```
 
+## The walk is by torchlight
+
+The owner's ruling after four review rounds of the lamp-lit corridor (the close, shallow-focus
+frames passed; the wide ones failed on the runner, the lamp shades and door 313): keep the
+scene, change the cinematography. The whole walk is a handheld flashlight point of view.
+
+- **The torch** (`TORCH` in `main.js`, `torchAim`, `torchLevel`, `TORCH_HAND` in `layout.js`) is a
+  real light in the walker's hand, 27 cm right of the lens, 30 cm below it: things cast shadows
+  that are seen, and a surface the walker is close to is raked. Four lights from that one point:
+  a soft hot spot about 19 degrees across, a spill about 48 degrees across and two stops under,
+  a faint ring from the reflector, and a very wide, very faint leak past the reflector's rim
+  that the walker's own surroundings are just seen by. The hot spot sits a little off the
+  centre of the spill. Tungsten colour; the dust pass draws the beam faintly in the air.
+- **Where it points** is a list of things worth finding (`AIMS`): the number on 301, the foot of
+  the right wall where the child's shoe lies, paper come away at a seam, the clawed inside of
+  305, the dried hand on 306, door 308 just under its number, the line of light under 311, the
+  boards across 312. Between them the beam is on one wall or the other a few steps ahead. At
+  the end it comes to the threshold of 313 and climbs the leaf to the number, the last thing
+  lit. The hand is never still (slow seeded noise). It falters once, at s 15.5: a slow dip to a
+  fifth and back over two metres of walking, going orange as it dims.
+- **The camera** follows the beam the way a head follows a hand, 14 cm of walking late and three
+  quarters of the way (nearly all the way on the narrow phone frame), so the hot spot is never
+  dead centre. Eye height 1.4 m, about a 42 mm lens on the wide frame, f/1.8, focused on what
+  the beam is on, 2 to 3 degrees of roll. The walker keeps close to whatever the torch is on
+  and goes round the open door 305 on its right.
+- **Exposure** is set for the hot spot (`exposureStops`): it follows the distance of what the
+  beam is on, most of the way, so near things burn a little and far things sink.
+- **The ceiling lamps** are dead, or a filament barely glowing that lights nothing but itself
+  (`LAMP_KIND.ember`). Five embers recede in the dark through the first half of the walk and go
+  out one after another from the far end between s 13 and 15.8, inside the third caption
+  ("The lights were fine a minute ago."); then the torch falters; then door 308. The exit sign
+  stays as the one cool accent, and the line of light under 311.
+- **The runner** is dark and only ever in the edge of the beam or out of focus. **Door 313** has
+  the wear of the most handled door on the floor: varnish flaked pale along the grain where it
+  is pushed and kicked, a greasy halo round handle and number, dirt run down from both.
+
 ## Stills first
 
-The owner's ruling: no full render until six stills pass review (two independent reviewers,
-8 of 10 or more each for photographic realism, four rounds at most). `stills.json` names the
-six: the first frame, mid walk, the glance at the clawed inside of door 305, the held frame at
-door 308, the scare at its peak (stand-in face, variant `f`) and the last door. They are real
-frames of the desktop walk, 1600 x 900, through the whole pipeline exactly as a shipped frame
-goes, only with more samples (320 against the walk's 48 to 96). One command renders them:
-`node corridor3d/render.mjs stills`.
+The gate is unchanged: no full render until six stills pass review (two fresh reviewers, 8 of
+10 or more each, two rounds at most for the torch-lit walk). `stills.json` names the six; the
+keyframes of rounds 1 to 4 are kept there under `rounds1to4` (they are frames of the walk as it
+was at commit 372b1ca). They are real frames of the desktop walk, 1600 x 900, through the whole
+pipeline exactly as a shipped frame goes, only with more samples (320). One command renders
+them: `node corridor3d/render.mjs stills`.
 
 ## How a frame is made
 
@@ -104,7 +139,7 @@ differs from it only where the door moved) but carries its own grain, as film wo
 finds the changed region by comparing frames: with grain that differs everywhere its threshold
 has to sit above the grain (not checked in this round, the encode has not been run).
 
-### Light
+### Light (rounds 1 to 4, kept for the record: the walk is now lit by the torch, see above)
 
 The corridor is pools of light with dark between them from the first frame. A bulb hangs level
 with the rim of its shade and its cone fades over its outer half, so a pool on the wall has a
@@ -218,6 +253,9 @@ as air). The volume stays in the code, off.
 - `clearcoat` renders black in this version, so varnish is plain low roughness.
 - Emissive surfaces that are small and bright make fireflies. The bulbs are therefore drawn in a
   separate raster overlay and do their lighting through an explicit light.
+- A 2D canvas `filter` (blur) used while baking a 2048 px skin left the whole canvas black, with
+  no error: the door it belonged to rendered as a flat grey laminate (specular only). The bakes
+  use no canvas filters where they draw in metres.
 - (The driver's check for a running Playwright test once matched the shell that had started
   the render, because that shell's command line contained the words: the render waited for
   ever. It now counts only the runner's own process.)

@@ -548,7 +548,7 @@ export function buildFigure(materials, { hingeSide = 1 } = {}) {
     key.position.set(kp.x ?? -0.42, kp.y ?? 0.3, kp.z ?? 0.36).applyMatrix4(headGroup.matrix);
     const eyeAt = H.eyes[P.glintEye ?? 0].clone().applyMatrix4(headGroup.matrix);
     keyTarget.position.copy(eyeAt).add(new THREE.Vector3(kp.ox ?? 0, kp.oy ?? -0.012, kp.oz ?? 0));
-    key.intensity = kp.cd ?? 0.42; // deep shadow: the stand-in is a presence, not a portrait
+    key.intensity = kp.cd ?? 0.04; // all but off: she is lit by the spill of the walker's torch, and only just // deep shadow: the stand-in is a presence, not a portrait
     key.angle = kp.angle ?? 0.11;
     key.penumbra = kp.pen ?? 0.8;
     // the rim: from deeper in the room, behind her on the side away from the door

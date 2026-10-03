@@ -12,7 +12,7 @@ const BASE = '/corridor3d/textures';
 const GRADE = {
   paper: 'grayscale(0.45) brightness(1.5) contrast(0.62)',
   boards: 'hue-rotate(9deg) saturate(0.44) brightness(1.0) contrast(0.96)', // brown, not crimson
-  carpet: 'hue-rotate(-4deg) saturate(0.5) contrast(1.2) brightness(0.24)', // a dusty brown-rose
+  carpet: 'hue-rotate(-4deg) saturate(0.45) contrast(1.2) brightness(0.14)', // a dark, dusty brown-rose: by torchlight it must never be the brightest plane
   door: 'hue-rotate(10deg) saturate(0.36) brightness(1.2) contrast(0.78)', // brown, the grain quiet
 };
 // Door skins: [material name, seed, { grime, kicked }]. scene.js hands them out.
@@ -20,7 +20,7 @@ export const DOOR_SKINS = [
   ['door301', 301, { grime: 0.6, kicked: 0.6 }],
   ['door306', 306, { grime: 0.5, kicked: 0.4 }],
   ['door308', 308, { grime: 0.7, kicked: 0.5 }],
-  ['door313', 313, { grime: 1.0, kicked: 1.0 }],
+  ['door313', 313, { grime: 1.0, kicked: 1.0, worn: 1 }],
   ['doorA', 11, { grime: 0.3, kicked: 0.5 }],
   ['doorB', 12, { grime: 0.6, kicked: 0.3 }],
   ['doorC', 13, { grime: 0.45, kicked: 0.8 }],
@@ -479,6 +479,10 @@ function clawedDoor(wood, W, H) {
     g.fillStyle = pat;
     g.fillRect(0, 0, W, H);
     // the inside of a door nobody polished: duller, and darker towards the floor
+    // (the figure of the veneer held back: under a torch a foot away its pale streaks read as
+    // drawn lines, and the gouges must be the only pale marks)
+    g.fillStyle = 'rgba(84,66,50,0.38)';
+    g.fillRect(0, 0, W, H);
     const shade = g.createLinearGradient(0, 0, 0, H);
     shade.addColorStop(0, 'rgba(0,0,0,0.12)');
     shade.addColorStop(0.6, 'rgba(0,0,0,0.05)');
@@ -499,7 +503,7 @@ function clawedDoor(wood, W, H) {
   // the height map gives it real depth for the normal map.
   const track = (x, y, len, lean, w, depth) => {
     // old cuts have gone grey-brown with dirt, the last ones are still pale
-    const tone = 0.72 + 0.4 * Math.pow(r(), 1.2); // some have gone dull with dirt, a few are fresh
+    const tone = 0.62 + 0.5 * Math.pow(r(), 1.3); // some have gone dull with dirt, a few are fresh
     // a nail skids: the line wavers, bites deeper in places and lifts off at the end
     const N = 24;
     const pts = [];
@@ -546,7 +550,7 @@ function clawedDoor(wood, W, H) {
   for (const [a, b] of [[0.21, 0.88], [1.035, 1.914]]) {
     const x0 = 0.108 * px;
     const w0 = (0.853 - 0.216) * px;
-    g.strokeStyle = 'rgba(8,5,3,0.5)';
+    g.strokeStyle = 'rgba(8,5,3,0.14)';
     g.lineWidth = 0.012 * px;
     g.strokeRect(x0, yOf(b), w0, (b - a) * px);
     hg.strokeStyle = 'rgba(0,0,0,0.75)';
@@ -560,10 +564,10 @@ function clawedDoor(wood, W, H) {
   // and the handle, where a door might give. Each place was gone over again and again, so the
   // marks come in dense patches, the varnish between them flaked off to bare, dull wood.
   const places = [];
-  for (let i = 0; i < 7; i++) {
-    const lockSide = i < 4;
+  for (let i = 0; i < 5; i++) {
+    const lockSide = i < 3;
     // (at hand height, round the handle and along the lock edge: nothing up in the dark)
-    places.push({ x: lockSide ? 0.5 + r() * 0.27 : 0.2 + r() * 0.3, y: 0.72 + r() * 0.55, rx: 0.08 + r() * 0.07, ry: 0.13 + r() * 0.12, n: lockSide ? 5 + Math.floor(r() * 3) : 3 + Math.floor(r() * 2) });
+    places.push({ x: lockSide ? 0.5 + r() * 0.27 : 0.2 + r() * 0.3, y: 0.72 + r() * 0.55, rx: 0.08 + r() * 0.07, ry: 0.13 + r() * 0.12, n: lockSide ? 3 + Math.floor(r() * 2) : 2 + Math.floor(r() * 2) });
   }
   for (const pl of places) {
     // the flaked varnish: an uneven pale patch, broken up along the grain
@@ -583,7 +587,7 @@ function clawedDoor(wood, W, H) {
     for (let k = 0; k < pl.n; k++) {
       const x = (pl.x + (r() - 0.5) * 1.6 * pl.rx) * px;
       const top = pl.y + pl.ry * (0.2 + 0.9 * r());
-      const len = (0.07 + r() * 0.26) * px;
+      const len = (0.05 + Math.pow(r(), 1.5) * 0.34) * px;
       const lean = bias + (r() - 0.5) * 0.1; // a set of nails comes down together
       const spread = (0.014 + r() * 0.008) * px;
       const fingers = r() < 0.35 ? 3 : 4;
@@ -634,10 +638,10 @@ function plates(S) {
   const ag = a.getContext('2d');
   const mg = m.getContext('2d');
   const hg = hgt.getContext('2d');
-  ag.fillStyle = 'rgb(150,116,60)';
+  ag.fillStyle = 'rgb(112,86,46)';
   ag.fillRect(0, 0, S, S);
   // roughness in G, metalness in B
-  mg.fillStyle = 'rgb(0,168,255)'; // dull: a tarnished plate does not flash back at the lamp
+  mg.fillStyle = 'rgb(0,196,255)'; // dull: a tarnished plate does not flash back at the lamp
   mg.fillRect(0, 0, S, S);
   hg.fillStyle = '#909090';
   hg.fillRect(0, 0, S, S);
@@ -980,7 +984,7 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
   T.decals = tex(decalAtlas(img['worn_plaster_wall/Diffuse'], size), { srgb: true, repeat: false });
   const claw = clawedDoor(src.door, Math.round(size * 0.75), Math.round((size * 0.75 * 2.03) / 0.86));
   T.claw = tex(claw.albedo, { srgb: true, repeat: false });
-  T.clawNormal = tex(heightToNormal(claw.height, 18, false), { repeat: false });
+  T.clawNormal = tex(heightToNormal(claw.height, 26, false), { repeat: false });
   {
     // where a nail has cut through, the varnish is gone: raw wood, dull
     const rc = canvas(claw.height.width, claw.height.height);

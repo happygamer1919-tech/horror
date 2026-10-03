@@ -1,9 +1,9 @@
 // Harness entry. The node driver (render.mjs) calls window.corridor.* through Playwright.
 import * as THREE from 'three';
-import { PhysicalCamera } from 'three-gpu-pathtracer';
+import { PhysicalCamera, PhysicalSpotLight } from 'three-gpu-pathtracer';
 import { Pipeline, LENS, lensZoom, lensForward } from './pipeline.js';
 import { buildScene } from './scene.js';
-import { SETS, cameraPose, frameS, exposureStops, scareOpen, scareLean, HW, FSTOP, focusDistance } from './layout.js';
+import { SETS, cameraPose, frameS, exposureStops, scareOpen, scareLean, HW, FSTOP, focusDistance, torchAim, torchLevel, TORCH_HAND } from './layout.js';
 
 const canvas = document.getElementById('c');
 let pipe;
@@ -12,8 +12,62 @@ let camera;
 let built = false;
 let volume = false; // a true haze volume is in the tracer (init({ haze }))
 
-// Exposed for the pools of light under the lamps: what they do not reach is left to go black.
-const BASE_EXPOSURE = 0.56;
+// Exposed for the hot spot of the torch on a wall two metres off (layout.js exposureStops follows
+// the distance of what the beam is on); what the beam does not reach is left to go black.
+const BASE_EXPOSURE = 2.1;
+
+// The torch: an old one, a tungsten bulb in a dented reflector. Three lights from one point in
+// the walker's hand: the hot spot (about 15 degrees across, soft edged), the spill round it (about
+// 38 degrees, three stops under), and a faint ring where the reflector's edge throws a second
+// image of the filament. The hot spot sits a little off the centre of the spill, as it does when
+// the bulb is not seated straight.
+// (And a fourth, very wide and very faint: what leaks past the rim of the reflector. It is what
+// the walker's own surroundings are seen by, just.)
+const TORCH = { cd: 62, color: [1.0, 0.8, 0.56], hot: [0.17, 0.92], spill: [0.42, 1.0, 0.21], ring: [0.235, 0.34, 0.03], leak: [1.05, 1.0, 0.012] };
+let torch;
+function buildTorch() {
+  const mk = (angle, pen) => {
+    const l = new PhysicalSpotLight(new THREE.Color(...TORCH.color), TORCH.cd, 0, angle, pen, 2);
+    l.radius = 0.014;
+    l.position.set(...TORCH_HAND);
+    const t = new THREE.Object3D();
+    l.target = t;
+    camera.add(l, t);
+    return l;
+  };
+  torch = { hot: mk(TORCH.hot[0], TORCH.hot[1]), spill: mk(TORCH.spill[0], TORCH.spill[1]), ring: mk(TORCH.ring[0], TORCH.ring[1]), leak: mk(TORCH.leak[0], TORCH.leak[1]) };
+}
+// Point it at the thing it is on for a walker at s, at the level it burns at there.
+function aimTorch(s, scaleBy = 1) {
+  const a = torchAim(s);
+  camera.updateMatrixWorld(true);
+  const local = camera.worldToLocal(new THREE.Vector3(a[0], a[1], -a[2]));
+  const d = local.length();
+  torch.hot.target.position.copy(local);
+  torch.spill.target.position.copy(local).add(new THREE.Vector3(0.03 * d, -0.022 * d, 0));
+  torch.ring.target.position.copy(torch.spill.target.position);
+  torch.leak.target.position.copy(torch.spill.target.position);
+  const lvl = torchLevel(s) * scaleBy;
+  // a failing battery goes orange before it goes dark
+  const warm = 0.45 + 0.55 * lvl;
+  for (const l of Object.values(torch)) l.color.setRGB(TORCH.color[0], TORCH.color[1] * (0.8 + 0.2 * warm), TORCH.color[2] * (0.55 + 0.45 * warm));
+  torch.hot.intensity = TORCH.cd * lvl;
+  torch.spill.intensity = TORCH.cd * TORCH.spill[2] * lvl;
+  torch.ring.intensity = TORCH.cd * TORCH.ring[2] * lvl;
+  torch.leak.intensity = TORCH.cd * TORCH.leak[2] * lvl;
+  camera.updateMatrixWorld(true);
+  // for the dust pass: the beam itself, faintly, in the air
+  const pos = new THREE.Vector3();
+  torch.hot.getWorldPosition(pos);
+  const to = new THREE.Vector3();
+  torch.spill.target.getWorldPosition(to);
+  const dir = to.sub(pos).normalize();
+  const col = (k) => new THREE.Vector3(torch.hot.color.r, torch.hot.color.g, torch.hot.color.b).multiplyScalar(TORCH.cd * lvl * k);
+  return [
+    { pos, dir, color: col(1), cone: [Math.cos(TORCH.hot[0]), Math.cos(TORCH.hot[0] * (1 - TORCH.hot[1]))] },
+    { pos, dir, color: col(TORCH.spill[2]), cone: [Math.cos(TORCH.spill[0]), Math.cos(TORCH.spill[0] * (1 - TORCH.spill[1]))] },
+  ];
+}
 
 function setPose(s, set) {
   const p = cameraPose(s, set);
@@ -44,6 +98,7 @@ window.corridor = {
     volume = (haze ?? 0) > 0;
     camera = new PhysicalCamera(45, 16 / 9, 0.08, 80);
     world.scene.add(camera);
+    buildTorch();
     return { gpu: pipe.gpu, triangles: Math.round(world.triangles) };
   },
 
@@ -56,6 +111,7 @@ window.corridor = {
     // the lens: nearly wide open, focused on what the walker is looking at
     camera.fStop = opts.fStop ?? FSTOP[set];
     camera.focusDistance = opts.focus ?? focusDistance(at);
+    let beam = aimTorch(at, opts.torch ?? 1);
     // debug view: cam = { p: [x, y, s], t: [x, y, s], fov }
     const free = opts.cam;
     if (free) {
@@ -69,6 +125,7 @@ window.corridor = {
       camera.focusDistance = opts.focus ?? Math.hypot(free.p[0] - free.t[0], free.p[1] - free.t[1], free.p[2] - free.t[2]);
     }
     camera.updateMatrixWorld(true);
+    if (free) beam = aimTorch(at, opts.torch ?? 1);
     const t0 = performance.now();
     if (state.moved || !built) {
       pipe.setScene(world.scene, camera);
@@ -90,7 +147,7 @@ window.corridor = {
       // but film grain is never the same twice: its seed is the frame's own
       grainSeed: seed + (scare ? 37 * (scare.j + 1) + (scare.variant === 'gap' ? 500 : 0) : 0),
       bounces: opts.bounces,
-      lamps: world.fogLamps(state.lamps),
+      lamps: beam,
       shutter: shutterLen > 0 && !free ? (u) => setPose(at + (u - 0.5) * shutterLen, set) : null,
       halfWidth: HW,
       volume,

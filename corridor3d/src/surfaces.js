@@ -599,7 +599,7 @@ export { printTile };
 // A woven red runner with a dark stripe down each side, the kind every hotel of the time had,
 // 1.2 m wide. Forty years of feet have worn a pale path down its middle and a bald patch in
 // front of every door; the edges, where nobody walks, kept their colour and took the dirt.
-export const CARPET_PANELS = 16; // 1.87 m each: 0.9 mm a texel along the runner, so the weave is in the albedo
+export const CARPET_PANELS = 8; // the runner is only ever in the edge of the beam or out of focus
 export const CARPET_FROM = START + 0.3;
 export const CARPET_TO = END - 0.015; // it runs up to the last door
 export const CARPET_LEN = (CARPET_TO - CARPET_FROM) / CARPET_PANELS;
@@ -735,7 +735,7 @@ const HANDLE = { x: -(LW / 2 - 0.058), y: 1.0 };
 export const doorUV = (x, y, handleSide) => [(handleSide < 0 ? x + LW / 2 : LW / 2 - x) / LW, y / DOOR.h];
 
 // src: { door } canvas (the scan, graded). opts: { grime 0..1, kicked 0..1 }.
-export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
+export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5, worn = 0 } = {}) {
   const c = canvas(S);
   const g = c.getContext('2d');
   const kx = S / LW;
@@ -760,8 +760,13 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
     pat.setTransform(across ? m.rotate(90).scale(k, -k) : m.scale(k, -k));
     g.fillStyle = pat;
     g.fillRect(a, b, cc - a, d - b);
-    const t = 0.78 + 0.26 * r();
-    g.globalCompositeOperation = 'multiply';
+    const t = (0.78 + 0.26 * r()) * (1 + 0.3 * worn); // where the varnish has worn thin the wood is paler
+    g.globalCompositeOperation = worn > 0 ? 'source-over' : 'multiply';
+    if (worn > 0) {
+      g.fillStyle = `rgba(150,128,100,${0.16 * worn})`;
+      g.fillRect(a, b, cc - a, d - b);
+      g.globalCompositeOperation = 'multiply';
+    }
     g.fillStyle = `rgb(${255 * t},${255 * t * (0.95 + 0.05 * r())},${255 * t * (0.9 + 0.1 * r())})`;
     g.fillRect(a, b, cc - a, d - b);
     g.restore();
@@ -868,6 +873,51 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
   rub(x0 + 0.0015, 0.02, x0 + 0.0015, DOOR.h);
   rub(x1 - 0.0015, 0.02, x1 - 0.0015, DOOR.h);
   rub(x0, 0.016, x1, 0.016);
+  if (worn > 0) {
+    // The most handled door on the floor (313): the varnish flaked off in pale patches broken
+    // along the grain where it is pushed, pulled and kicked, dirt run down from the lock and the
+    // number, a greasy dark halo round both.
+    const gauss = () => (r() + r() + r() - 1.5) / 1.5;
+    g.save();
+    for (const [cx, cy, rx, ry, n, across] of [
+      [HANDLE.x + 0.12, 1.14, 0.13, 0.26, 150, 0],
+      [0.06, 1.34, 0.2, 0.26, 70, 0],
+      [0, 0.12, 0.36, 0.09, 150, 1],
+      [0.02, 0.96, 0.3, 0.05, 60, 1],
+      [x0 + 0.035, 1.02, 0.025, 0.5, 70, 0],
+      [x1 - 0.05, 0.6, 0.04, 0.5, 40, 0],
+    ]) {
+      for (let i = 0; i < n; i++) {
+        g.fillStyle = `rgba(${148 + 30 * r()},${120 + 26 * r()},${90 + 22 * r()},${(0.1 + 0.22 * r()) * worn})`;
+        const a = 0.003 + r() * 0.009;
+        const b = 0.012 + r() * 0.045;
+        g.beginPath();
+        g.ellipse(cx + gauss() * rx, cy + gauss() * ry, across ? b : a, across ? a : b, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    for (const [cx, cy, rx, ry] of [[HANDLE.x + 0.01, 0.98, 0.07, 0.16], [0, 1.655, 0.12, 0.07]]) {
+      g.save();
+      g.translate(cx, cy);
+      g.scale(rx, ry);
+      const rg = g.createRadialGradient(0, 0, 0.55, 0, 0, 1.25);
+      rg.addColorStop(0, `rgba(9,7,5,${0.55 * worn})`);
+      rg.addColorStop(1, 'rgba(9,7,5,0)');
+      g.fillStyle = rg;
+      g.fillRect(-1.3, -1.3, 2.6, 2.6);
+      g.restore();
+    }
+    for (let i = 0; i < 16; i++) {
+      const top = i < 9 ? [HANDLE.x + (r() - 0.5) * 0.05, 0.88] : [(r() - 0.5) * 0.14, 1.61];
+      const len = 0.12 + r() * 0.45;
+      const gr = g.createLinearGradient(0, top[1], 0, top[1] - len);
+      gr.addColorStop(0, `rgba(8,6,4,${0.3 * worn})`);
+      gr.addColorStop(1, 'rgba(8,6,4,0)');
+      g.fillStyle = gr;
+      g.fillRect(top[0], top[1] - len, 0.003 + r() * 0.008, len);
+    }
+    g.restore();
+  }
   // round the handle plate the varnish is worn through in a ragged ring: every hand lands there
   for (let i = 0; i < 70; i++) {
     const a = r() * Math.PI * 2;

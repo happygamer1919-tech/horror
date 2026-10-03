@@ -399,7 +399,7 @@ const FINAL = /* glsl */ `
     // whatever structure the shadows have rides on top of it
     // one hue over everything is a tint, not a photograph: the deep shadows drift a little
     // cooler and greener than the tungsten pools (their level is not touched)
-    col *= mix(vec3(0.872, 1.038, 1.142), vec3(1.0), smoothstep(0.02, 0.25, l));
+    col *= mix(vec3(0.955, 1.012, 1.045), vec3(1.0), smoothstep(0.015, 0.09, l));
     col = lift + col * (1.0 - lift);
     // grain, matched to the film layer the site lays over its hero: clumps of about two pixels,
     // nearly monochrome with a little colour, strongest in the low midtones, fading into the
@@ -1003,7 +1003,7 @@ export class Pipeline {
 export const LENS = { k1: 0.055, ca: 0.0032 };
 // The look of the film and the lens, in one place.
 export const LOOK = {
-  dust: 0.00011, // in-scatter of the lamp cones, thin
+  dust: 0.0005, // in-scatter of the torch beam: the cone is faintly there in the dusty air
   extinction: 0.004, // per metre: the far end loses a tenth of its contrast
   bloom: 0.2, // the glow round a lamp: 25 to 40 px at 1600 wide
   halo: 0.2, // the long warm tail: it reaches 100 to 200 px from a lamp

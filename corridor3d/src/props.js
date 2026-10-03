@@ -217,7 +217,7 @@ function shoe() {
           // scuffed at the toe and along the welt, dirt in the creases
           const uu = p[0] / L;
           const scuff = smooth(0.8, 1, uu) * 0.35 + smooth(0.018, 0.006, p[1] - soleT(uu)) * 0.3;
-          const k = (0.9 + 0.2 * fbm(p[0] * 60, p[2] * 60 + p[1] * 40, 9, 3)) * (1 + 5 * scuff);
+          const k = (0.9 + 0.2 * fbm(p[0] * 60, p[2] * 60 + p[1] * 40, 9, 3)) * (1 + 1.5 * scuff);
           col.push(k, k * 0.97, k * 0.94);
         }
       }
@@ -269,7 +269,7 @@ function shoe() {
     const gi = new THREE.BufferGeometry();
     gi.setAttribute('position', new THREE.Float32BufferAttribute(ins, 3));
     gi.computeVertexNormals();
-    b.add('cream', gi, null, [0.85, 0.74, 0.58]); // the lining, pale and grubby
+    b.add('cream', gi, null, [0.3, 0.26, 0.2]); // the lining, pale and grubby
   }
   return b;
 }
@@ -492,7 +492,7 @@ export async function buildProps(bag, materials, T, doorMeta) {
     const k = 1.22; // about a size 31
     // It stands where it was stepped out of, in the first pool of light: upright, the toe turned
     // towards the right wall, side on to the walker: the sole, the strap and the dark mouth of it.
-    bag.addBag(sh, M(move(-0.08, 0, 0), scale(k), rotX(0.06), rotZ(-0.16), rotY(0.75), move(x, carpetHeight(x, ss) + 0.002, -ss)));
+    bag.addBag(sh, M(move(-0.08, 0, 0), scale(k), rotX(0.06), rotZ(-0.16), rotY(2.3), move(x, 0.002, -ss)));
   }
 
   // ---- on the ceiling: two smoke detectors, yellowed, one hanging by its wire ----
@@ -585,7 +585,7 @@ export async function buildProps(bag, materials, T, doorMeta) {
   {
     const d = doorByNo(311);
     const frame = wallFrame(d.side, d.s + DOOR.w / 2);
-    const lamp = new THREE.PointLight(new THREE.Color(1.0, 0.86, 0.66), 26, 0, 2);
+    const lamp = new THREE.PointLight(new THREE.Color(1.0, 0.86, 0.66), 5, 0, 2);
     // low and close behind the door, so it rakes out under it and across the corridor floor
     const p = new THREE.Vector3(0.05, 0.06, -WALL_T - 0.62).applyMatrix4(frame);
     lamp.position.copy(p);
