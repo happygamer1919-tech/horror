@@ -149,6 +149,8 @@ export const en: Copy = {
     languages: { ro: 'Romanian', ru: 'Russian', en: 'English' },
     total: 'Total',
     submit: 'Book a time slot',
+    choose: (levels) => (levels ? 'Choose team size and level' : 'Choose team size'),
+    confirmCall: 'We call you on the day of the game to confirm the booking.',
     request: 'We copy one line: team, level, language, total. Paste it into the comment field of the booking form.',
     tel: 'Or call',
     note: 'No payment on this page. You pay in cash at the venue.',
@@ -213,7 +215,7 @@ export const en: Copy = {
       { q: 'How can I pay?', a: 'Cash only, at the venue.', known: true },
       {
         q: 'How do I book?',
-        a: `Fill in the registration card on this page and press "Book a time slot". Choose a free time in the booking form and paste the copied line (team, level, language, total) into its comment field. Or call ${v.phone}.`,
+        a: `Fill in the registration card on this page and press "Book a time slot". Choose a free time in the booking form and paste the copied line (team, level, language, total) into its comment field. Or call ${v.phone}.${v.confirmCall ? ` ${v.confirmCall}` : ''}`,
         known: true,
       },
       { q: 'Where is the hotel?', a: `${v.address}.`, known: true },

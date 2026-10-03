@@ -149,6 +149,8 @@ export const ro: Copy = {
     languages: { ro: 'Română', ru: 'Rusă', en: 'Engleză' },
     total: 'Total',
     submit: 'Rezervați o oră',
+    choose: (levels) => (levels ? 'Alegeți mărimea echipei și nivelul' : 'Alegeți mărimea echipei'),
+    confirmCall: 'Vă sunăm în ziua jocului pentru a confirma rezervarea.',
     request: 'Copiem un singur rând: echipă, nivel, limbă, total. Lipiți-l în câmpul de comentariu al formularului de rezervare.',
     tel: 'Sau sunați',
     note: 'Nicio plată pe această pagină. Plata se face în numerar, la fața locului.',
@@ -213,7 +215,7 @@ export const ro: Copy = {
       { q: 'Cum pot plăti?', a: 'Doar în numerar, la fața locului.', known: true },
       {
         q: 'Cum rezerv?',
-        a: `Completați fișa de cazare de pe această pagină și apăsați „Rezervați o oră”. Alegeți o oră liberă în formularul de rezervare și lipiți rândul copiat (echipă, nivel, limbă, total) în câmpul de comentariu. Sau sunați la ${v.phone}.`,
+        a: `Completați fișa de cazare de pe această pagină și apăsați „Rezervați o oră”. Alegeți o oră liberă în formularul de rezervare și lipiți rândul copiat (echipă, nivel, limbă, total) în câmpul de comentariu. Sau sunați la ${v.phone}.${v.confirmCall ? ` ${v.confirmCall}` : ''}`,
         known: true,
       },
       { q: 'Unde este hotelul?', a: `${v.address}.`, known: true },

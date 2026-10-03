@@ -15,7 +15,7 @@ import Sticky from '../../components/Sticky.astro';
 import Prices from '../../components/Prices.astro';
 import Voucher from '../../components/Voucher.astro';
 import { LANGS, abs, type Lang } from '../../config';
-import { copy, site, priceFrom, CONTACT_LEVELS_ENABLED, VOUCHERS_ENABLED } from '../../content';
+import { copy, site, priceFrom, CONTACT_LEVELS_ENABLED, VOUCHERS_ENABLED, CONFIRM_CALL_ENABLED } from '../../content';
 
 export function getStaticPaths() {
   return LANGS.map((lang) => ({ params: { lang } }));
@@ -33,6 +33,7 @@ const faq = t.faq.items({
   address,
   levels: CONTACT_LEVELS_ENABLED,
   vouchers: VOUCHERS_ENABLED,
+  confirmCall: CONFIRM_CALL_ENABLED ? t.checkin.confirmCall : null,
 });
 
 // Structured data. Base.astro only prints it when SITE_INDEXABLE=true.

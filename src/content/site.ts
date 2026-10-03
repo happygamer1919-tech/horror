@@ -22,6 +22,11 @@ export const VOUCHERS_ENABLED = true;
 // Components read it as BOOKING_URL (see index.ts). Booking always goes through the check-in card.
 export const SLOTS_URL = 'https://widget.easyweek.io/horror-quest-moldova/team/34544/62497';
 
+// The desk phones the guest on the day of the game to confirm the booking. The line shows on
+// the check-in card, in the booking dialog and in the "How do I book?" answer. false hides
+// the line everywhere.
+export const CONFIRM_CALL_ENABLED = true;
+
 // Telegram, the second "ask a question" channel next to WhatsApp. A phone link cannot be
 // prefilled reliably, so the site copies the message to the clipboard and says so.
 export const TELEGRAM_URL = 'https://t.me/+37368232596';

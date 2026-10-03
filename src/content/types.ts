@@ -20,6 +20,8 @@ export interface FaqValues {
   address: string;
   levels: boolean;
   vouchers: boolean;
+  // The "we call you on the day of the game" sentence, or null when CONFIRM_CALL_ENABLED is off.
+  confirmCall: string | null;
 }
 
 export interface Copy {
@@ -154,6 +156,10 @@ export interface Copy {
     languages: { ro: string; ru: string; en: string };
     total: string;
     submit: string;
+    // Next to the booking button while it is disabled. `levels` is CONTACT_LEVELS_ENABLED.
+    choose: (levels: boolean) => string;
+    // Shown only while CONFIRM_CALL_ENABLED is true (card, booking dialog, FAQ).
+    confirmCall: string;
     request: string;
     tel: string;
     note: string;
