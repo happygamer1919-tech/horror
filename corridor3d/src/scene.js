@@ -71,7 +71,7 @@ export async function buildScene({ textureSize = 2048, haze = HAZE.density } = {
     if (kind === 'scare') hingeSide = near;
     if (kind === 'scratched') {
       hingeSide = -near;
-      angle = 1.12; // hangs wide: its inside faces the walker and the lamp
+      angle = 1.22; // hangs wide (70 degrees): its inside faces the walker and the lamp
     }
     const leaf = buildLeaf({
       no: d.no,
@@ -94,6 +94,14 @@ export async function buildScene({ textureSize = 2048, haze = HAZE.density } = {
       const pivot = new THREE.Group();
       const lw = DOOR.w - 0.007;
       pivot.position.set(hingeSide * (DOOR.w / 2 - 0.0035), 0, -REC - DOOR.t);
+      // door 308 is the darkest leaf in the corridor: at the scare it is a dark mass beside a lit wall
+      for (const [mat, list] of leaf.items) {
+        if (!mat.startsWith('door')) continue;
+        for (const g of list) {
+          const c = g.attributes.color;
+          for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * 0.27, c.getY(i) * 0.26, c.getZ(i) * 0.25);
+        }
+      }
       const leafGroup = leaf.build(materials, 'scareLeaf');
       leafGroup.position.set(-hingeSide * (lw / 2), 0, DOOR.t);
       pivot.add(leafGroup);

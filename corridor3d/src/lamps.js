@@ -14,6 +14,11 @@ export const LAMP_CD = 46; // candela at full level
 // after the bulb; its upper face is what the ceiling round a lamp, the flex and the rose are
 // lit by (an albedo of about a half up there: a faint stain of light a metre across, no more).
 const SHADE_GLOW = 5;
+// What the camera sees of the glass. A camera exposed for the pools of light clips the lamps:
+// the glass burns out to white where the bulb sits behind it and rolls off warm to the rim. That
+// brightness is drawn in the overlay pass (like the bulb), on top of the traced glass, so the
+// lamp reads as a source without the ceiling getting any more light than it has.
+const SHADE_SEEN = 6.5;
 
 function pendant(r, kind) {
   const b = new Bag();
@@ -70,7 +75,7 @@ function pendant(r, kind) {
   const rimY = -(drop - 0.055) - 0.115;
   // (its texture coordinates pinned to the rim of the glow map: left as a torus's own, the rim
   // glowed like a neon ring)
-  const rim = new THREE.TorusGeometry(0.195, 0.0035, 10, 128);
+  const rim = new THREE.TorusGeometry(0.195, 0.0055, 12, 128);
   for (let i = 0; i < rim.attributes.uv.count; i++) rim.attributes.uv.setY(i, 0.985);
   b.add('shade', rim, M(rotX(Math.PI / 2), move(0, rimY, 0)));
   return b;
@@ -95,9 +100,18 @@ export function buildLamps(materials) {
     shadeMat.roughness = 0.45 + 0.4 * d;
     const body = pendant(r, kind).build({ ...materials, shade: shadeMat }, `lamp${l.k}`);
     pivot.add(body);
+    // the glass as the camera sees it (overlay): the same surface, the same glow map
+    let glass = null;
+    body.traverse((o) => {
+      if (o.isMesh && o.material === shadeMat) {
+        glass = new THREE.Mesh(o.geometry, new THREE.MeshBasicMaterial({ map: shadeMat.emissiveMap, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+        glass.userData.overlay = true;
+      }
+    });
+    if (glass) pivot.add(glass);
     // not one of them hangs quite plumb
     // (and so no two pools of light on the walls are the same shape)
-    if (l.k !== SWING_LAMP) pivot.rotation.set((r() - 0.5) * 0.16, 0, (r() - 0.5) * 0.2);
+    if (l.k !== SWING_LAMP) pivot.rotation.set((r() - 0.5) * 0.16 + (kind.tilt ?? 0), 0, (r() - 0.5) * 0.2 + (kind.lean ?? 0));
 
     // The bulb hangs level with the rim of the shade, so its light reaches nearly to the
     // horizontal; the cone fades over its outer two thirds, which on the wall is a penumbra some
@@ -105,7 +119,9 @@ export function buildLamps(materials) {
     const light = new PhysicalSpotLight(LAMP_COLOR, LAMP_CD, 0, 1.43, 0.52, 2);
     light.radius = 0.034;
     light.position.set(0, -(drop + 0.056), 0);
-    light.target.position.set(0, -3, 0);
+    // (the last bulb sits crooked in its holder: it throws its light at door 313 and the left
+    // wall, and leaves the right wall to the dark)
+    light.target.position.set(kind.aim ? kind.aim[0] : 0, -3, kind.aim ? kind.aim[1] : 0);
     pivot.add(light, light.target);
 
     // overlay only: the bulb
@@ -114,7 +130,7 @@ export function buildLamps(materials) {
     bulb.position.set(0, -drop, 0);
     bulb.userData.overlay = true;
     pivot.add(bulb);
-    fixtures.push({ k: l.k, s: l.s, pivot, light, shadeMat, bulb, kind, last: Boolean(l.last) });
+    fixtures.push({ k: l.k, s: l.s, pivot, light, shadeMat, bulb, glass, kind, last: Boolean(l.last) });
   }
   return fixtures;
 }
@@ -133,5 +149,10 @@ export function setLamp(f, level) {
   const b = 60 * level;
   f.bulb.material.color.setRGB(b * 1.0, b * 0.84 * (0.75 + 0.25 * warm), b * 0.6 * (0.5 + 0.5 * warm));
   f.bulb.visible = on;
+  if (f.glass) {
+    f.glass.visible = on;
+    const g = SHADE_SEEN * level * (1 - 0.35 * f.kind.dust);
+    f.glass.material.color.setRGB(g, g * 0.6 * (0.75 + 0.25 * warm), g * 0.26 * (0.5 + 0.5 * warm));
+  }
   return on;
 }

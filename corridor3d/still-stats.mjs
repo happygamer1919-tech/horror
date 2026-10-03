@@ -10,10 +10,14 @@ for (const f of files) {
   const hist = new Uint32Array(256);
   let dark = 0;
   let zero = 0;
+  let hot = 0;
+  let peak = 0;
   for (let i = 0; i < data.length; i += 3) {
     const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     hist[Math.round(l)]++;
     if (l <= 3) dark++;
+    if (l >= 245) hot++;
+    if (l > peak) peak = l;
     if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 0) zero++;
   }
   const pct = (q) => {
@@ -24,7 +28,7 @@ for (const f of files) {
     }
     return 255;
   };
-  console.log(`${f.split('/').pop()}  luma 0-3: ${((100 * dark) / n).toFixed(1)} %  pure 0: ${((100 * zero) / n).toFixed(2)} %  p5 ${pct(0.05)} p25 ${pct(0.25)} p50 ${pct(0.5)} p75 ${pct(0.75)} p95 ${pct(0.95)} p99.5 ${pct(0.995)}`);
+  console.log(`${f.split('/').pop()}  luma 0-3: ${((100 * dark) / n).toFixed(1)} %  pure 0: ${((100 * zero) / n).toFixed(2)} %  luma >= 245: ${((100 * hot) / n).toFixed(2)} %  peak ${Math.round(peak)}  p5 ${pct(0.05)} p25 ${pct(0.25)} p50 ${pct(0.5)} p75 ${pct(0.75)} p95 ${pct(0.95)} p99.5 ${pct(0.995)}`);
   if (col) {
     const x = Math.min(info.width - 1, Number(col));
     const out = [];

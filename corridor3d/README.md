@@ -62,8 +62,8 @@ goes, only with more samples (320 against the walk's 48 to 96). One command rend
 1. **Path tracing** with `three-gpu-pathtracer` (WebGL2, real GPU through ANGLE Metal; the
    driver logs the `UNMASKED_RENDERER` string). Real global illumination, 7 bounces. Each lamp
    is a small disc light under its shade (soft penumbra); the opal glass glows as an emissive
-   surface and is what lights the ceiling. The camera is a thin lens (f/2.2, about 30 mm on the
-   wide frame, 61 degrees across): what
+   surface and is what lights the ceiling. The camera is a thin lens (f/2.2, about 35 mm on the
+   wide frame, 55 degrees across): what
    is close to it, the walls at the edge of the frame, is soft, and the focus follows what the
    walker looks at (`focusDistance` in `layout.js`). It also moves a little during the exposure
    (an eighth of the step to the next frame).
@@ -75,8 +75,9 @@ goes, only with more samples (320 against the walk's 48 to 96). One command rend
    over the aperture, so they carry the same depth of field as the traced image. Pixels on
    silhouettes are filtered among themselves in plain radiance, never divided by albedo: on a
    pixel that straddles an edge the traced coverage and the rastered albedo never agree exactly
-   and the quotient spikes. A last pass removes lone pixels several times brighter than
-   everything round them.
+   and the quotient spikes. The same goes for a hard jump of the albedo on one plane (a decal,
+   a sign): there the quotient left a pale one-pixel rim. A last pass removes lone pixels
+   several times brighter than everything round them.
 3. **Dust.** The lamp cones are ray-marched against the depth buffer: thin haze, thicker in the
    light, with slow density noise. The inverse square is held flat within about 60 cm of each
    bulb (`fogCore`).
@@ -97,7 +98,11 @@ goes, only with more samples (320 against the walk's 48 to 96). One command rend
 
 Everything is deterministic: progress in, pixels out. `Math.random` is replaced by a seeded
 generator, there is no wall clock, and a frame's seed depends only on its set and index. The
-tracer's stratified sampler is rebuilt from that seed for every frame.
+tracer's stratified sampler is rebuilt from that seed for every frame. The film grain has a
+seed of its own: a scare frame is traced with the seed of the frame it is laid over (so it
+differs from it only where the door moved) but carries its own grain, as film would. `encode.mjs`
+finds the changed region by comparing frames: with grain that differs everywhere its threshold
+has to sit above the grain (not checked in this round, the encode has not been run).
 
 ### Light
 
@@ -106,7 +111,14 @@ with the rim of its shade and its cone fades over its outer half, so a pool on t
 hot spot under the lamp, falls away towards the rail and ends in a penumbra some 40 cm deep; the
 lamps hang off the centre line and none plumb, so no two pools have the same shape. The opal
 glass glows on both faces: hot where the bulb sits behind it, dimmer to the rim, and its upper
-face lights the ceiling (plaster with an albedo of about a half), the flex and the rose. No two lamps are
+face lights the ceiling (plaster with an albedo of about a half), the flex and the rose. What
+the camera sees of the glass is drawn in the overlay pass on top of the traced glass
+(`SHADE_SEEN` in `lamps.js`): a camera exposed for the pools clips its lamps, so the glass burns
+out to white where the bulb sits behind it and rolls off warm to the rim, with a glow of 25 to
+40 px round it, without the ceiling getting any more light. The last bulb sits crooked in its
+holder and throws its light at door 313 and the left wall. The walker never stands square in the
+middle: close to the left wall at the start, drifting right under the swinging lamp, right of
+door 313 at the end, the horizon one to two degrees off level. No two lamps are
 the same lamp (`LAMP_KIND` in `layout.js`): different bulbs, flex, dust on the glass; lamp 1 is
 a weak orange bulb; lamp 3 burnt out long ago and its shade is gone (a bare dead bulb), so there
 is always a black gap in the middle of the corridor; lamp 4, over door 308, is tired. The far

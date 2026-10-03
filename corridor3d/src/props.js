@@ -492,7 +492,22 @@ export async function buildProps(bag, materials, T, doorMeta) {
     const k = 1.22; // about a size 31
     // It stands where it was stepped out of, in the first pool of light: upright, the toe turned
     // towards the right wall, side on to the walker: the sole, the strap and the dark mouth of it.
-    bag.addBag(sh, M(move(-0.08, 0, 0), scale(k), rotX(0.1), rotY(0.3), move(x, carpetHeight(x, ss) - 0.0005, -ss)));
+    bag.addBag(sh, M(move(-0.08, 0, 0), scale(k), rotX(0.06), rotZ(-0.16), rotY(0.75), move(x, carpetHeight(x, ss) + 0.002, -ss)));
+  }
+
+  // ---- on the ceiling: two smoke detectors, yellowed, one hanging by its wire ----
+  for (const [x, s, hang] of [[0.32, 5.1, 0], [-0.28, 26.3, 1]]) {
+    const y = CH - (hang ? 0.06 : 0);
+    bag.add('cream', new THREE.CylinderGeometry(0.052, 0.058, 0.03, 28), M(rotX(hang ? 0.5 : 0), move(x, y - 0.015, -s)), [0.8, 0.72, 0.52]);
+    bag.add('cream', new THREE.CylinderGeometry(0.03, 0.036, 0.016, 20), M(rotX(hang ? 0.5 : 0), move(x, y - 0.038, -s + (hang ? 0.012 : 0))), [0.6, 0.54, 0.4]);
+    if (hang) bag.add('cable', new THREE.CylinderGeometry(0.002, 0.002, 0.06, 6), move(x, CH - 0.03, -s - 0.02));
+  }
+
+  // ---- the latch plate on the edge of the open door 305 ----
+  {
+    const m = doorMeta[305];
+    const lw = DOOR.w - 0.007;
+    bag.add('brassDull', box(0.0015, 0.16, 0.022, 0, 0, 0), M(move(m.handleSide * (lw / 2 + 0.0008), 1.0, -DOOR.t / 2), leafPlace(305)), [0.9, 0.85, 0.75]);
   }
 
   // ---- trolley, parked against the left wall in the dark part ----

@@ -421,7 +421,7 @@ function hand(edgeX, dirX, y0) {
       return (base + j(0.2, 0.05, 0.18) + j(0.47, 0.03, 0.13) + j(0.76, 0.026, 0.09)) * (0.3 + 0.7 * tip);
     };
     const sw = sweep(pts, rad, { tint: (u) => skinTint(u, i), up: new THREE.Vector3(0, 1, 0), flat: 0.8 });
-    b.add('skin', sw.geo, null, [0.4, 0.38, 0.37]); // a stop under the face: no brighter than the door edge it holds
+    b.add('skin', sw.geo, null, [0.2, 0.19, 0.185]); // two stops under the face: no brighter than the door edge it holds
     // the nail on the back of the last bone, facing the corridor: short, ridged, broken at the edge
     const nu = 0.885;
     const nc = sw.at(nu);
@@ -431,7 +431,7 @@ function hand(edgeX, dirX, y0) {
     const basis = new THREE.Matrix4().makeBasis(nt, back, side);
     const nail = new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2);
     const centre = nc.clone().addScaledVector(back, rad(nu) * 0.7);
-    b.add('nail', nail, M(new THREE.Matrix4().makeScale(w * 0.72, w * 0.2, w * 0.6), basis, move(centre.x, centre.y, centre.z)), [0.45 - 0.03 * i, 0.41 - 0.025 * i, 0.36 - 0.025 * i]);
+    b.add('nail', nail, M(new THREE.Matrix4().makeScale(w * 0.72, w * 0.2, w * 0.6), basis, move(centre.x, centre.y, centre.z)), [0.2 - 0.012 * i, 0.185 - 0.01 * i, 0.16 - 0.01 * i]);
   });
   // the thumb, flat against the edge face, its tip towards the corridor
   {
@@ -444,7 +444,7 @@ function hand(edgeX, dirX, y0) {
     ];
     const rad = (u) => lerp(0.0102, 0.0072, u) * (u > 0.92 ? 0.4 + 0.6 * Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.92) / 0.08, 2))) : 1) * (1 + 0.15 * Math.exp(-Math.pow((u - 0.55) / 0.05, 2)));
     const sw = sweep(pts, rad, { tint: (u) => skinTint(u * 0.9, 5), up: new THREE.Vector3(0, 0, 1), flat: 0.78 });
-    b.add('skin', sw.geo, null, [0.45, 0.43, 0.42]);
+    b.add('skin', sw.geo, null, [0.22, 0.21, 0.205]);
   }
   // the back of the hand and the wrist, in the gap and going back into the dark room
   const back = new THREE.SphereGeometry(1, 28, 20);

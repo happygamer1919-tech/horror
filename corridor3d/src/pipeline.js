@@ -180,7 +180,8 @@ const ATROUS_EDGE = /* glsl */ `
 // G-buffer disagrees with the centre sample) keep the traced, antialiased value instead.
 const REMOD = /* glsl */ `
   uniform sampler2D tex; uniform sampler2D raw; uniform sampler2D albedo; uniform sampler2D overlay;
-  uniform sampler2D gbuf; uniform sampler2D gbufAA; varying vec2 vUv;
+  uniform sampler2D gbuf; uniform sampler2D gbufAA; uniform vec2 px; varying vec2 vUv;
+  float lumA(vec2 uv) { return dot(max(texture2D(albedo, uv).rgb, vec3(0.03)), vec3(0.2126, 0.7152, 0.0722)); }
   void main() {
     vec3 al = max(texture2D(albedo, vUv).rgb, vec3(0.03));
     vec4 c = texture2D(gbuf, vUv);
@@ -189,6 +190,20 @@ const REMOD = /* glsl */ `
     float step_ = abs(a.a - c.a) / max(c.a, 0.1);
     float edge = clamp(max(bend * 14.0, step_ * 60.0), 0.0, 1.0);
     if (c.a <= 0.0) edge = 1.0;
+    // Where the albedo itself jumps on one plane (the runner on the boards, a decal on a door)
+    // there is no geometric edge, but the traced coverage and the rastered albedo disagree by a
+    // fraction of a pixel all the same: the quotient spiked into a pale one-pixel rim along the
+    // runner. Such pixels go the radiance way too.
+    float la = lumA(vUv);
+    float ae = 0.0;
+    for (int i = 0; i < 4; i++) {
+      vec2 o = i == 0 ? vec2(px.x, 0.0) : i == 1 ? vec2(-px.x, 0.0) : i == 2 ? vec2(0.0, px.y) : vec2(0.0, -px.y);
+      float ln = lumA(vUv + o);
+      ae = max(ae, abs(ln - la) / (ln + la));
+    }
+    // (only a hard jump counts: the weave of the runner or the print of the paper must stay on
+    // the albedo path, or they are filtered flat)
+    edge = max(edge, smoothstep(0.42, 0.62, ae));
     // The filtered image is irradiance (divided by albedo, multiplied back here). The edge path
     // is plain radiance, never divided: on a pixel that straddles an edge the traced coverage and
     // the rastered albedo never agree exactly, and their quotient spikes.
@@ -311,10 +326,13 @@ const FINAL = /* glsl */ `
     float t = m < knee ? m : knee + (1.0 - knee) * (1.0 - exp(-(m - knee) / (1.0 - knee)));
     // the toe of the negative: the deep shadows are compressed (never clipped: the print's own
     // black, the lift, is added after), so the dark between the lamps stays dark
-    t *= t / (t + toe);
+    // (the toe takes 1 / (1 + toe) off everything, white included: white is given back at the
+    // top of the curve only, so the shadows and the midtones stay exactly where they were)
+    t *= (t / (t + toe)) * mix(1.0, 1.0 + toe, smoothstep(0.55, 0.97, t));
     vec3 o = c * (t / m);
-    float bleach = smoothstep(0.7, 1.0, t);
-    o = mix(o, vec3(t), 0.55 * bleach);
+    // what is far over white burns out to white: the core of a lamp, the bulb
+    float bleach = 0.5 * smoothstep(0.7, 1.0, t) + 0.5 * smoothstep(1.2, 3.2, m);
+    o = mix(o, vec3(t), bleach);
     return clamp(o, 0.0, 1.0);
   }
   vec3 toSRGB(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
@@ -378,6 +396,9 @@ const FINAL = /* glsl */ `
     col = mix(vec3(l), col, sat * mix(0.5, 1.0, smoothstep(0.015, 0.1, l)));
     // the toe: scene black is not paper black. It lands a little above zero, a little warm, and
     // whatever structure the shadows have rides on top of it
+    // one hue over everything is a tint, not a photograph: the deep shadows drift a little
+    // cooler and greener than the tungsten pools (their level is not touched)
+    col *= mix(vec3(0.93, 1.02, 1.07), vec3(1.0), smoothstep(0.02, 0.22, l));
     col = lift + col * (1.0 - lift);
     // grain, matched to the film layer the site lays over its hero: clumps of about two pixels,
     // nearly monochrome with a little colour, strongest in the low midtones, fading into the
@@ -386,7 +407,7 @@ const FINAL = /* glsl */ `
     float n = (vn(p * 0.58, seed) + 0.6 * vn(p * 1.1 + 31.0, seed + 3.0) - 0.8) * 1.7;
     vec3 chroma = vec3(vn(p * 0.5 + 7.0, seed + 11.0), vn(p * 0.5 + 13.0, seed + 12.0), vn(p * 0.5 + 19.0, seed + 13.0)) - 0.5;
     float amt = grain * (0.3 + 0.7 * smoothstep(0.02, 0.18, l)) * (1.0 - 0.75 * smoothstep(0.45, 0.95, l));
-    col += (n * vec3(1.0, 0.98, 0.94) + chroma * 0.4) * amt;
+    col += n * vec3(1.0, 0.98, 0.94) * amt + chroma * (0.4 * amt + 0.006 * (1.0 - smoothstep(0.03, 0.2, l)));
     gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
   }
 `;
@@ -502,7 +523,7 @@ export class Pipeline {
       atrous: fsq(ATROUS, { tex: { value: null }, gbuf: { value: null }, px: { value: new THREE.Vector2() }, stepSize: { value: 1 }, invProj: { value: new THREE.Matrix4() }, sigmaL: { value: 4 } }),
       atrousEdge: fsq(ATROUS_EDGE, { tex: { value: null }, gbufAA: { value: null }, px: { value: new THREE.Vector2() }, stepSize: { value: 1 }, sigmaL: { value: 6 } }),
       despeck: fsq(DESPECK, { tex: { value: null }, overlay: { value: null }, px: { value: new THREE.Vector2() } }),
-      remod: fsq(REMOD, { tex: { value: null }, raw: { value: null }, albedo: { value: null }, overlay: { value: null }, gbuf: { value: null }, gbufAA: { value: null } }),
+      remod: fsq(REMOD, { px: { value: new THREE.Vector2() }, tex: { value: null }, raw: { value: null }, albedo: { value: null }, overlay: { value: null }, gbuf: { value: null }, gbufAA: { value: null } }),
       fog: fsq(FOG, {
         tex: { value: null },
         gbuf: { value: null },
@@ -864,6 +885,7 @@ export class Pipeline {
     q.remod.material.uniforms.raw.value = esrc.texture;
     q.remod.material.uniforms.gbuf.value = rt.gbuf.texture;
     q.remod.material.uniforms.gbufAA.value = rt.gbufAA.texture;
+    q.remod.material.uniforms.px.value = px;
     // (the filter's result is in src: write into the other of the pair)
     this.pass(q.remod, dst);
     q.despeck.material.uniforms.tex.value = dst.texture;
@@ -943,7 +965,7 @@ export class Pipeline {
       u.vignette.value = post.vignette ?? LOOK.vignette;
       // more gain, more grain: the exposure opens up in the dark and the film shows it
       u.grain.value = (post.grain ?? LOOK.grain) * (opts.grainGain ?? 1);
-      u.seed.value = seed % 1000;
+      u.seed.value = (opts.grainSeed ?? seed) % 1000;
       u.aspect.value = w / h;
       u.res.value.set(w, h);
       u.sat.value = post.sat ?? LOOK.sat;
@@ -982,8 +1004,8 @@ export const LENS = { k1: 0.055, ca: 0.0032 };
 export const LOOK = {
   dust: 0.00011, // in-scatter of the lamp cones, thin
   extinction: 0.004, // per metre: the far end loses a tenth of its contrast
-  bloom: 0.2, // the tight glow round a bulb
-  halo: 0.32, // the long warm tail: it reaches 100 to 200 px from a lamp
+  bloom: 0.2, // the glow round a lamp: 25 to 40 px at 1600 wide
+  halo: 0.2, // the long warm tail: it reaches 100 to 200 px from a lamp
   ghost: 0.02,
   soft: 1.6, // radius of the corner softness, pixels at the corner of a 900 px high frame
   vignette: 0.6,

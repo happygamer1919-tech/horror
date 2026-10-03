@@ -150,7 +150,6 @@ export const GHOSTS = [
   { side: 1, s: 1.3, y: 1.62, w: 0.36, h: 0.46 },
   { side: -1, s: 16.9, y: 1.55, w: 0.42, h: 0.56 },
   { side: 1, s: 24.3, y: 1.6, w: 0.3, h: 0.4 },
-  { side: 0, s: 60.62, y: 1.62, w: 0.34, h: 0.44 },
 ];
 
 // Dirt on the wallpaper as a colour multiplier, for a point of a wall.
@@ -188,7 +187,7 @@ function paperDirt(side, s, y) {
     const tide2 = Math.exp(-Math.pow((wet - 0.56) / 0.025, 2)) * smooth(0.45, 0.6, fbm(s * 3 + q, y * 3, 33, 3));
     const run = smooth(0.5, 0.75, fbm(s * 38 + q, y * 0.7, 31, 3));
     mul(c, inside * 0.5, 0.88, 0.78, 0.58);
-    mul(c, inside * run * 0.5, 0.74, 0.62, 0.45);
+    mul(c, inside * run * 0.2, 0.74, 0.62, 0.45);
     mul(c, tide * 0.55, 0.56, 0.44, 0.28);
     mul(c, tide2 * 0.35, 0.62, 0.5, 0.34);
     const mould = inside * smooth(0.52, 0.78, fbm(s * 16 + q, y * 16, 61, 3)) * smooth(1.6, 2.45, y);
@@ -198,6 +197,13 @@ function paperDirt(side, s, y) {
   const patch = fbm(s * 0.8 + q + 9, y * 1.0 + 3, 57, 4) + 0.1 * (fbm(s * 6 + q, y * 6, 59, 3) - 0.5);
   mul(c, smooth(0.655, 0.685, patch) * 0.26, 0.8, 0.7, 0.54);
   mul(c, Math.exp(-Math.pow((patch - 0.67) / 0.007, 2)) * 0.36, 0.58, 0.47, 0.32);
+  // shoulders and trolleys: a rubbed, greasy band about 1.35 m up, here and there
+  mul(c, Math.exp(-Math.pow((y - 1.36 - 0.05 * fbm(s * 0.6 + q, 2, 73, 2)) / 0.075, 2)) * smooth(0.45, 0.62, fbm(s * 0.45 + q, 6, 75, 3)) * 0.34, 0.62, 0.56, 0.48);
+  // where two walls meet, the paper is cut into the corner and the corner holds the dirt
+  {
+    const corner = side === 0 ? HW - Math.abs(s - 60) : END - s;
+    mul(c, 0.62 * smooth(0.035, 0.0, corner) + 0.2 * smooth(0.14, 0.0, corner), 0.38, 0.34, 0.28);
+  }
   // grime at hand height beside every door
   for (const d of side === 0 ? [{ side: 0, s: 60 - DOOR.w / 2 }] : DOORS) {
     if (d.side !== side) continue;
@@ -249,9 +255,9 @@ function printTile() {
   for (let k = 0; k < 4; k++) {
     const cx = (k + 0.5) * unit;
     for (let y = (k % 2 ? 0.5 : 0) * drop - drop; y < S + drop; y += drop) {
-      sprig(g, cx, y, mm * 1.25, 'rgb(196,190,170)');
+      sprig(g, cx, y, mm * 1.25, 'rgb(180,172,150)');
       // a dot between the sprigs
-      g.fillStyle = 'rgb(210,204,186)';
+      g.fillStyle = 'rgb(186,178,156)';
       g.beginPath();
       g.arc(cx, y + drop / 2, 2.2 * mm, 0, Math.PI * 2);
       g.fill();
@@ -371,7 +377,7 @@ export function wallAlbedo(p, S, src) {
   for (let n = n0; n <= n1; n++) {
     const h = hash2(n, side + 5, 911);
     const h2 = hash2(n, side + 5, 913);
-    const k = 0.93 + 0.07 * h;
+    const k = 0.965 + 0.035 * h;
     g.fillStyle = `rgb(${255 * k},${255 * k * (0.98 + 0.02 * h2)},${255 * k * (0.94 + 0.06 * h2)})`;
     g.fillRect(n * SEAM, DADO - 0.02, SEAM, H);
   }
@@ -610,7 +616,7 @@ export function carpetTransform(p) {
 // How worn the pile is at a point, 0..1.
 export function carpetWear(x, s) {
   const wander = 0.07 * Math.sin(s * 0.7 + 1) + 0.04 * Math.sin(s * 1.9);
-  let a = 0.7 * Math.exp(-Math.pow((x - wander) / 0.23, 2)) * (0.25 + 1.1 * fbm(x * 3, s * 1.2, 91, 3));
+  let a = 0.95 * Math.exp(-Math.pow((x - wander) / 0.21, 2)) * (0.15 + 1.3 * fbm(x * 3, s * 1.2, 91, 3));
   for (const d of DOORS) {
     const ds = (s - d.s - DOOR.w / 2) / 0.34;
     if (Math.abs(ds) > 2.5) continue;
@@ -621,11 +627,12 @@ export function carpetWear(x, s) {
 }
 function carpetDirt(x, s) {
   const c = [1, 1, 1];
-  let k = 0.74 + 0.36 * fbm(x * 0.9, s * 0.35, 193, 4);
-  k *= 0.88 + 0.24 * fbm(x * 5, s * 5, 195, 3);
+  let k = 0.62 + 0.6 * fbm(x * 0.9, s * 0.35, 193, 4);
+  k *= 0.8 + 0.4 * fbm(x * 5, s * 5, 195, 3);
+  k *= 0.9 + 0.2 * fbm(x * 22, s * 22, 199, 2); // trodden-in grit
   c[0] = c[1] = c[2] = k;
   // dirt collects where nobody walks
-  mul(c, smooth(RUNNER - 0.24, RUNNER - 0.02, Math.abs(x)) * (0.5 + 0.5 * fbm(x * 2, s * 1.4, 197, 2)), 0.42, 0.42, 0.44);
+  mul(c, smooth(RUNNER - 0.26, RUNNER - 0.02, Math.abs(x)) * (0.55 + 0.6 * fbm(x * 2, s * 1.4, 197, 2)), 0.3, 0.3, 0.31);
   // old stains: soaked in, darker at the rim where they dried
   const f = fbm(x * 1.7 + 9, s * 1.1, 97, 4) + 0.08 * (fbm(x * 9, s * 9, 99, 2) - 0.5);
   mul(c, smooth(0.66, 0.76, f) * 0.3, 0.62, 0.58, 0.55);
@@ -652,9 +659,14 @@ export function carpetAlbedo(p, S, src) {
   // the stripes down each side: two dark green bands between ochre lines, the binding outside
   g.globalCompositeOperation = 'multiply';
   for (const sx of [-1, 1]) {
+    // woven, so never ruled: each band wanders a few millimetres and swells and thins along its length
     const band = (x0, x1, col) => {
       g.fillStyle = col;
-      g.fillRect(sx > 0 ? x0 : -x1, p.s0 - CM, x1 - x0, L);
+      for (let s = p.s0 - CM; s < p.s1 + CM; s += 0.04) {
+        const j = 0.005 * (fbm(s * 0.9, x0 * 7 + sx, 187, 3) - 0.5) + 0.002 * (noise2(s * 14, x0 * 9 + sx, 189) - 0.5);
+        const w = (x1 - x0) * (0.9 + 0.2 * noise2(s * 3, x1 * 5 + sx, 185));
+        g.fillRect((sx > 0 ? x0 : -x1) + j, s, w, 0.0405);
+      }
     };
     band(0.395, 0.41, 'rgb(150,144,120)');
     band(0.43, 0.5, 'rgb(96,104,82)');
@@ -666,9 +678,10 @@ export function carpetAlbedo(p, S, src) {
     // the ochre lines are woven, not ruled: a little uneven in strength along their length
     for (let s = p.s0 - CM; s < p.s1 + CM; s += 0.05) {
       const k = 0.14 + 0.2 * fbm(s * 1.3, sx * 3, 191, 3);
-      g.fillStyle = `rgba(150,118,62,${k})`;
-      g.fillRect(sx > 0 ? 0.415 : -0.423, s, 0.008, 0.0505);
-      g.fillRect(sx > 0 ? 0.505 : -0.512, s, 0.007, 0.0505);
+      const j = 0.005 * (fbm(s * 0.9, 3 + sx, 187, 3) - 0.5);
+      g.fillStyle = `rgba(150,118,62,${k * 0.7})`;
+      g.fillRect((sx > 0 ? 0.415 : -0.423) + j, s, 0.008, 0.0505);
+      g.fillRect((sx > 0 ? 0.505 : -0.512) + j, s, 0.007, 0.0505);
     }
   }
   // dirt and stains
@@ -678,7 +691,7 @@ export function carpetAlbedo(p, S, src) {
   g.drawImage(field(256, 768, (u, v) => carpetDirt(-RUNNER - CM + u * W, p.s0 - CM + (1 - v) * L)), 0, 0, S, S);
   g.globalCompositeOperation = 'source-over';
   // wear: the pile gone pale and grey, down to the backing where it is worst
-  g.drawImage(field(256, 768, (u, v) => [0.5, 0.38, 0.31, 0.62 * carpetWear(-RUNNER - CM + u * W, p.s0 - CM + (1 - v) * L)]), 0, 0, S, S);
+  g.drawImage(field(256, 768, (u, v) => [0.3, 0.215, 0.18, 0.5 * carpetWear(-RUNNER - CM + u * W, p.s0 - CM + (1 - v) * L)]), 0, 0, S, S);
   // lint and grit: along the edges and anywhere the vacuum never reached; a few burns
   world(g);
   const r = mulberry(8800 + p.k);
@@ -851,6 +864,16 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
   rub(x0 + 0.0015, 0.02, x0 + 0.0015, DOOR.h);
   rub(x1 - 0.0015, 0.02, x1 - 0.0015, DOOR.h);
   rub(x0, 0.016, x1, 0.016);
+  // round the handle plate the varnish is worn through in a ragged ring: every hand lands there
+  for (let i = 0; i < 70; i++) {
+    const a = r() * Math.PI * 2;
+    const rx = 0.03 + 0.02 * r();
+    const ry = 0.11 + 0.03 * r();
+    g.fillStyle = `rgba(${132 + 30 * r()},${104 + 24 * r()},${76 + 18 * r()},${(0.025 + 0.05 * r()) * (0.4 + grime)})`;
+    g.beginPath();
+    g.ellipse(HANDLE.x + Math.cos(a) * rx, HANDLE.y - 0.03 + Math.sin(a) * ry, 0.003 + r() * 0.005, 0.004 + r() * 0.009, 0, 0, Math.PI * 2);
+    g.fill();
+  }
   // kicked along the bottom rail: black rubber, pale cuts, chips out of the edge
   const nk = Math.round(60 + 160 * kicked);
   for (let i = 0; i < nk; i++) {
@@ -858,7 +881,7 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5 } = {}) {
     const y = 0.02 + Math.pow(r(), 1.7) * 0.36;
     const len = 0.01 + r() * 0.09;
     const pale = r() < 0.5;
-    g.strokeStyle = pale ? `rgba(150,120,90,${0.12 + 0.3 * r()})` : `rgba(6,5,4,${0.25 + 0.5 * r()})`;
+    g.strokeStyle = pale ? `rgba(150,120,90,${0.2 + 0.4 * r()})` : `rgba(6,5,4,${0.25 + 0.5 * r()})`;
     g.lineWidth = pale ? 0.0006 + r() * 0.0012 : 0.0008 + r() * 0.004;
     const tilt = (r() - 0.5) * 0.9;
     g.beginPath();

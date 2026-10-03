@@ -86,6 +86,9 @@ window.corridor = {
       seed,
       exposure: BASE_EXPOSURE * Math.pow(2, exposureStops(at)) * (opts.exposureScale ?? 1),
       grainGain: 1 + 0.22 * Math.max(0, exposureStops(at)),
+      // the traced image of a scare frame must match the held frame outside the door (same seed),
+      // but film grain is never the same twice: its seed is the frame's own
+      grainSeed: seed + (scare ? 37 * (scare.j + 1) + (scare.variant === 'gap' ? 500 : 0) : 0),
       bounces: opts.bounces,
       lamps: world.fogLamps(state.lamps),
       shutter: shutterLen > 0 && !free ? (u) => setPose(at + (u - 0.5) * shutterLen, set) : null,

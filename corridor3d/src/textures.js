@@ -10,9 +10,9 @@ const BASE = '/corridor3d/textures';
 
 // How each scan is graded before it is laid (CSS filter syntax).
 const GRADE = {
-  paper: 'grayscale(0.45) brightness(1.62) contrast(0.9)',
+  paper: 'grayscale(0.45) brightness(1.5) contrast(0.62)',
   boards: 'hue-rotate(9deg) saturate(0.44) brightness(1.0) contrast(0.96)', // brown, not crimson
-  carpet: 'hue-rotate(-14deg) saturate(1.1) contrast(1.12) brightness(0.5)',
+  carpet: 'hue-rotate(-14deg) saturate(0.8) contrast(1.2) brightness(0.3)',
   door: 'hue-rotate(10deg) saturate(0.36) brightness(1.2) contrast(0.78)', // brown, the grain quiet
 };
 // Door skins: [material name, seed, { grime, kicked }]. scene.js hands them out.
@@ -499,7 +499,7 @@ function clawedDoor(wood, W, H) {
   // the height map gives it real depth for the normal map.
   const track = (x, y, len, lean, w, depth) => {
     // old cuts have gone grey-brown with dirt, the last ones are still pale
-    const tone = 0.74 + 0.4 * Math.pow(r(), 1.3);
+    const tone = 0.72 + 0.4 * Math.pow(r(), 1.2); // some have gone dull with dirt, a few are fresh
     // a nail skids: the line wavers, bites deeper in places and lifts off at the end
     const N = 24;
     const pts = [];
@@ -524,10 +524,10 @@ function clawedDoor(wood, W, H) {
       const b = bite(i / N) * depth;
       // crushed, dirty varnish either side; the walls of the groove raw wood, pale and grey, not
       // gold; the bottom of the cut in its own shadow; a thin torn lip catching the light
-      seg(g, i, w * 2.6, `rgba(30,18,10,${0.26 * b})`);
-      seg(g, i, w * (0.6 + 0.6 * b), `rgba(${Math.round(tone * (158 + 34 * b))},${Math.round(tone * (136 + 30 * b))},${Math.round(tone * (106 + 24 * b))},${0.5 + 0.45 * b})`);
+      seg(g, i, w * 1.9, `rgba(14,9,6,${0.4 * b})`);
+      seg(g, i, w * (0.6 + 0.6 * b), `rgba(${Math.round(tone * (176 + 26 * b))},${Math.round(tone * (152 + 22 * b))},${Math.round(tone * (118 + 18 * b))},${0.4 + 0.45 * b})`);
       seg(g, i, w * 0.32, `rgba(24,15,9,${0.7 * b})`);
-      seg(g, i, w * 0.18, `rgba(188,170,142,${0.22 * b * tone})`, -w * 0.42);
+      seg(g, i, w * 0.18, `rgba(188,170,142,${0.1 * b * b * tone})`, -w * 0.42);
       seg(hg, i, w * (0.8 + 0.6 * b), `rgba(0,0,0,${0.35 + 0.6 * b})`);
     }
     // a splinter or two torn up at the deepest point
@@ -542,13 +542,28 @@ function clawedDoor(wood, W, H) {
       g.stroke();
     }
   };
+  // the inside of a panelled leaf: two recessed panels, as a dark line and a step in the height
+  for (const [a, b] of [[0.21, 0.88], [1.035, 1.914]]) {
+    const x0 = 0.108 * px;
+    const w0 = (0.853 - 0.216) * px;
+    g.strokeStyle = 'rgba(8,5,3,0.5)';
+    g.lineWidth = 0.012 * px;
+    g.strokeRect(x0, yOf(b), w0, (b - a) * px);
+    hg.strokeStyle = 'rgba(0,0,0,0.75)';
+    hg.lineWidth = 0.024 * px;
+    hg.strokeRect(x0, yOf(b), w0, (b - a) * px);
+    hg.strokeStyle = 'rgba(255,255,255,0.35)';
+    hg.lineWidth = 0.006 * px;
+    hg.strokeRect(x0 + 0.03 * px, yOf(b) + 0.03 * px, w0 - 0.06 * px, (b - a) * px - 0.06 * px);
+  }
   // Where the hands worked: most of it at the height a child reaches, on the side of the lock
   // and the handle, where a door might give. Each place was gone over again and again, so the
   // marks come in dense patches, the varnish between them flaked off to bare, dull wood.
   const places = [];
   for (let i = 0; i < 7; i++) {
     const lockSide = i < 4;
-    places.push({ x: lockSide ? 0.52 + r() * 0.24 : 0.14 + r() * 0.34, y: i === 5 ? 1.45 + r() * 0.2 : 0.62 + r() * 0.62, rx: 0.08 + r() * 0.07, ry: 0.13 + r() * 0.12, n: lockSide ? 5 + Math.floor(r() * 3) : 3 + Math.floor(r() * 2) });
+    // (at hand height, round the handle and along the lock edge: nothing up in the dark)
+    places.push({ x: lockSide ? 0.5 + r() * 0.27 : 0.2 + r() * 0.3, y: 0.72 + r() * 0.55, rx: 0.08 + r() * 0.07, ry: 0.13 + r() * 0.12, n: lockSide ? 5 + Math.floor(r() * 3) : 3 + Math.floor(r() * 2) });
   }
   for (const pl of places) {
     // the flaked varnish: an uneven pale patch, broken up along the grain
@@ -557,7 +572,7 @@ function clawedDoor(wood, W, H) {
     for (let i = 0; i < 46; i++) {
       const a2 = r() * Math.PI * 2;
       const d = Math.sqrt(r());
-      g.fillStyle = `rgba(${150 + 30 * r()},${124 + 26 * r()},${96 + 22 * r()},${0.02 + 0.05 * r()})`;
+      g.fillStyle = `rgba(${150 + 30 * r()},${124 + 26 * r()},${96 + 22 * r()},${0.008 + 0.02 * r()})`;
       g.beginPath();
       g.ellipse((pl.x + Math.cos(a2) * d * pl.rx) * px, yOf(pl.y + Math.sin(a2) * d * pl.ry), (0.004 + r() * 0.012) * px, (0.015 + r() * 0.05) * px, 0, 0, Math.PI * 2);
       g.fill();
@@ -569,10 +584,10 @@ function clawedDoor(wood, W, H) {
       const x = (pl.x + (r() - 0.5) * 1.6 * pl.rx) * px;
       const top = pl.y + pl.ry * (0.2 + 0.9 * r());
       const len = (0.07 + r() * 0.26) * px;
-      const lean = r() < 0.18 ? (r() < 0.5 ? -1 : 1) * (0.5 + 0.5 * r()) : bias + (r() - 0.5) * 0.16; // now and then across the grain
+      const lean = bias + (r() - 0.5) * 0.1; // a set of nails comes down together
       const spread = (0.014 + r() * 0.008) * px;
       const fingers = r() < 0.35 ? 3 : 4;
-      const w = (0.0022 + Math.pow(r(), 1.6) * 0.0062) * px; // a nail drawn lightly, a nail dug in
+      const w = (0.0022 + Math.pow(r(), 1.6) * 0.0032) * px; // one to three pixels at the distance of the glance
       const depth = 0.55 + 0.45 * r();
       for (let f = 0; f < fingers; f++) {
         track(x + f * spread, yOf(top) + Math.abs(f - 1.5) * 0.012 * px + r() * 5, len * (0.6 + 0.4 * r()) * (f === 3 ? 0.75 : 1), lean + (r() - 0.5) * 0.05, w * (f === 3 ? 0.8 : 1), depth * (0.75 + 0.25 * r()));
@@ -965,7 +980,7 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
   T.decals = tex(decalAtlas(img['worn_plaster_wall/Diffuse'], size), { srgb: true, repeat: false });
   const claw = clawedDoor(src.door, Math.round(size * 0.75), Math.round((size * 0.75 * 2.03) / 0.86));
   T.claw = tex(claw.albedo, { srgb: true, repeat: false });
-  T.clawNormal = tex(heightToNormal(claw.height, 12, false), { repeat: false });
+  T.clawNormal = tex(heightToNormal(claw.height, 18, false), { repeat: false });
   {
     // where a nail has cut through, the varnish is gone: raw wood, dull
     const rc = canvas(claw.height.width, claw.height.height);
@@ -998,7 +1013,7 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
         // wraps round the shade: blend the noise with itself half a turn on
         const n = (a, b, sd) => fbm(u * a, v * b, sd, 3) * (1 - Math.abs(2 * u - 1)) + fbm((u + 0.5) * a + 7, v * b, sd, 3) * Math.abs(2 * u - 1);
         const dust = 0.55 + 0.75 * n(7, 3, 901);
-        const wipe = 1 - 0.3 * smooth(0.5, 0.62, n(2.2, 1.2, 903));
+        const wipe = 1; // (a wiped half read as a dark crease across the shade)
         // the glass is hot where the bulb sits behind it and falls away steeply to the rim
         const k = Math.pow(clamp(base * dust * wipe, 0, 1), 1.3);
         const i = (y * 512 + x) * 4;

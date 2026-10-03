@@ -216,7 +216,8 @@ export function buildShell(bag) {
       const len = s1 - s0;
       const place = (y) => (side < 0 ? M(move(-HW, y, -s1)) : M(rotY(Math.PI), move(HW, y, -s0)));
       const sAt = (z) => (side < 0 ? s1 - z : s0 + z);
-      bag.add('trim', paint(extrude(PROFILE.skirting, len, { step: 0.12 }), (v) => trimWear(sAt(v.z) + side * 40, v.y, v.x / 0.018, smooth(SKIRT - 0.03, SKIRT, v.y) * smooth(0.012, 0.002, v.x), 61)), place(0));
+      // (a shade lighter than the boards above it, so it reads as a skirting board and not as their foot)
+      bag.add('trim', paint(extrude(PROFILE.skirting, len, { step: 0.12 }), (v) => trimWear(sAt(v.z) + side * 40, v.y, v.x / 0.018, smooth(SKIRT - 0.03, SKIRT, v.y) * smooth(0.012, 0.002, v.x), 61).map((c) => c * 1.7)), place(0));
       // the rail went up in lengths: a hair's gap at each joint, no two lengths at quite the same
       // height, and a long one sags
       {
@@ -228,7 +229,7 @@ export function buildShell(bag) {
           const dy = (rr() - 0.5) * 0.004;
           const tilt = (rr() - 0.5) * 0.0022;
           const z0 = z;
-          const g = extrude(PROFILE.dado, piece - 0.0025, { step: 0.08, caps: true });
+          const g = extrude(PROFILE.dado, piece - 0.0025, { step: 0.08 });
           const pos = g.attributes.position;
           for (let i = 0; i < pos.count; i++) pos.setY(i, pos.getY(i) + dy + tilt * pos.getZ(i) - 0.0025 * Math.sin((Math.PI * pos.getZ(i)) / piece));
           g.translate(0, 0, z0);

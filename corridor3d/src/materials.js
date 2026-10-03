@@ -91,7 +91,7 @@ export function makeMaterials(T) {
       normalMap: T.plank_flooring.normalMap,
       roughnessMap: T.plank_flooring.roughnessMap,
       color: new THREE.Color(0.62, 0.58, 0.54),
-      roughness: 0.85,
+      roughness: 0.6, // old polish: the boards give the lamps back softly
       vertexColors: true,
     }),
     [1.34, 1.34],
@@ -157,7 +157,7 @@ export function makeMaterials(T) {
 
   // The shoe.
   // a child's best shoe: pale leather gone cream, scuffed (black patent on a dark runner was a dark capsule)
-  m.leather = P({ color: new THREE.Color(0.46, 0.4, 0.3), roughness: 0.42, side: THREE.DoubleSide, vertexColors: true });
+  m.leather = P({ color: new THREE.Color(0.2, 0.085, 0.06), roughness: 0.38, side: THREE.DoubleSide, vertexColors: true }); // oxblood, scuffed
   m.sole = P({ color: new THREE.Color(0.2, 0.13, 0.08), roughness: 0.8, vertexColors: true });
 
   // The figure behind the door.
