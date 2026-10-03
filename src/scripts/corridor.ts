@@ -111,11 +111,16 @@ class Sequence {
   url(i: number) {
     return `${this.base}${this.info.dir}/${pad(i)}.${this.info.ext}`;
   }
+  // The decoded window. A phone frame is 900 x 1800 (6.5 MB decoded): at most 6 ahead, 2 behind
+  // and 1 of slack either side are kept, 11 bitmaps, about 70 MB. Everything else stays compressed.
   private get ahead() {
-    return this.mobile ? 8 : 10;
+    return this.mobile ? 6 : 10;
   }
   private get behind() {
-    return this.mobile ? 3 : 5;
+    return this.mobile ? 2 : 5;
+  }
+  private get slack() {
+    return this.mobile ? 1 : 3;
   }
 
   // Start fetching. `only`: just these frames (the still, or the idle head start).
@@ -214,7 +219,7 @@ class Sequence {
     this.fill();
     for (const [k, bmp] of this.full) {
       const d = (k - i) * this.dir;
-      if (d > this.ahead + 3 || d < -this.behind - 3) {
+      if (d > this.ahead + this.slack || d < -this.behind - this.slack) {
         bmp.close();
         this.full.delete(k);
       }
@@ -443,20 +448,22 @@ export function initCorridor() {
         g.fillStyle = 'rgb(214, 170, 120)';
         g.fillRect(0, 0, W, H);
         // She leans out past the door edge, which hides the right of the picture: the lamp
-        // reaches the eye and cheek on the left, the contour beyond them falls into the dark,
-        // and so does everything towards the edge.
+        // reaches one eye and the cheek under it, the contour beyond them falls into the dark,
+        // and so does everything towards the edge. No more than a third of the face is lit, and
+        // that no brighter than the skin of the hand on the door.
         const fall = g.createLinearGradient(0, 0, W, 0);
-        fall.addColorStop(0, 'rgb(40, 38, 36)');
-        fall.addColorStop(0.22, 'rgb(225, 220, 214)');
-        fall.addColorStop(0.45, 'rgb(205, 198, 190)');
-        fall.addColorStop(0.7, 'rgb(48, 40, 32)');
-        fall.addColorStop(1, 'rgb(8, 7, 6)');
+        fall.addColorStop(0, 'rgb(14, 13, 12)');
+        fall.addColorStop(0.16, 'rgb(128, 124, 120)');
+        fall.addColorStop(0.27, 'rgb(150, 146, 140)');
+        fall.addColorStop(0.4, 'rgb(84, 78, 72)');
+        fall.addColorStop(0.55, 'rgb(18, 15, 13)');
+        fall.addColorStop(1, 'rgb(0, 0, 0)');
         g.fillStyle = fall;
         g.fillRect(0, 0, W, H);
         // and falls off towards the top and the bottom of the head
-        const vert = g.createRadialGradient(W * 0.34, H * 0.42, H * 0.1, W * 0.34, H * 0.42, H * 0.6);
+        const vert = g.createRadialGradient(W * 0.27, H * 0.4, H * 0.06, W * 0.27, H * 0.4, H * 0.5);
         vert.addColorStop(0, 'rgb(255, 255, 255)');
-        vert.addColorStop(1, 'rgb(20, 18, 16)');
+        vert.addColorStop(1, 'rgb(6, 5, 5)');
         g.fillStyle = vert;
         g.fillRect(0, 0, W, H);
         g.globalCompositeOperation = 'source-over';
@@ -517,6 +524,17 @@ export function initCorridor() {
     };
     tri(P[0], P[1], P[2], [0, 0], [W, 0], [W, H]);
     tri(P[0], P[2], P[3], [0, 0], [W, H], [0, H]);
+    // the shadow of the door edge: the half of the gap nearer the leaf gets almost no light
+    const [j1, e1, e2, j2] = q.clip.map(([x, y]) => [fx(x), fy(y)]);
+    const em = [(e1[0] + e2[0]) / 2, (e1[1] + e2[1]) / 2];
+    const jm = [(j1[0] + j2[0]) / 2, (j1[1] + j2[1]) / 2];
+    const shade = ctx.createLinearGradient(em[0], em[1], em[0] + (jm[0] - em[0]) * 0.55, em[1] + (jm[1] - em[1]) * 0.55);
+    shade.addColorStop(0, 'rgba(0, 0, 0, 0.9)');
+    shade.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = shade;
+    ctx.fillRect(Math.min(...P.map((p) => p[0])) - 4, Math.min(...P.map((p) => p[1])) - 4, Math.max(...P.map((p) => p[0])) - Math.min(...P.map((p) => p[0])) + 8, Math.max(...P.map((p) => p[1])) - Math.min(...P.map((p) => p[1])) + 8);
     ctx.restore();
     faceDraws++;
     canvas.dataset.faceDraws = String(faceDraws);

@@ -47,10 +47,13 @@ stand-in is shown. What to send and where it goes: `src/assets/scare/README.md`.
 
 Please also confirm:
 
-- The corridor is rendered offline with three development-only packages: `three` (named in the
-  brief), `three-gpu-pathtracer` and `three-mesh-bvh` (not named in the brief). None of them is
-  sent to visitors; the site ships only the rendered frames. Keep them, or I replace the path
-  tracer with plain three.js rendering, which loses the real bounced light and soft shadows.
+- **Needed before the corridor is merged:** the corridor is rendered offline with three
+  development-only packages: `three` (named in the brief), `three-gpu-pathtracer` and
+  `three-mesh-bvh` (not named in the brief, MIT licensed). None of them is sent to visitors; the
+  site ships only the rendered frames. Options: (a) keep them (recommended: the bounced light,
+  soft shadows and haze that make the frames read as a real place come from the path tracer);
+  (b) I replace the path tracer with plain three.js raster rendering, which keeps `three` only
+  and loses most of that realism. Nothing else in the repository depends on them.
 
 - +373 682 32 596 is registered on WhatsApp. The card, the voucher and the floating button all depend on it.
 - The opening hours as I read them: Mon-Thu 16:00-03:00, Fri 16:00-00:00, Sat-Sun 24 hours.

@@ -21,11 +21,13 @@ stand-in are used instead. The fingers on the door edge are part of the rendered
 - **Background:** black, or as dark as possible. The picture is added to the darkness of the gap,
   so everything black in it disappears and everything bright in it shows.
 - **Light:** lit from the front and a little from above, soft, no flash glare. She leans out
-  past the edge of the door, which covers the right of the picture: the site keeps the left half
-  in the light and lets the right half fall away into the dark. **The eye that should catch the
-  light is the one on the left of the picture.** Keep that eye open and looking into the lens.
-- **Expression and styling:** still, pale, no smile. Long dark hair hanging beside the face is
-  ideal: it frames the lit side against the dark of the room.
+  past the edge of the door, which covers the right of the picture: the site keeps about the
+  left third in the light, lets the rest fall away into the dark, and lays the shadow of the door
+  edge over the half of the gap nearest the door. **The eye that should catch the light is the
+  one on the left of the picture.** Keep that eye open and looking into the lens.
+- **Expression and styling:** still, pale, no smile. Long dark hair hanging beside the face, or
+  wet and across it with the one eye showing, is ideal: it is how the 3D stand-in looks, and it
+  frames the lit side against the dark of the room.
 - **Colour:** any. It is reduced to almost monochrome and tinted warm.
 - **Size on disk:** under 150 kB. It loads only when a visitor reaches the door.
 - **Consent:** use a photograph you have the right to publish. If it is a real person, written

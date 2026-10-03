@@ -19,8 +19,10 @@ interface Scare {
   count: number;
   rect: number[];
   has: number[];
+  quads: ({ quad: number[][]; clip: number[][] } | null)[];
 }
 interface SetInfo {
+  dir: string;
   w: number;
   h: number;
   frames: number;
@@ -371,12 +373,155 @@ test('a supplied face photo is composited into the door gap', async ({ page }) =
   await expect(canvas).toHaveAttribute('data-face-mode', 'photo');
   const { set } = await setInfo(page);
   await approach(page, set);
+  // While the door is open, measure the canvas inside the gap (the clip outline the manifest
+  // gives for each scare frame) and in a band of the head quad just outside it.
+  await page.evaluate(
+    ([quads, fw, fh]) => {
+      const c = document.querySelector<HTMLCanvasElement>('[data-corridor]')!;
+      const g = c.getContext('2d')!;
+      const rec: { patch: number; inside: number; outside: number }[] = [];
+      (window as unknown as { __faceRec: typeof rec }).__faceRec = rec;
+      (window as unknown as { __gapMeans: unknown }).__gapMeans = (src: CanvasRenderingContext2D, j: number) => {
+        const q = quads[j];
+        if (!q) return null;
+        const k = Math.max(c.width / fw, c.height / fh);
+        const cx = (fw - c.width / k) / 2;
+        const cy = (fh - c.height / k) / 2;
+        const to = ([x, y]: number[]) => [(x * fw - cx) * k, (y * fh - cy) * k];
+        const clip = new Path2D();
+        q.clip.map(to).forEach(([x, y], i) => (i ? clip.lineTo(x, y) : clip.moveTo(x, y)));
+        clip.closePath();
+        const quad = q.quad.map(to);
+        const xs = quad.map((p) => p[0]);
+        const ys = quad.map((p) => p[1]);
+        const x0 = Math.max(0, Math.floor(Math.min(...xs)));
+        const y0 = Math.max(0, Math.floor(Math.min(...ys)));
+        const x1 = Math.min(c.width, Math.ceil(Math.max(...xs)));
+        const y1 = Math.min(c.height, Math.ceil(Math.max(...ys)));
+        if (x1 <= x0 || y1 <= y0) return null;
+        const d = src.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+        let si = 0;
+        let ni = 0;
+        let so = 0;
+        let no = 0;
+        for (let y = y0; y < y1; y += 1) {
+          for (let x = x0; x < x1; x += 1) {
+            const i = ((y - y0) * (x1 - x0) + (x - x0)) * 4;
+            const v = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+            if (g.isPointInPath(clip, x + 0.5, y + 0.5)) {
+              si += v;
+              ni++;
+            } else {
+              so += v;
+              no++;
+            }
+          }
+        }
+        return { inside: ni ? si / ni : -1, outside: no ? so / no : -1, n: ni };
+      };
+      const tick = () => {
+        const j = Number(c.dataset.patch);
+        if (c.dataset.scare === 'playing' && j >= 0) {
+          const m = (window as unknown as { __gapMeans: (s: CanvasRenderingContext2D, j: number) => { inside: number; outside: number } | null }).__gapMeans(g, j);
+          if (m) rec.push({ patch: j, inside: m.inside, outside: m.outside });
+        }
+        if (c.dataset.scare !== 'done') requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    },
+    [set.scare.quads, set.w, set.h] as [SetInfo['scare']['quads'], number, number],
+  );
   await toFrame(page, set.scare.frame + 5, set.frames);
   await expect(canvas).toHaveAttribute('data-scare', 'done', { timeout: 6000 });
   await expect(canvas).toHaveAttribute('data-scare-plays', '1');
   // the "empty gap" frames were used and the photo was drawn into them
   expect(new Set(patches)).toEqual(new Set(['g']));
   expect(await num(page, 'face-draws')).toBeGreaterThan(3);
+
+  // The same scare frames again, drawn here without the photo (the walk frame and the empty-gap
+  // patch, exactly as the scrubber lays them), measured the same way. Where the photo was drawn
+  // the gap must be clearly lighter; outside the gap nothing may have changed.
+  const rec = await page.evaluate(() => (window as unknown as { __faceRec: { patch: number; inside: number; outside: number }[] }).__faceRec);
+  const mid = rec.filter((r) => r.patch >= Math.round(set.scare.count * 0.3) && r.patch <= Math.round(set.scare.count * 0.7));
+  expect(mid.length, 'frames measured while the face is fully in').toBeGreaterThan(2);
+  const base = await page.evaluate(
+    async ([s, list]) => {
+      const c = document.querySelector<HTMLCanvasElement>('[data-corridor]')!;
+      const root = c.dataset.base ?? '';
+      const pad = (n: number, w: number) => String(n).padStart(w, '0');
+      const bmp = async (url: string) => createImageBitmap(await (await fetch(url)).blob());
+      const walk = await bmp(`${root}${s.dir}/${pad(s.scare.frame, 3)}.${s.ext}`);
+      const off = document.createElement('canvas');
+      off.width = c.width;
+      off.height = c.height;
+      const o = off.getContext('2d')!;
+      const k = Math.max(c.width / s.w, c.height / s.h);
+      const crop = { w: c.width / k, h: c.height / k, x: (s.w - c.width / k) / 2, y: (s.h - c.height / k) / 2 };
+      const out: Record<number, unknown> = {};
+      for (const j of list) {
+        o.drawImage(walk, crop.x, crop.y, crop.w, crop.h, 0, 0, c.width, c.height);
+        const patch = await bmp(`${root}${s.dir}/s/g-${pad(j, 2)}.${s.ext}`);
+        const [x, y, w, h] = s.scare.rect;
+        o.drawImage(patch, (x - crop.x) * k, (y - crop.y) * k, w * k, h * k);
+        out[j] = (window as unknown as { __gapMeans: (s: CanvasRenderingContext2D, j: number) => unknown }).__gapMeans(o, j);
+      }
+      return out;
+    },
+    [set, [...new Set(mid.map((r) => r.patch))]] as [SetInfo, number[]],
+  );
+  for (const r of mid) {
+    const b = base[r.patch] as { inside: number; outside: number; n: number };
+    expect(b.n, `the gap covers pixels at scare frame ${r.patch}`).toBeGreaterThan(30);
+    expect(r.inside, `scare frame ${r.patch}: the photo lights the gap (without it: ${b.inside.toFixed(1)})`).toBeGreaterThan(b.inside * 1.3 + 3);
+    expect(Math.abs(r.outside - b.outside), `scare frame ${r.patch}: nothing is drawn outside the gap`).toBeLessThan(2.5);
+  }
+});
+
+test('every frame of both sets is lit: none of them is a black screen', async ({ page }, info) => {
+  // Decoded here, in the browser that shows them, frame by frame: not sampled along the walk.
+  test.skip(info.project.name !== 'desktop-1440', 'the frames are the same files for both projects');
+  test.slow();
+  await open(page);
+  const manifest = JSON.parse((await canvasOf(page).getAttribute('data-manifest')) ?? '{}');
+  for (const name of ['desktop', 'mobile']) {
+    const s = manifest.sets[name] as SetInfo;
+    const means = await page.evaluate(async (s) => {
+      const c = document.querySelector<HTMLCanvasElement>('[data-corridor]')!;
+      const root = c.dataset.base ?? '';
+      const off = document.createElement('canvas');
+      off.width = Math.round(s.w / 8);
+      off.height = Math.round(s.h / 8);
+      const o = off.getContext('2d', { willReadFrequently: true })!;
+      const out: { mean: number; p99: number }[] = [];
+      for (let i = 0; i < s.frames; i++) {
+        const blob = await (await fetch(`${root}${s.dir}/${String(i).padStart(3, '0')}.${s.ext}`)).blob();
+        const bmp = await createImageBitmap(blob);
+        o.drawImage(bmp, 0, 0, off.width, off.height);
+        bmp.close();
+        const d = o.getImageData(0, 0, off.width, off.height).data;
+        const lum: number[] = [];
+        let sum = 0;
+        for (let k = 0; k < d.length; k += 4) {
+          const v = 0.299 * d[k] + 0.587 * d[k + 1] + 0.114 * d[k + 2];
+          sum += v;
+          lum.push(v);
+        }
+        lum.sort((a, b) => a - b);
+        out.push({ mean: sum / lum.length, p99: lum[Math.floor(lum.length * 0.99)] });
+      }
+      return out;
+    }, s);
+    expect(means.length).toBe(s.frames);
+    // The darkest beat (the lamps dying behind the walker after the scare) is designed: a dark
+    // corridor with its far end lit, a mean of about 6/255. A black screen is a mean of 1 or 2.
+    const darkest = Math.min(...means.map((m) => m.mean));
+    const at = means.findIndex((m) => m.mean === darkest);
+    expect(darkest, `${name}: frame ${at} is the darkest (mean ${darkest.toFixed(1)}/255)`).toBeGreaterThan(5);
+    // and every frame has something clearly lit in it: its brightest 1 % of pixels
+    const dimmest = Math.min(...means.map((m) => m.p99));
+    const at2 = means.findIndex((m) => m.p99 === dimmest);
+    expect(dimmest, `${name}: frame ${at2} has the dimmest highlights (${dimmest.toFixed(0)}/255)`).toBeGreaterThan(48);
+  }
 });
 
 test('without a photo in the slot the page says so', async ({ page }) => {
