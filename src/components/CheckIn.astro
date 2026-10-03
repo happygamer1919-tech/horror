@@ -1,6 +1,6 @@
 ---
 import type { Lang } from '../config';
-import { copy, site, priceFor, CONTACT_LEVELS_ENABLED, LEVELS, BOOKING_URL, TELEGRAM_URL } from '../content';
+import { copy, site, priceFor, CONTACT_LEVELS_ENABLED, CONFIRM_CALL_ENABLED, LEVELS, BOOKING_URL, TELEGRAM_URL } from '../content';
 import SectionHead from './SectionHead.astro';
 
 interface Props {
@@ -93,9 +93,24 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
         {
           BOOKING_URL && (
             <>
-              <button class="btn btn--primary card__submit" type="submit" data-book>
-                {c.submit}
-              </button>
+              {/* The button stays off until the team size is valid and a level is chosen
+                  (scripts/checkin.ts). The prompt keeps its line when it is hidden, so nothing
+                  on the card moves when the button comes on. */}
+              <div class="card__book">
+                <button class="btn btn--primary card__submit" type="submit" data-book disabled={CONTACT_LEVELS_ENABLED} aria-describedby={CONTACT_LEVELS_ENABLED ? 'card-choose' : undefined}>
+                  {c.submit}
+                </button>
+                <p class:list={['card__choose', !CONTACT_LEVELS_ENABLED && 'is-off']} id="card-choose" data-book-prompt>
+                  {c.choose(CONTACT_LEVELS_ENABLED)}
+                </p>
+              </div>
+              {
+                CONFIRM_CALL_ENABLED && (
+                  <p class="card__confirm" data-confirm-call>
+                    {c.confirmCall}
+                  </p>
+                )
+              }
               <p class="card__request" data-request>
                 {c.request}
               </p>
@@ -148,6 +163,13 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
                 {b.newTab}
               </a>
             </p>
+            {
+              CONFIRM_CALL_ENABLED && (
+                <p class="bk__call" data-confirm-call>
+                  {c.confirmCall}
+                </p>
+              )
+            }
           </div>
           <div class="bk__body">
             <p class="bk__slow" data-booking-slow>
@@ -243,6 +265,10 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
     color: var(--stamp);
     font-variant-numeric: tabular-nums;
   }
+  .card__confirm {
+    font-size: 14px;
+    font-weight: 500;
+  }
   .card__request {
     font-size: 14px;
     font-weight: 500;
@@ -335,6 +361,30 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
   .card__submit:hover {
     background: #6f1410;
     box-shadow: none;
+  }
+  /* Not yet available: an empty outline on the paper. It fills in with the stamp red once
+     the team size and the level are chosen. */
+  .card__submit:disabled {
+    border-color: rgba(143, 29, 24, 0.5);
+    background: transparent;
+    color: var(--paper-ash);
+    cursor: not-allowed;
+  }
+  /* Button and its prompt. The prompt always keeps its line: hiding it moves nothing. */
+  .card__book {
+    display: grid;
+    gap: 8px;
+  }
+  .card__choose {
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--stamp);
+  }
+  .card__choose.is-off {
+    visibility: hidden;
   }
   /* Second channel: ask a question on WhatsApp or Telegram. */
   .card__ask {
@@ -430,6 +480,14 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
     .card__submit {
       width: auto;
     }
+    .card__book {
+      grid-column: 1 / -1;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 22px;
+    }
+    .card__confirm,
+    .card__request,
     .card__note,
     .card__tel,
     .card__ask {
@@ -625,6 +683,18 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
     text-decoration-color: var(--brass-lo);
     white-space: nowrap;
   }
+  /* The desk calls on the day of the game: one quiet line under the hint. Short phones
+     leave it out (it is on the card and in the FAQ), so the widget keeps its height. */
+  .bk__call {
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--bone);
+  }
+  @media (max-height: 700px) and (max-width: 899px) {
+    .bk__call {
+      display: none;
+    }
+  }
   .bk__body {
     position: relative;
     display: grid;
@@ -700,6 +770,10 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
     .bk__hint a {
       display: block;
       width: max-content;
+    }
+    .bk__call {
+      grid-column: 1 / -1;
+      font-size: 13px;
     }
     .bk__slow {
       grid-template-columns: 1fr auto;

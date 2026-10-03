@@ -2,6 +2,8 @@
 // for (team size, level, game language), shows the live total, and turns them into one
 // summary line. "Book a time slot" copies that line and opens the widget; the guest pastes
 // it into the widget's comment field. WhatsApp and Telegram carry the same line.
+// The booking button is off until the team size is a whole number inside the allowed range
+// and a level is chosen; a short prompt next to it says so.
 import { copyText } from './clipboard';
 import { openBooking } from './booking';
 
@@ -39,6 +41,18 @@ export function initCheckin() {
   const out = form.querySelector<HTMLOutputElement>('[data-total]');
   const wa = form.querySelector<HTMLAnchorElement>('[data-ask-wa]');
   const tg = form.querySelector<HTMLAnchorElement>('[data-ask-tg]');
+  const book = form.querySelector<HTMLButtonElement>('[data-book]');
+  const prompt = form.querySelector<HTMLElement>('[data-book-prompt]');
+  const hasLevels = form.querySelector('input[name="level"]') !== null;
+
+  // A whole number inside min..max of the field. The default value counts as chosen.
+  const teamOk = () => {
+    const raw = team?.value.trim() ?? '';
+    const n = Number(raw);
+    return raw !== '' && Number.isInteger(n) && n >= Number(team?.min) && n <= Number(team?.max);
+  };
+  // No default level: the team chooses. Without the selector there is nothing to choose.
+  const levelOk = () => !hasLevels || form.querySelector('input[name="level"]:checked') !== null;
 
   const totalText = () => {
     const price = prices[String(Number(team?.value))];
@@ -63,11 +77,24 @@ export function initCheckin() {
     const message = [form.dataset.hello ?? '', summaryLine(labels, values())].filter(Boolean).join('\n');
     if (wa) wa.href = buildWhatsAppUrl(form.dataset.wa ?? '', message);
     if (tg) tg.dataset.message = message;
+    if (book) {
+      const ready = teamOk() && levelOk();
+      book.disabled = !ready;
+      if (prompt) {
+        // Hidden, not removed: the line stays, so the card does not jump. The description
+        // is dropped with it, or a screen reader would still read the hidden prompt.
+        prompt.classList.toggle('is-off', ready);
+        if (ready) book.removeAttribute('aria-describedby');
+        else book.setAttribute('aria-describedby', prompt.id);
+      }
+    }
   };
   form.addEventListener('input', sync);
   form.addEventListener('change', sync);
   // The level can also be picked in the key section, see level.ts.
   document.addEventListener('hotel:level', sync);
+  // A page restored from the back/forward cache comes back with its fields as they were.
+  window.addEventListener('pageshow', sync);
   sync();
 
   form.addEventListener('submit', (e) => {

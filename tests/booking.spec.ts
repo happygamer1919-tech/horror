@@ -33,6 +33,19 @@ const TOAST: Record<L, string> = {
   ru: 'Сообщение скопировано - вставьте его в Telegram',
   en: 'Message copied - paste it in Telegram',
 };
+// Next to the booking button while it is disabled.
+const CHOOSE: Record<L, string> = {
+  ro: 'Alegeți mărimea echipei și nivelul',
+  ru: 'Выберите размер команды и уровень',
+  en: 'Choose team size and level',
+};
+// CONFIRM_CALL_ENABLED (src/content/site.ts): the desk phones on the day of the game.
+const CONFIRM_CALL: Record<L, string> = {
+  ro: 'Vă sunăm în ziua jocului pentru a confirma rezervarea.',
+  ru: 'В день игры мы позвоним вам, чтобы подтвердить бронь.',
+  en: 'We call you on the day of the game to confirm the booking.',
+};
+const FAQ_BOOK: Record<L, string> = { ro: 'Cum rezerv?', ru: 'Как забронировать?', en: 'How do I book?' };
 // Each case: team size, level, game language.
 const CASES: { team: number; level: 'none' | 'weak' | 'hardcore'; game: L }[] = [
   { team: 2, level: 'none', game: 'ro' },
@@ -203,23 +216,118 @@ for (const lang of LANGS) {
       expect(await page.evaluate(() => String(window.getSelection()))).toBe(line(lang, CASES[0]));
     });
 
-    test('the card refuses to book without a level and with a team size outside 2 to 11', async ({ page, context }) => {
+    test('the booking button is disabled until a team size inside 2 to 11 and a level are chosen, with a prompt next to it', async ({ page, context }) => {
       await seal(context);
       await open(page, lang);
       const form = page.locator('[data-checkin]');
       const dialog = page.locator('[data-booking]');
+      const book = form.locator('[data-book]');
+      const prompt = form.locator('[data-book-prompt]');
+      const team = form.locator('input[name="team"]');
       await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
-      await form.locator('[data-book]').click();
-      await expect(dialog, 'no level chosen').toBeHidden();
-      await form.locator('input[name="level"][value="weak"]').check({ force: true });
-      for (const bad of ['1', '12', '0', '']) {
-        await form.locator('input[name="team"]').fill(bad);
-        await form.locator('[data-book]').click();
-        await expect(dialog, `team "${bad}"`).toBeHidden();
+      const off = async (why: string) => {
+        await expect(book, why).toBeDisabled();
+        // The real attribute, not a look.
+        expect(await book.evaluate((b) => b.hasAttribute('disabled')), why).toBe(true);
+        await expect(prompt, why).toBeVisible();
+        await expect(prompt).toHaveText(CHOOSE[lang]);
+        // The prompt is the button's description.
+        await expect(book).toHaveAttribute('aria-describedby', (await prompt.getAttribute('id'))!);
+        // A click does nothing.
+        await book.click({ force: true });
+        await expect(dialog, why).toBeHidden();
+      };
+      const on = async (why: string) => {
+        await expect(book, why).toBeEnabled();
+        expect(await book.evaluate((b) => b.hasAttribute('disabled')), why).toBe(false);
+        await expect(prompt, why).toBeHidden();
+        // Hidden, and no longer read out as the description either.
+        await expect(book).not.toHaveAttribute('aria-describedby', /.*/);
+      };
+
+      // On arrival: the default team size counts as chosen, the level has no default.
+      await expect(team).toHaveValue('4');
+      await off('no level chosen');
+      // Where the button, the prompt and everything after them sit on the card, measured
+      // from the card's own corner (the card is still sliding in when the test gets here).
+      const place = () =>
+        form.evaluate((card) => {
+          const c = card.getBoundingClientRect();
+          const at = (sel: string) => {
+            const r = card.querySelector(sel)!.getBoundingClientRect();
+            return { x: Math.round((r.left - c.left) * 10) / 10, y: Math.round((r.top - c.top) * 10) / 10, w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10 };
+          };
+          return { book: at('[data-book]'), prompt: at('[data-book-prompt]'), ask: at('.card__ask'), card: Math.round(c.height * 10) / 10 };
+        });
+      const before = await place();
+      // The prompt sits next to the button: right under it on a phone, beside it on a wide screen.
+      if (page.viewportSize()!.width < 900) {
+        expect(before.prompt.y).toBeGreaterThanOrEqual(before.book.y + before.book.h);
+        expect(before.prompt.y - (before.book.y + before.book.h)).toBeLessThan(16);
+      } else {
+        expect(before.prompt.x).toBeGreaterThanOrEqual(before.book.x + before.book.w);
+        expect(before.prompt.x - (before.book.x + before.book.w)).toBeLessThan(40);
+        expect(Math.abs(before.prompt.y + before.prompt.h / 2 - (before.book.y + before.book.h / 2))).toBeLessThan(6);
       }
-      await form.locator('input[name="team"]').fill('3');
-      await form.locator('[data-book]').click();
+
+      // Choosing a level turns it on, at once, and nothing on the card moves.
+      await form.locator('input[name="level"][value="weak"]').check({ force: true });
+      await on('level chosen');
+      expect(await place()).toEqual(before);
+
+      // Clearing the team size, or a size outside 2 to 11, or not a whole number, turns it off again.
+      for (const bad of ['', '1', '12', '0', '2.5']) {
+        await team.fill(bad);
+        await off(`team "${bad}"`);
+        expect(await place()).toEqual(before);
+        await team.fill('3');
+        await on('team 3');
+      }
+      // The ends of the range are inside it.
+      for (const good of ['2', '11']) {
+        await team.fill(good);
+        await on(`team ${good}`);
+      }
+
+      // And it books.
+      await book.click();
       await expect(dialog).toBeVisible();
+    });
+
+    test('the confirmation call is announced on the card, in the booking dialog and in the "How do I book?" answer', async ({ page, context }) => {
+      await seal(context);
+      await open(page, lang);
+      const form = page.locator('[data-checkin]');
+      await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      // On the card, between the booking button and the "ask a question" links.
+      const onCard = form.locator('[data-confirm-call]');
+      await expect(onCard).toHaveCount(1);
+      await expect(onCard).toBeVisible();
+      await expect(onCard).toHaveText(CONFIRM_CALL[lang]);
+      // Read in one go: the card may still be sliding in.
+      const at = await form.evaluate((card) => {
+        const box = (sel: string) => {
+          const r = card.querySelector(sel)!.getBoundingClientRect();
+          return { top: r.top, bottom: r.bottom };
+        };
+        return { call: box('[data-confirm-call]'), book: box('[data-book]'), ask: box('.card__ask') };
+      });
+      expect(at.call.top).toBeGreaterThanOrEqual(at.book.bottom);
+      expect(at.call.bottom).toBeLessThanOrEqual(at.ask.top);
+      expect(at.call.top - at.book.bottom, 'near the button').toBeLessThan(60);
+      // In the FAQ answer about booking.
+      const item = page.locator('.faq__item', { has: page.locator('summary', { hasText: FAQ_BOOK[lang] }) });
+      await expect(item).toHaveCount(1);
+      await expect(item.locator('p')).toContainText(CONFIRM_CALL[lang]);
+      // One line in the booking dialog, and the widget still keeps most of the screen (the
+      // share is asserted in the dialog test above).
+      await fill(page, lang, CASES[1]);
+      await form.locator('[data-book]').click();
+      const inDialog = page.locator('[data-booking] [data-confirm-call]');
+      await expect(inDialog).toBeVisible();
+      await expect(inDialog).toHaveText(CONFIRM_CALL[lang]);
+      // Plain hyphens only.
+      expect(CONFIRM_CALL[lang] + CHOOSE[lang]).not.toMatch(/[\u2013\u2014]/);
     });
 
     test('ask a question on WhatsApp: the prefilled message is the greeting plus the summary line', async ({ page, context }) => {
@@ -248,6 +356,13 @@ for (const lang of LANGS) {
       await expect(toast).toHaveAttribute('role', 'status');
       await expect(toast).toHaveAttribute('aria-live', 'polite');
       await expect(toast).toBeHidden();
+      // The link is pressed where a thumb finds it, in the lower part of the screen, once the
+      // card has finished sliding in. Set here, so the toast check below is about that
+      // position: a click on a card that is still moving is retried by the test runner with
+      // a different scroll alignment each time, and where it stops is then a matter of timing.
+      await expect(form).toHaveClass(/is-in/);
+      await form.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      await tg.evaluate((el) => el.scrollIntoView({ block: 'end' }));
       const [popup] = await Promise.all([page.waitForEvent('popup'), tg.click()]);
       await popup.waitForLoadState();
       expect(popup.url()).toBe(TELEGRAM_URL);
@@ -442,11 +557,17 @@ test('the 404 page has the floating control with both channels and the toast', a
   await expect(page.locator('[data-toast]')).toHaveText(TOAST.ro);
 });
 
-test('picking a level at the desk preselects it on the card', async ({ page, context }) => {
+test('picking a level at the desk preselects it on the card and turns the booking button on', async ({ page, context }) => {
   await seal(context);
   await open(page, 'en');
+  // Until then the booking button on the card is off.
+  await expect(page.locator('#checkin [data-book]')).toBeDisabled();
+  await expect(page.locator('#checkin [data-book-prompt]')).toBeVisible();
   await page.locator('#keys input[data-level-input][value="hardcore"]').check({ force: true });
   await expect(page.locator('#checkin input[name="level"][value="hardcore"]')).toBeChecked();
+  // The level chosen at the desk counts on the card: the button is on, the prompt is gone.
+  await expect(page.locator('#checkin [data-book]')).toBeEnabled();
+  await expect(page.locator('#checkin [data-book-prompt]')).toBeHidden();
   const href = (await page.locator('[data-ask-wa]').getAttribute('href'))!;
   expect(new URL(href).searchParams.get('text')).toContain('Level: Hardcore');
   // No tint follows the level: the page never hints at what a level contains.
