@@ -5,11 +5,6 @@
       "nor_gl",
       "Rough"
     ],
-    "decrepit_wallpaper": [
-      "Diffuse",
-      "nor_gl",
-      "Rough"
-    ],
     "dark_wood": [
       "Diffuse",
       "nor_gl",
@@ -51,7 +46,6 @@
   },
   "res": {
     "dirty_carpet": "2k",
-    "decrepit_wallpaper": "2k",
     "walnut_veneer": "2k"
   }
 }

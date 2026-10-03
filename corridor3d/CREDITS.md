@@ -9,11 +9,10 @@ into `corridor3d/textures/`. The list the script reads is `assets.json`.
 
 | Asset | Used for | URL |
 |-------|----------|-----|
-| dirty_carpet | Pile and dirt of the carpet runner | https://polyhaven.com/a/dirty_carpet |
-| decrepit_wallpaper | Stains and surface of the wallpaper | https://polyhaven.com/a/decrepit_wallpaper |
+| dirty_carpet (2k) | Pile of the carpet runner (normal and roughness) | https://polyhaven.com/a/dirty_carpet |
 | oak_veneer_01 | Door leaves, and the base of the clawed door face | https://polyhaven.com/a/oak_veneer_01 |
 | dark_wood | Skirting, dado rail, architraves, door linings | https://polyhaven.com/a/dark_wood |
-| wood_cabinet_worn_long | Wainscot boards | https://polyhaven.com/a/wood_cabinet_worn_long |
+| walnut_veneer (2k) | Wainscot: book-matched straight-grain walnut panels | https://polyhaven.com/a/walnut_veneer |
 | wood_floor_worn | Floorboards beside the runner | https://polyhaven.com/a/wood_floor_worn |
 | painted_plaster_wall | Ceiling and cornice | https://polyhaven.com/a/painted_plaster_wall |
 | worn_plaster_wall | Bare plaster where the wallpaper has come away | https://polyhaven.com/a/worn_plaster_wall |
@@ -27,9 +26,11 @@ into `corridor3d/textures/`. The list the script reads is `assets.json`.
 
 ## Authored here (no outside source)
 
-Drawn in code in `src/textures.js`: the wallpaper print, the pattern of the carpet runner,
-the decal atlas (dried blood, water stains, grime, gouges, carpet stains), the clawed face of
-door 305, the brass number plates, the exit sign, the do-not-disturb card, the framed prints.
+Drawn in code in `src/surfaces.js`: the regency-stripe wallpaper (albedo, emboss, sheen), the
+walnut panel layout of the wainscot (from the scan above), the woven carpet runner. In
+`src/textures.js`: the decal atlas (dried blood, water stains, grime, gouges, carpet stains,
+ghosts of removed pictures, scuffs, rubbed varnish), the clawed face of door 305, the brass
+number plates, the exit sign, the do-not-disturb card, the framed prints.
 Modelled in code: the corridor, the doors and their furniture, the lamps, the child's shoe, the
 housekeeping trolley, the peeling wallpaper, and the figure behind door 308.
 

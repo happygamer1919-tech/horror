@@ -127,16 +127,17 @@ function decalAtlas(plaster, size) {
     }
   };
   // dried: nearly black where it was thick, rust at the thin edges, a darker rim where it dried
+  // Old blood is brown, not black: thin where it was smeared, soaked into the varnish at the edges.
   const smear = (draw, alpha = 0.9) => {
     g.save();
     g.filter = 'blur(2.5px)';
-    g.globalAlpha = alpha * 0.55;
-    draw('rgb(92,30,16)', 1.1);
+    g.globalAlpha = alpha * 0.45;
+    draw('rgb(104,50,28)', 1.1);
     g.filter = 'blur(1px)';
-    g.globalAlpha = alpha;
-    draw('rgb(46,11,7)', 1);
-    g.globalAlpha = alpha * 0.8;
-    draw('rgb(28,6,4)', 0.82);
+    g.globalAlpha = alpha * 0.75;
+    draw('rgb(74,30,16)', 0.92);
+    g.globalAlpha = alpha * 0.5;
+    draw('rgb(46,16,9)', 0.66);
     g.restore();
   };
   const bloodMark = (variant) => {
@@ -180,7 +181,7 @@ function decalAtlas(plaster, size) {
           g.ellipse(hx + t * 4, hy + t * C * 0.32, ww, ww * 0.7, 0, 0, Math.PI * 2);
           g.fill();
         }
-      }, 0.92);
+      }, 0.78);
     } else if (variant === 1) {
       // a sideways wipe along the frame
       g.translate(C / 2, C / 2);
@@ -832,7 +833,7 @@ function paperBack(S) {
 }
 
 export async function loadTextures({ size = 2048, small = 1024 } = {}) {
-  const ids = ['dirty_carpet', 'decrepit_wallpaper', 'dark_wood', 'oak_veneer_01', 'walnut_veneer', 'wood_floor_worn', 'painted_plaster_wall', 'worn_plaster_wall', 'rough_wood'];
+  const ids = ['dirty_carpet', 'dark_wood', 'oak_veneer_01', 'walnut_veneer', 'wood_floor_worn', 'painted_plaster_wall', 'worn_plaster_wall', 'rough_wood'];
   const img = {};
   await Promise.all(
     ids.flatMap((id) =>
