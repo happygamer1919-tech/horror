@@ -46,7 +46,7 @@ export const LAMP_Y = CH - LAMP_DROP;
 // Camera position (s) at which each lamp dies. Far lamps first; the wave reaches the walker
 // just after the scare door (lamp 4 hangs in front of it and is still alight while the door
 // opens, and while the walker turns back to the corridor), then runs on behind him.
-export const FAIL_AT = { 6: 2.4, 5: 5.2, 4: 17.35, 3: 17.7, 2: 18.05, 1: 18.4, 0: 18.75 };
+export const FAIL_AT = { 6: 2.4, 5: 5.2, 4: 17.5, 3: 17.8, 2: 18.1, 1: 18.4, 0: 18.75 };
 export const FADE_LEN = 0.55; // metres of walking a lamp takes to die
 
 export const WALK_FROM = 0.35;
