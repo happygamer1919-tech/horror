@@ -117,7 +117,7 @@ const AIMS = [
   [7.7, 1.2, 1.3, [-0.95, 1.78, 9.2]], // paper come away at a seam, under the dead swinging shade
   [10.5, 1.5, 0.75, [-0.52, 1.02, 11.4]], // the clawed inside of door 305, at the height of a child's hands
   [12.5, 1.0, 1.3, [0.95, 1.0, 13.35]], // the dried hand on door 306
-  [16.75, 2.1, 0.9, [0.95, 1.32, 17.3]], // door 308, below its number: the edge that will open is at the rim of the hot spot: the edge that will open is out in the spill
+  [16.75, 2.1, 0.9, [0.95, 1.32, 17.3]], // door 308, below its number: the edge that will open is at the rim of the hot spot
   [21.4, 1.5, 1.5, [-0.95, 0.12, 23.75]], // the line of light under 311
   [24.4, 1.2, 1.0, [0.95, 1.25, 25.9]], // the boards across 312
 ];

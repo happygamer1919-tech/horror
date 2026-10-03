@@ -161,10 +161,14 @@ export function makeMaterials(T) {
   m.sole = P({ color: new THREE.Color(0.2, 0.13, 0.08), roughness: 0.8, vertexColors: true });
 
   // The figure behind the door.
-  m.skin = P({ color: new THREE.Color(0.075, 0.062, 0.052), roughness: 0.42, sheen: 0.3, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.75, 0.55, 0.5), vertexColors: true });
-  m.eye = P({ color: new THREE.Color(1, 1, 1), roughness: 0.03, vertexColors: true });
+  // (The torch is beside the lens, so anything smooth that faces the walker throws it straight back:
+  // a wet cheek and wet knuckles shone at luma 110 to 150 whatever their colour. Dry, matt skin.)
+  m.skin = P({ color: new THREE.Color(0.042, 0.035, 0.03), roughness: 0.9, specularIntensity: 0.15, vertexColors: true });
+  // (by torchlight a white, mirror-wet eyeball was a glowing blob: the white is dull and bloodshot,
+  // the surface less of a mirror, and what is left is one small catchlight)
+  m.eye = P({ color: new THREE.Color(0.22, 0.17, 0.14), roughness: 0.34, specularIntensity: 0.6, vertexColors: true });
   m.hair = P({ color: new THREE.Color(0.01, 0.009, 0.008), roughness: 0.62, specularIntensity: 0.3, side: THREE.DoubleSide, vertexColors: true });
-  m.nail = P({ color: new THREE.Color(0.72, 0.66, 0.6), roughness: 0.16, vertexColors: true });
+  m.nail = P({ color: new THREE.Color(0.2, 0.18, 0.16), roughness: 0.75, specularIntensity: 0.3, vertexColors: true });
   m.gown = P({ color: new THREE.Color(0.05, 0.046, 0.04), roughness: 1, side: THREE.DoubleSide, vertexColors: true });
 
   for (const [name, mat] of Object.entries(m)) {

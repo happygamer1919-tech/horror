@@ -96,7 +96,6 @@ export function buildLamps(materials) {
     shadeMat.name = `shade${l.k}`;
     // forty years of cigarettes and dust on the glass: each a different shade of yellow-brown
     const d = kind.dust;
-    const warmUnused = 0; // (lamps no longer light the corridor: see setLamp)
     shadeMat.color.setRGB(0.62 - 0.22 * d, 0.55 - 0.22 * d, 0.42 - 0.2 * d);
     shadeMat.roughness = 0.45 + 0.4 * d;
     const body = pendant(r, kind).build({ ...materials, shade: shadeMat }, `lamp${l.k}`);
