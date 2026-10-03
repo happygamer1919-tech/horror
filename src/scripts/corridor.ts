@@ -10,8 +10,10 @@
 //   - nothing of the sequence is requested until the first input, or until the page has been
 //     idle well after load (and then only every 8th frame). One small poster loads with the page.
 //
-// Once per browser session, on the first pass, door 308 opens a hand's width while the walk
-// holds still for 625 ms. Afterwards it is a closed door like the others.
+// Once per browser session, on the first pass, door 308 opens a hand's width for 625 ms. The
+// walk frame holds while the patches play, and the picture pushes in slowly towards the door (a
+// CSS transform, done by the compositor), so the walk never looks frozen. Afterwards it is a
+// closed door like the others.
 import { ScrollTrigger } from './scroll';
 import { still, once } from './env';
 import { doorCreak } from './audio';
@@ -440,16 +442,19 @@ export function initCorridor() {
         g.globalCompositeOperation = 'multiply';
         g.fillStyle = 'rgb(214, 170, 120)';
         g.fillRect(0, 0, W, H);
-        // light reaches the gap past the jamb: a strip on the door-edge side, dark beyond it
+        // She leans out past the door edge, which hides the right of the picture: the lamp
+        // reaches the eye and cheek on the left, the contour beyond them falls into the dark,
+        // and so does everything towards the edge.
         const fall = g.createLinearGradient(0, 0, W, 0);
-        fall.addColorStop(0, 'rgb(6, 5, 4)');
-        fall.addColorStop(0.42, 'rgb(34, 28, 22)');
-        fall.addColorStop(0.62, 'rgb(170, 160, 150)');
-        fall.addColorStop(1, 'rgb(235, 230, 225)');
+        fall.addColorStop(0, 'rgb(40, 38, 36)');
+        fall.addColorStop(0.22, 'rgb(225, 220, 214)');
+        fall.addColorStop(0.45, 'rgb(205, 198, 190)');
+        fall.addColorStop(0.7, 'rgb(48, 40, 32)');
+        fall.addColorStop(1, 'rgb(8, 7, 6)');
         g.fillStyle = fall;
         g.fillRect(0, 0, W, H);
         // and falls off towards the top and the bottom of the head
-        const vert = g.createRadialGradient(W * 0.7, H * 0.45, H * 0.1, W * 0.7, H * 0.45, H * 0.62);
+        const vert = g.createRadialGradient(W * 0.34, H * 0.42, H * 0.1, W * 0.34, H * 0.42, H * 0.6);
         vert.addColorStop(0, 'rgb(255, 255, 255)');
         vert.addColorStop(1, 'rgb(20, 18, 16)');
         g.fillStyle = vert;
@@ -515,6 +520,21 @@ export function initCorridor() {
     ctx.restore();
     faceDraws++;
     canvas.dataset.faceDraws = String(faceDraws);
+  };
+
+  // The door beat: lean in towards the gap while it plays, settle back while the walk catches up.
+  const pushIn = (sc: ScareInfo) => {
+    const [x, y, w, h] = sc.rect;
+    const ox = clamp(((x + w / 2 - crop.x) / crop.w) * 100, 0, 100);
+    const oy = clamp(((y + h / 2 - crop.y) / crop.h) * 100, 0, 100);
+    canvas.style.transformOrigin = `${ox.toFixed(1)}% ${oy.toFixed(1)}%`;
+    canvas.style.transition = `transform ${Math.round((sc.count / sc.fps) * 1000)}ms cubic-bezier(0.25, 0.1, 0.35, 1)`;
+    canvas.style.transform = 'scale(1.045)';
+  };
+  const pushOut = () => {
+    if (!canvas.style.transform) return;
+    canvas.style.transition = 'transform 900ms cubic-bezier(0.45, 0, 0.25, 1)';
+    canvas.style.transform = '';
   };
 
   // --- drawing ---
@@ -590,6 +610,7 @@ export function initCorridor() {
           canvas.dataset.scarePlays = String(scarePlays);
           canvas.dataset.scare = 'playing';
           doorCreak(sc.count / sc.fps);
+          pushIn(sc);
         } else {
           scareState = 'idle';
         }
@@ -603,6 +624,7 @@ export function initCorridor() {
       if (j >= sc.count) {
         scareState = 'idle';
         canvas.dataset.scare = 'done';
+        pushOut();
         catchUp = true;
         shownTarget = sc.frame;
       } else {
@@ -682,6 +704,7 @@ export function initCorridor() {
     delete canvas.dataset.scareReady;
     scareState = 'idle';
     catchUp = false;
+    pushOut();
     setName = name;
     info = next;
     canvas.dataset.set = setName;

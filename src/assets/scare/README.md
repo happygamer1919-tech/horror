@@ -15,15 +15,16 @@ stand-in are used instead. The fingers on the door edge are part of the rendered
 
 - **Framing:** one face, front on or turned slightly to its left, filling the picture from
   hairline to chin. Portrait, about 3 : 4 (for example 600 x 810 px). Smaller is fine: on screen
-  the picture is drawn about 90 px wide on a desktop screen and 40 px on a phone, mostly in
+  the picture is drawn about 120 px wide on a desktop screen and 60 px on a phone, mostly in
   shadow, and is seen for about half a second.
 - **Background:** black, or as dark as possible. The picture is added to the darkness of the gap,
   so everything black in it disappears and everything bright in it shows.
-- **Light:** lit from the front and a little from the viewer's right, soft, no flash glare. The
-  site puts the viewer's right half in the light and lets the left half fall away into the dark:
-  **the eye that should catch the light is the one on the right of the picture.** Keep that eye
-  open and looking into the lens.
-- **Expression and styling:** still, pale, no smile. Hair may fall across the left of the picture.
+- **Light:** lit from the front and a little from above, soft, no flash glare. She leans out
+  past the edge of the door, which covers the right of the picture: the site keeps the left half
+  in the light and lets the right half fall away into the dark. **The eye that should catch the
+  light is the one on the left of the picture.** Keep that eye open and looking into the lens.
+- **Expression and styling:** still, pale, no smile. Long dark hair hanging beside the face is
+  ideal: it frames the lit side against the dark of the room.
 - **Colour:** any. It is reduced to almost monochrome and tinted warm.
 - **Size on disk:** under 150 kB. It loads only when a visitor reaches the door.
 - **Consent:** use a photograph you have the right to publish. If it is a real person, written

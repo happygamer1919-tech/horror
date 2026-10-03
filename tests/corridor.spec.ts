@@ -2,7 +2,9 @@
 // Everything is asserted on state the scrubber exposes (data attributes on the canvas) and on
 // the network, never on timing luck.
 import { test, expect, type Page } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync, copyFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const BASE = '/horror';
@@ -147,19 +149,67 @@ test('the door opens once: not on a second pass, and not after a reload in the s
   expect(patches, 'no scare frames are even fetched once it has played').toEqual([]);
 });
 
-test('the scare is quiet: it lasts 500 to 700 ms and touches only a small part of the frame', async ({ page }) => {
+test('the scare is quiet: the door moves for 500 to 700 ms, then shuts, in a small part of the frame', async ({ page }) => {
   await open(page);
+  const canvas = canvasOf(page);
   const { set } = await setInfo(page);
   const sc = set.scare;
-  const ms = (sc.count / sc.fps) * 1000;
-  expect(ms).toBeGreaterThanOrEqual(500);
-  expect(ms).toBeLessThanOrEqual(700);
   // the door is shut on the first and the last frame of the run
   expect(sc.has[0]).toBe(0);
   expect(sc.has[sc.count - 1]).toBe(0);
   // the patch that changes is a fraction of the picture: not a full-screen event
   const share = (sc.rect[2] * sc.rect[3]) / (set.w * set.h);
   expect(share).toBeLessThan(0.3);
+
+  await approach(page, set);
+  // Watch every animation frame from here on: the scare state, the patch on the canvas, and a
+  // checksum of the canvas pixels inside the patch rectangle (the canvas shows a centred crop).
+  await page.evaluate(
+    ([rect, fw, fh]) => {
+      const c = document.querySelector<HTMLCanvasElement>('[data-corridor]')!;
+      const g = c.getContext('2d')!;
+      const log: [number, string, string, number][] = [];
+      (window as unknown as { __rec: typeof log }).__rec = log;
+      let after = 0;
+      const tick = (t: number) => {
+        const k = Math.max(c.width / fw, c.height / fh);
+        const cx = (fw - c.width / k) / 2;
+        const cy = (fh - c.height / k) / 2;
+        const x0 = Math.max(0, Math.floor((rect[0] - cx) * k));
+        const y0 = Math.max(0, Math.floor((rect[1] - cy) * k));
+        const x1 = Math.min(c.width, Math.ceil((rect[0] + rect[2] - cx) * k));
+        const y1 = Math.min(c.height, Math.ceil((rect[1] + rect[3] - cy) * k));
+        let sum = 0;
+        if (x1 > x0 && y1 > y0) {
+          const d = g.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+          for (let i = 0; i < d.length; i += 4 * 5) sum = (sum * 31 + d[i] + d[i + 1] * 7 + d[i + 2] * 13) >>> 0;
+        }
+        log.push([t, c.dataset.scare ?? '', c.dataset.patch ?? '', sum]);
+        if (c.dataset.scare === 'done') after++;
+        if (after < 20 && log.length < 2000) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    },
+    [sc.rect, set.w, set.h] as [number[], number, number],
+  );
+  await toFrame(page, sc.frame + 5, set.frames);
+  await expect(canvas).toHaveAttribute('data-scare', 'done', { timeout: 6000 });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __rec: unknown[] }).__rec.length)).toBeGreaterThan(5);
+  const rec = await page.evaluate(() => (window as unknown as { __rec: [number, string, string, number][] }).__rec);
+  const playing = rec.filter((r) => r[1] === 'playing');
+  expect(playing.length, 'animation frames while the door moves').toBeGreaterThan(8);
+  const start = playing[0][0];
+  const end = rec.find((r) => r[1] === 'done')![0];
+  // measured on the page, not read from the manifest: from the door starting to move to the door shut
+  expect(end - start).toBeGreaterThanOrEqual(500);
+  expect(end - start).toBeLessThanOrEqual(900);
+  // the door really moves: many different patches drawn, and the pixels in the rectangle change
+  const drawn = new Set(playing.map((r) => r[2]).filter((p) => p !== '-1'));
+  expect(drawn.size, 'patches drawn').toBeGreaterThanOrEqual(8);
+  expect(new Set(playing.map((r) => r[3])).size, 'different pictures in the door rectangle').toBeGreaterThanOrEqual(6);
+  // and it is shut again at the end: once it is over, no patch is drawn
+  expect(rec[rec.length - 1][1]).toBe('done');
+  expect(rec[rec.length - 1][2]).toBe('-1');
 });
 
 test('the old silhouette is gone', async ({ page, request }) => {
@@ -314,4 +364,39 @@ test('a supplied face photo is composited into the door gap', async ({ page }) =
 test('without a photo in the slot the page says so', async ({ page }) => {
   await open(page);
   await expect(canvasOf(page)).toHaveAttribute('data-face-mode', 'stand-in');
+});
+
+test('the photo slot is wired at build time: a face file in src/assets/scare reaches the page', async ({}, info) => {
+  // One build is enough for both projects, and two at once would share the slot.
+  test.skip(info.project.name !== 'desktop-1440', 'runs once, in the desktop project');
+  test.slow();
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const fixture = join(root, 'tests', 'fixtures', 'face.png');
+  const slot = join(root, 'src', 'assets', 'scare', 'face.png');
+  const out = join(root, 'test-results', 'face-slot-build');
+  expect(existsSync(slot), 'the slot is empty in the repository').toBe(false);
+  // the site the other tests run against was built without a face
+  expect(readFileSync(join(root, 'dist', 'ro', 'index.html'), 'utf8')).not.toContain('data-face=');
+  copyFileSync(fixture, slot);
+  try {
+    execFileSync('npx', ['astro', 'build', '--outDir', out], { cwd: root, stdio: 'pipe', timeout: 170000 });
+  } finally {
+    rmSync(slot, { force: true });
+  }
+  try {
+    for (const lang of ['ro', 'ru', 'en']) {
+      const html = readFileSync(join(out, lang, 'index.html'), 'utf8');
+      const m = /data-face="([^"]+)"/.exec(html);
+      expect(m, `${lang}: the canvas carries the face`).toBeTruthy();
+      const url = m![1];
+      // Vite inlines a file under 4 kB (the fixture is one) and emits anything larger (a real photo)
+      const bytes = url.startsWith('data:image/png;base64,')
+        ? Buffer.from(url.slice(url.indexOf(',') + 1), 'base64')
+        : readFileSync(join(out, url.replace(/^\/horror\//, '')));
+      if (!url.startsWith('data:')) expect(url).toMatch(/^\/horror\/.+\.png$/);
+      expect(bytes.equals(readFileSync(fixture)), `${lang}: the face on the page is the file in the slot`).toBe(true);
+    }
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
 });
