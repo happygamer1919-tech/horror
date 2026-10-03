@@ -131,7 +131,7 @@ export function cameraPose(s, set) {
 // Render sets. fov is vertical, in degrees.
 export const SETS = {
   desktop: { w: 1600, h: 900, fov: 43.5, frames: 168, dir: 'd' },
-  mobile: { w: 720, h: 1440, fov: 80, frames: 112, dir: 'm' },
+  mobile: { w: 720, h: 1440, fov: 72, frames: 112, dir: 'm' },
 };
 export const frameS = (set, i) => camS(i / (SETS[set].frames - 1));
 

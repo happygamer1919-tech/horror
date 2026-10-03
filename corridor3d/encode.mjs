@@ -81,24 +81,37 @@ async function makeDummy() {
 // ship just the patch: it is drawn over the walk frame it was cut from.
 async function patchRect(dir, w, h) {
   const hold = await sharp(join(dir, 'hold.png')).removeAlpha().raw().toBuffer();
-  let x0 = w;
-  let y0 = h;
-  let x1 = 0;
-  let y1 = 0;
+  // Changes are counted in 16 px blocks, and a block counts only when a good share of its
+  // pixels changed: the door and whoever is behind it. The faint shift in bounced light across
+  // the rest of the corridor when the door opens is left to the feathered edge.
+  const B = 16;
+  const bw = Math.ceil(w / B);
+  const bh = Math.ceil(h / B);
+  const hits = new Uint16Array(bw * bh);
   const files = (await readdir(dir)).filter((f) => /^(face|gap)-\d+\.png$/.test(f));
   for (const f of files) {
     const img = await sharp(join(dir, f)).removeAlpha().raw().toBuffer();
+    const count = new Uint16Array(bw * bh);
     for (let y = 0; y < h; y += 2) {
       for (let x = 0; x < w; x += 2) {
         const i = (y * w + x) * 3;
         const d = Math.abs(img[i] - hold[i]) + Math.abs(img[i + 1] - hold[i + 1]) + Math.abs(img[i + 2] - hold[i + 2]);
-        if (d > 30) {
-          if (x < x0) x0 = x;
-          if (x > x1) x1 = x;
-          if (y < y0) y0 = y;
-          if (y > y1) y1 = y;
-        }
+        if (d > 30) count[Math.floor(y / B) * bw + Math.floor(x / B)]++;
       }
+    }
+    for (let k = 0; k < count.length; k++) if (count[k] > (B * B) / 4 / 5) hits[k] = 1;
+  }
+  let x0 = w;
+  let y0 = h;
+  let x1 = 0;
+  let y1 = 0;
+  for (let by = 0; by < bh; by++) {
+    for (let bx = 0; bx < bw; bx++) {
+      if (!hits[by * bw + bx]) continue;
+      x0 = Math.min(x0, bx * B);
+      y0 = Math.min(y0, by * B);
+      x1 = Math.max(x1, Math.min(w - 1, bx * B + B - 1));
+      y1 = Math.max(y1, Math.min(h - 1, by * B + B - 1));
     }
   }
   if (x1 <= x0) return null;

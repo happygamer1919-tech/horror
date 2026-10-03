@@ -83,7 +83,7 @@ Things the tracer needed:
 | | Desktop | Mobile |
 |---|---|---|
 | Frame | 1600 x 900 | 720 x 1440 |
-| Lens | 43.5 degrees vertical, about 26 mm | 80 degrees vertical, so floor, both walls and the lamps fit a phone |
+| Lens | 43.5 degrees vertical, about 26 mm | 72 degrees vertical, so floor, both walls and the lamps fit a phone |
 | Frames | 168 | 112 |
 | Render time | about 25 s a frame, 72 min | about 20 s a frame, 37 min |
 | Format | AVIF, quality 56 (up to 68 for dark frames) | WebP, quality 56 (up to 68 for dark frames) |
