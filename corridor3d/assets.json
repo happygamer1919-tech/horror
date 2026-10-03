@@ -39,6 +39,21 @@
       "Diffuse",
       "nor_gl",
       "Rough"
+    ],
+    "decrepit_wallpaper": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "wood_cabinet_worn_long": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
+    ],
+    "wood_table_001": [
+      "Diffuse",
+      "nor_gl",
+      "Rough"
     ]
   },
   "models": {
@@ -46,6 +61,21 @@
   },
   "res": {
     "dirty_carpet": "2k",
-    "walnut_veneer": "2k"
+    "walnut_veneer": "2k",
+    "decrepit_wallpaper": "2k",
+    "wood_cabinet_worn_long": "2k",
+    "wood_table_001": "2k",
+    "dark_wood": "2k",
+    "oak_veneer_01": "2k"
+  },
+  "ambientcg": {
+    "Carpet015": {
+      "res": "2K-JPG",
+      "maps": [
+        "Color",
+        "NormalGL",
+        "Roughness"
+      ]
+    }
   }
 }

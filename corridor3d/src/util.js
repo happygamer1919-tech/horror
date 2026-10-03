@@ -124,7 +124,8 @@ export function grid(x0, y0, x1, y1, cell = 0.1) {
 // Extrude a 2D profile (array of [a, b] points, in metres) along a length. The profile lies
 // in the XY plane, the length runs along +Z from 0. Flat shaded per profile segment unless
 // `smoothShade`. UV: u = distance around the profile, v = z, so wood grain runs along the piece.
-export function extrude(profile, length, { closed = false, caps = false, smoothShade = false } = {}) {
+// `step` cuts the length into pieces of about that size, so wear can be painted along it.
+export function extrude(profile, length, { closed = false, caps = false, smoothShade = false, step = 0 } = {}) {
   const pts = closed ? [...profile, profile[0]] : profile;
   const pos = [];
   const uv = [];
@@ -134,8 +135,13 @@ export function extrude(profile, length, { closed = false, caps = false, smoothS
     const [a1, b1] = pts[i + 1];
     const seg = Math.hypot(a1 - a0, b1 - b0);
     // two triangles, wound so the normal points to the right of the walking direction of the profile
-    pos.push(a0, b0, 0, a1, b1, 0, a1, b1, length, a0, b0, 0, a1, b1, length, a0, b0, length);
-    uv.push(dist, 0, dist + seg, 0, dist + seg, length, dist, 0, dist + seg, length, dist, length);
+    const n = step > 0 ? Math.max(1, Math.round(length / step)) : 1;
+    for (let k = 0; k < n; k++) {
+      const z0 = (length * k) / n;
+      const z1 = (length * (k + 1)) / n;
+      pos.push(a0, b0, z0, a1, b1, z0, a1, b1, z1, a0, b0, z0, a1, b1, z1, a0, b0, z1);
+      uv.push(dist, z0, dist + seg, z0, dist + seg, z1, dist, z0, dist + seg, z1, dist, z1);
+    }
     dist += seg;
   }
   if (caps) {

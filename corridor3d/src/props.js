@@ -85,7 +85,7 @@ function peel(bag, frame, side, sOfX, x0, y0, w, len, { seed = 1, curl = 2.9, tu
       // grimy towards the torn edge, paste-stained near where it still holds
       const t = it / NT;
       const k = (0.62 + 0.3 * fbm(sx * 5, sy * 5, seed, 3)) * (1 - 0.4 * smooth(0.6, 1, t)) * (1 - 0.2 * smooth(0.15, 0, t));
-      col.push(k, k * 0.93, k * 0.8);
+      col.push(k, k * 0.9, k * 0.72);
     };
     for (let iu = 0; iu < NU; iu++) {
       for (let it = 0; it < NT; it++) {
@@ -353,35 +353,13 @@ export async function buildProps(bag, materials, T, doorMeta) {
   const lights = [];
   const R = mulberry(909);
 
-  // ---- grime on every leaf: round the handle, and kicked along the bottom ----
   const leafPlace = (no) => {
     const m = doorMeta[no];
     return M(leafMatrix(m), m.frame);
   };
   const onLeaf = (x, y) => leafDepth(x, y);
-  for (const no of Object.keys(doorMeta).map(Number)) {
-    const m = doorMeta[no];
-    if (m.dynamic) continue;
-    const hx = m.handleSide * (DOOR.w / 2 - 0.06);
-    decal(bag, R() < 0.5 ? 'grime1' : 'grime2', leafPlace(no), hx - m.handleSide * 0.05, 1.02, 0.34, 0.5, { zFn: onLeaf, rot: R() * 6, n: 20, soft: true });
-    decal(bag, 'grime2', leafPlace(no), (R() - 0.5) * 0.2, 0.2, 0.8, 0.36, { zFn: onLeaf, rot: R() * 0.3, n: 20, soft: true });
-  }
-
-  // ---- door 313, the last one: the most handled and the least cleaned. Black round the handle,
-  // kicked dark along the bottom rail, a run of old dirt down from the lock ----
-  {
-    const m = doorMeta[LAST_ROOM];
-    const hx = m.handleSide * (DOOR.w / 2 - 0.06);
-    decal(bag, 'rub', leafPlace(LAST_ROOM), hx - m.handleSide * 0.05, 1.04, 0.3, 0.4, { zFn: onLeaf, rot: 0.3, n: 20 });
-    decal(bag, 'rub', leafPlace(LAST_ROOM), hx - m.handleSide * 0.02, 1.36, 0.18, 0.26, { zFn: onLeaf, rot: -0.6, n: 16, lift: 0.0034 });
-    decal(bag, 'scuff', leafPlace(LAST_ROOM), 0.0, 0.14, 0.86, 0.36, { zFn: onLeaf, n: 20, lift: 0.0036 });
-    decal(bag, 'scuff', leafPlace(LAST_ROOM), 0.1, 0.24, 0.6, 0.3, { zFn: onLeaf, n: 20, lift: 0.0038, flip: true });
-    decal(bag, 'drip1', leafPlace(LAST_ROOM), hx - m.handleSide * 0.02, 0.62, 0.16, 0.6, { zFn: onLeaf, n: 16, soft: true });
-    // the end wall: water has come down it from the ceiling, both sides of the door
-    decal(bag, 'drip1', endFrame(), -0.66, CH - 0.11 - 0.55, 0.55, 1.1, { lift: 0.003, n: 8 });
-    decal(bag, 'drip1', endFrame(), 0.7, CH - 0.11 - 0.4, 0.42, 0.8, { lift: 0.003, n: 8, flip: true });
-    decal(bag, 'water3', endFrame(), 0.62, 1.75, 0.5, 0.6, { lift: 0.003, n: 8, rot: 1.2 });
-  }
+  // (the grime round every handle and along every bottom rail is baked into the leaf skins, and
+  // the water on the end wall into its panel: surfaces.js)
 
   // ---- old dried blood at handle height: door 306 and the wall beside it ----
   // A hand pressed flat on the door beside the handle and dragged down; three fingers drawn
@@ -435,58 +413,16 @@ export async function buildProps(bag, materials, T, doorMeta) {
     ['water1', 0.3, 26.9, 0.9, 0.9, 3.3],
   ];
   for (const [name, x, s, w, h, rot] of stains) decal(bag, name, ceil, x, -s, w, h, { rot, lift: 0.003, n: 2 });
-  const runs = [
-    [-1, 6.1, 1.0],
-    [1, 13.3, 0.9],
-    [-1, 19.3, 1.1],
-    [1, 23.8, 1.2],
-    [1, 2.7, 0.8],
-    [-1, 10.4, 1.25],
-    [1, 6.0, 0.7],
-    [-1, 14.2, 0.9],
-    [1, 20.1, 1.0],
-    [-1, 25.1, 0.8],
-  ];
-  for (const [side, s, len] of runs) {
-    const frame = wallFrame(side, s);
-    decal(bag, 'drip1', frame, 0, CH - 0.11 - len / 2, 0.7, len, { zFn: (x, y) => wallBulge(side, s + (side < 0 ? x : -x), y), lift: 0.003, n: 8 });
-  }
   // grime where hands and shoulders go: by the switches and along the wainscot rail
   // ---- stains on the carpet ----
   const floorM = rotX(-Math.PI / 2); // local (x, y, z) -> world (x, z, -y); y is s
+  // (the runner's own stains are in its bake; these two are where something dark soaked in)
   const cstains = [
-    ['stain1', -0.18, 5.7, 0.62, 0.5, 0.4],
     ['stain2', 0.24, 16.4, 0.5, 0.7, 1.2],
-    ['stain1', 0.05, 22.3, 0.8, 0.6, 2.2],
-    ['stain2', -0.3, 11.0, 0.4, 0.4, 3.0],
     // something dark has soaked out under door 313 and dried into the runner
     ['stain2', 0.04, END - 0.42, 0.95, 0.62, 0.25],
-    ['stain1', 0.3, 14.6, 0.5, 0.36, 4.1],
-    ['stain1', -0.36, 19.6, 0.56, 0.4, 0.7],
-    ['stain2', 0.22, 25.2, 0.46, 0.5, 2.6],
   ];
   for (const [name, x, s, w, h, rot] of cstains) decal(bag, name, floorM, x, s, w, h, { rot, zFn: carpetHeight, lift: 0.003, n: 14, soft: true });
-
-  // ---- pictures that are no longer there, and the scuffs a hotel corridor collects ----
-  for (const [side, s, y, w, h] of [
-    [-1, 9.75, 1.6, 0.6, 0.5],
-    [1, 14.55, 1.58, 0.5, 0.42],
-    [1, 21.05, 1.56, 0.62, 0.48],
-    [-1, 25.0, 1.6, 0.5, 0.42],
-  ]) {
-    const frame = wallFrame(side, s);
-    decal(bag, 'ghost', frame, 0, y, w, h, { zFn: (x, yy) => wallBulge(side, s + (side < 0 ? x : -x), yy), lift: 0.003, n: 8 });
-  }
-  {
-    const r = mulberry(4455);
-    for (const side of [-1, 1]) {
-      for (let s = 0.6; s < END - 0.6; s += 1.1 + 1.6 * r()) {
-        if (DOORS.some((d) => d.side === side && s > d.s - 0.45 && s < d.s + DOOR.w + 0.45)) continue;
-        const frame = wallFrame(side, s);
-        decal(bag, 'scuff', frame, 0, 0.18 + 0.2 * r(), 0.7 + 0.5 * r(), 0.32, { lift: 0.002, n: 2, rot: (r() - 0.5) * 0.1, flip: r() < 0.5 });
-      }
-    }
-  }
 
   // ---- peeling wallpaper: narrow strips coming away at the seams, under the cornice ----
   {
@@ -500,19 +436,12 @@ export async function buildProps(bag, materials, T, doorMeta) {
       const x0 = dir > 0 ? seam : seam - w;
       peel(bag, side < 0 ? left : right, side, null, x0, y0, w, len, { seed, curl });
     };
-    // in the band the lamps light, so the pale back of the paper and its torn edge catch the light
-    strip(-1, 8.5, 1, 1.5, 0.12, 0.5, 3, 2.0);
-    strip(-1, 8.5, -1, 1.66, 0.08, 0.36, 4, 2.0);
-    strip(-1, 4.1, 1, 1.72, 0.09, 0.34, 6, 2.1);
-    strip(1, 1.9, 1, 1.7, 0.08, 0.36, 12, 2.1);
-    strip(1, 11.3, -1, 1.52, 0.1, 0.48, 9, 1.8);
-    strip(1, 15.8, 1, 1.5, 0.1, 0.5, 8, 1.8);
-    strip(-1, 17.6, 1, 1.45, 0.12, 0.6, 5, 2.2);
-    strip(-1, 17.6, -1, 1.62, 0.07, 0.4, 15, 2.0);
-    // past the dead lamps the end lamp is behind every flap, so they hang as narrow tongues of
-    // paper, not wings
-    strip(1, 23.3, -1, 1.5, 0.085, 0.5, 21, 1.7);
-    strip(-1, 26.4, 1, 1.62, 0.08, 0.42, 14, 1.6);
+    // A few, and small: a hand's width of paper that has let go along a seam and leans out of
+    // the wall, not a flag. Each sits where the light of a lamp reaches it.
+    strip(-1, 8.5, 1, 1.86, 0.05, 0.2, 3, 1.3);
+    strip(1, 2.2, 1, 2.0, 0.04, 0.16, 12, 1.2);
+    strip(1, 15.9, 1, 1.78, 0.055, 0.24, 8, 1.4);
+    strip(-1, 26.4, 1, 1.9, 0.045, 0.2, 14, 1.1);
   }
 
   // ---- boards nailed across door 312 ----
@@ -671,7 +600,22 @@ export async function buildProps(bag, materials, T, doorMeta) {
       m.name = `ext-${src.name}`;
       o.material = m;
     });
-    model.position.set(HW - 0.13, 0, -15.95);
+    // The scan stands on a moulded plastic base (the first 13 cm). Cut it away and stand the
+    // cylinder on the boards, the way one stands in a corridor nobody inspects.
+    const BASE_H = 0.135;
+    model.traverse((o) => {
+      if (!o.isMesh || !/body/.test(o.material.name)) return;
+      const geo = o.geometry;
+      const pos = geo.attributes.position;
+      const idx = geo.index.array;
+      const keep = [];
+      for (let i = 0; i < idx.length; i += 3) {
+        const top = Math.max(pos.getY(idx[i]), pos.getY(idx[i + 1]), pos.getY(idx[i + 2]));
+        if (top > BASE_H) keep.push(idx[i], idx[i + 1], idx[i + 2]);
+      }
+      geo.setIndex(keep);
+    });
+    model.position.set(HW - 0.14, -BASE_H + 0.002, -15.95);
     model.rotation.y = -Math.PI / 2 + 0.25;
     objects.push(model);
   } catch (e) {

@@ -1,7 +1,8 @@
 // Assembles the corridor and exposes the few things that move: lamp levels, the swinging lamp,
 // the scare door and whoever is behind it.
 import * as THREE from 'three';
-import { HW, CH, WALL_T, END, DOOR, DOORS, SPECIAL, LAST_ROOM, SWING_LAMP, SCARE_DOOR, lampLevel, swing, door as doorByNo } from './layout.js';
+import { FogVolumeMaterial } from 'three-gpu-pathtracer';
+import { HW, CH, WALL_T, START, END, DOOR, DOORS, SPECIAL, LAST_ROOM, SWING_LAMP, SCARE_DOOR, lampLevel, swing, door as doorByNo } from './layout.js';
 import { Bag, M, move, rotY, mulberry, grid, planarUV, paint, boxAt, boxUV } from './util.js';
 import { loadTextures } from './textures.js';
 import { makeMaterials } from './materials.js';
@@ -34,10 +35,19 @@ function room(bag, side, s0) {
   front(s0, s0 + DOOR.w, DOOR.h + 0.02, CH);
 }
 
-export async function buildScene({ textureSize = 2048 } = {}) {
+// The air: forty years of dust and smoke, a thin homogeneous haze the tracer scatters light in.
+// density is per metre: thin, a quarter of the light from the far end is lost on the way.
+export const HAZE = { density: 0.01, color: [0.9, 0.86, 0.8] };
+
+// Which skin each door wears: the ones the walker stops at have their own.
+const OWN_SKIN = { 301: 'door301', 306: 'door306', 308: 'door308', 313: 'door313' };
+const SHARED = ['doorA', 'doorB', 'doorC', 'doorD'];
+
+export async function buildScene({ textureSize = 2048, haze = HAZE.density } = {}) {
   const T = await loadTextures({ size: textureSize, small: Math.min(1024, textureSize) });
   const materials = makeMaterials(T);
   for (const m of Object.values(materials)) if (!['wallpaperPeel', 'paperBack'].includes(m.name)) m.side = THREE.DoubleSide;
+  const skinOf = (no) => OWN_SKIN[no] ?? SHARED[((no * 7) >> 1) % SHARED.length];
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000000);
@@ -59,7 +69,7 @@ export async function buildScene({ textureSize = 2048 } = {}) {
     if (kind === 'scare') hingeSide = near;
     if (kind === 'scratched') {
       hingeSide = -near;
-      angle = 0.96;
+      angle = 1.12; // hangs wide: its inside faces the walker and the lamp
     }
     const leaf = buildLeaf({
       no: d.no,
@@ -68,11 +78,12 @@ export async function buildScene({ textureSize = 2048 } = {}) {
       seed: d.no,
       plateTilt: (r() - 0.5) * (d.no === 309 ? 0.5 : 0.05),
       gap: kind === 'light' ? 0.02 : 0.004,
+      skin: skinOf(d.no),
     });
     // no two leaves the same: walnut to mahogany, some darker with old varnish
-    const tk = 0.78 + 0.34 * r();
+    const tk = 0.74 + 0.36 * r();
     const red = r();
-    const tint = [tk, tk * (0.84 + 0.12 * red), tk * (0.78 + 0.18 * red)];
+    const tint = [tk, tk * (0.9 + 0.1 * red), tk * (0.84 + 0.16 * red)];
     doorMeta[d.no] = { frame, hingeSide, handleSide: -hingeSide, angle, outward, dynamic: kind === 'scare' };
     if (kind === 'scare') {
       // its own group so it can swing
@@ -90,7 +101,7 @@ export async function buildScene({ textureSize = 2048 } = {}) {
     } else {
       const lb = new Bag();
       lb.addBag(leaf, M(leafMatrix({ hingeSide, angle, outward }), frame));
-      for (const [mat, list] of lb.items) for (const g of list) bag.add(mat, g, null, mat === 'door' ? tint : null);
+      for (const [mat, list] of lb.items) for (const g of list) bag.add(mat, g, null, mat.startsWith('door') ? tint : null);
     }
     if (kind === 'scratched' || kind === 'scare' || kind === 'light') room(bag, d.side, d.s);
   }
@@ -98,7 +109,7 @@ export async function buildScene({ textureSize = 2048 } = {}) {
   {
     const frame = endFrame();
     buildSurround(bag, frame, { seed: LAST_ROOM });
-    const leaf = buildLeaf({ no: LAST_ROOM, handleSide: -1, seed: LAST_ROOM, plateTilt: 0.075 }); // a screw gone: the plate hangs crooked
+    const leaf = buildLeaf({ no: LAST_ROOM, handleSide: -1, seed: LAST_ROOM, plateTilt: 0.075, skin: skinOf(LAST_ROOM) }); // a screw gone: the plate hangs crooked
     bag.addBag(leaf, M(leafMatrix({ hingeSide: 1, angle: 0.004 }), frame));
     doorMeta[LAST_ROOM] = { frame, hingeSide: 1, handleSide: -1, angle: 0.004, outward: false, dynamic: false };
   }
@@ -109,6 +120,23 @@ export async function buildScene({ textureSize = 2048 } = {}) {
 
   const fixtures = buildLamps(materials);
   for (const f of fixtures) scene.add(f.pivot);
+
+  // The haze: a closed box that holds the camera, a little LARGER than the corridor, its faces
+  // inside the walls, under the floor and above the ceiling. A face just inside the room is
+  // crossed by every ray a millimetre before it reaches a surface, and where the carpet's waves
+  // came within the tracer's ray offset of that face they rendered black.
+  if (haze > 0) {
+    const e = -0.06;
+    const box = new THREE.BoxGeometry(2 * (HW - e), CH - 2 * e, END - START - 2 * e);
+    const air = new FogVolumeMaterial({ color: new THREE.Color(...HAZE.color) });
+    air.density = haze;
+    const fog = new THREE.Mesh(box, air);
+    fog.position.set(0, CH / 2, -(START + END) / 2);
+    fog.name = 'haze';
+    fog.userData.volume = true;
+    fog.visible = false;
+    scene.add(fog);
+  }
 
   const figure = buildFigure(materials, { hingeSide: dyn.scare.hingeSide });
   dyn.scare.frameGroup.add(figure.root);

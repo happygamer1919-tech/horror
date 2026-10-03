@@ -7,6 +7,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { DOOR, WALL_T } from './layout.js';
 import { Bag, box, boxAt, boxUV, extrude, planarUV, M, move, rotX, rotY, rotZ, mulberry } from './util.js';
 import { plateCell } from './textures.js';
+import { doorUV } from './surfaces.js';
 
 export const REC = 0.09; // how far the leaf face sits back from the corridor wall
 const ARCH = [
@@ -37,9 +38,8 @@ function quad(p, uv) {
   g.computeVertexNormals();
   return g;
 }
-// Axis-aligned rectangle at depth z, facing +z. `rail` turns the grain to run along x.
-function face(x0, y0, x1, y1, z, rail, o = [0, 0]) {
-  const uv = rail ? (x, y) => [y + o[0], x + o[1]] : (x, y) => [x + o[0], y + o[1]];
+// Axis-aligned rectangle at depth z, facing +z. `uv` maps a point of the leaf to its skin.
+function face(x0, y0, x1, y1, z, uv) {
   return quad(
     [
       [x0, y0, z],
@@ -138,7 +138,8 @@ function handle(bag, dir, droop, mat = 'brass') {
 
 // The leaf, in its own coordinates: x from -lw/2 to lw/2, y up from the floor, front face at z = 0.
 // handleSide: which x side carries the handle. inside: 'plain' or 'claw'.
-export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, plate = true, plateTilt = 0, gap = 0.006 }) {
+// skin: the material of the corridor face (a baked skin, see surfaces.js).
+export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, plate = true, plateTilt = 0, gap = 0.006, skin = 'doorA' }) {
   const b = new Bag();
   const r = mulberry(seed * 7919);
   const lw = DOOR.w - 0.007;
@@ -151,17 +152,17 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
   const px0 = x0 + stile;
   const px1 = x1 - stile;
   const ys = [y0, 0.21, 0.88, 1.035, y1 - 0.112, y1];
-  const o = [r() * 3, r() * 3];
+  const uv = (x, y) => doorUV(x, y, handleSide);
   // stiles
-  b.add('door', face(x0, y0, px0, y1, 0, false, o));
-  b.add('door', face(px1, y0, x1, y1, 0, false, [o[0] + 0.7, o[1] + 0.4]));
+  b.add(skin, face(x0, y0, px0, y1, 0, uv));
+  b.add(skin, face(px1, y0, x1, y1, 0, uv));
   // rails
   for (const [a, c] of [
     [ys[0], ys[1]],
     [ys[2], ys[3]],
     [ys[4], ys[5]],
   ])
-    b.add('door', face(px0, a, px1, c, 0, true, [o[0] + a, o[1] + 1.3]));
+    b.add(skin, face(px0, a, px1, c, 0, uv));
   // panels: a bevel down to a field set back 11 mm, with a raised centre
   const bev = 0.024;
   const dz = -0.011;
@@ -169,8 +170,6 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
     [ys[1], ys[2]],
     [ys[3], ys[4]],
   ]) {
-    const po = [o[0] + 0.33 + a, o[1] + 0.2];
-    const uv = (x, y) => [x + po[0], y + po[1]];
     const ring = [
       [px0, a, px1, a, px1 - bev, a + bev, px0 + bev, a + bev],
       [px1, a, px1, c, px1 - bev, c - bev, px1 - bev, a + bev],
@@ -179,7 +178,7 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
     ];
     for (const q of ring) {
       b.add(
-        'door',
+        skin,
         quad(
           [
             [q[0], q[1], 0],
@@ -189,8 +188,6 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
           ],
           [uv(q[0], q[1]), uv(q[2], q[3]), uv(q[4], q[5]), uv(q[6], q[7])],
         ),
-        null,
-        [0.8, 0.8, 0.8],
       );
     }
     // field
@@ -200,10 +197,10 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
     const fy1 = c - bev;
     const inset = 0.05;
     const rz = dz + 0.005;
-    b.add('door', face(fx0, fy0, fx1, fy0 + inset, dz, false, po));
-    b.add('door', face(fx0, fy1 - inset, fx1, fy1, dz, false, po));
-    b.add('door', face(fx0, fy0 + inset, fx0 + inset, fy1 - inset, dz, false, po));
-    b.add('door', face(fx1 - inset, fy0 + inset, fx1, fy1 - inset, dz, false, po));
+    b.add(skin, face(fx0, fy0, fx1, fy0 + inset, dz, uv));
+    b.add(skin, face(fx0, fy1 - inset, fx1, fy1, dz, uv));
+    b.add(skin, face(fx0, fy0 + inset, fx0 + inset, fy1 - inset, dz, uv));
+    b.add(skin, face(fx1 - inset, fy0 + inset, fx1, fy1 - inset, dz, uv));
     const e = 0.012;
     const rr = [
       [fx0 + inset, fy0 + inset, fx1 - inset, fy0 + inset, fx1 - inset - e, fy0 + inset + e, fx0 + inset + e, fy0 + inset + e],
@@ -213,7 +210,7 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
     ];
     for (const q of rr) {
       b.add(
-        'door',
+        skin,
         quad(
           [
             [q[0], q[1], dz],
@@ -225,13 +222,13 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
         ),
       );
     }
-    b.add('door', face(fx0 + inset + e, fy0 + inset + e, fx1 - inset - e, fy1 - inset - e, rz, false, po));
+    b.add(skin, face(fx0 + inset + e, fy0 + inset + e, fx1 - inset - e, fy1 - inset - e, rz, uv));
   }
   // edges
-  const edge = (g) => b.add('door', g, null, [0.7, 0.7, 0.7]);
+  const edge = (g) => b.add('trim', g, null, [0.5, 0.48, 0.46]);
   // the body sits behind the deepest panel; thin strips close the perimeter up to the face
   const deep = 0.0125;
-  edge(boxUV(boxAt(x0, y0, -t, lw, y1 - y0, t - deep), { along: 'y', offset: [o[0], o[1]] }));
+  edge(boxUV(boxAt(x0, y0, -t, lw, y1 - y0, t - deep), { along: 'y', offset: [r() * 3, r() * 3] }));
   for (const x of [x0, x1 - 0.002]) edge(boxUV(boxAt(x, y0, -deep, 0.002, y1 - y0, deep - 0.0002), { along: 'y' }));
   for (const y of [y0, y1 - 0.002]) edge(boxUV(boxAt(x0, y, -deep, lw, 0.002, deep - 0.0002), { along: 'x' }));
   // back face

@@ -2,8 +2,13 @@
 //   1. path trace the scene (three-gpu-pathtracer, WebGL2) into two independent half buffers
 //   2. raster G-buffers (albedo, view normal + depth) and an overlay of the things that glow
 //   3. denoise: demodulate by albedo, variance-guided edge-avoiding a-trous, remodulate
-//   4. volumetric dust in the lamp cones, bloom, lens distortion, chromatic aberration,
+//   4. bloom and halation, lens distortion, chromatic aberration, softness towards the corners,
 //      vignette, exposure, ACES, film grain, sRGB
+// The haze is real: a homogeneous volume inside the tracer (scene.js), so the lamp cones and the
+// loss of contrast with distance come from scattering. The ray-marched dust pass is still here
+// for comparison (opts.scatter > 0), off by default. The lens is real too: a thin lens with an
+// aperture in the tracer (PhysicalCamera), and the raster G-buffers are accumulated through the
+// same lens so the denoiser is guided by what the tracer saw.
 // Everything is deterministic for a given seed: Math.random is replaced by a seeded generator.
 import * as THREE from 'three';
 import { WebGLPathTracer } from 'three-gpu-pathtracer';
@@ -58,6 +63,13 @@ const DEMOD = /* glsl */ `
     vec3 al = max(texture2D(albedo, vUv).rgb, vec3(0.03));
     vec3 ia = max(texture2D(a, vUv).rgb, 0.0) / al;
     vec3 ib = max(texture2D(b, vUv).rgb, 0.0) / al;
+    // A firefly (a path that scattered in the haze a hand's width from a bulb) lands in one half
+    // only: neither half may be more than a few times the other. On an edge pixel, where the
+    // filter finds few neighbours to average it away, this is what removes it.
+    float la = lum(ia); float lb = lum(ib);
+    float ca = lb * 2.5 + 0.03; float cb = la * 2.5 + 0.03;
+    if (la > ca) ia *= ca / la;
+    if (lb > cb) ib *= cb / lb;
     float d = 0.5 * (lum(ia) - lum(ib));
     gl_FragColor = vec4(0.5 * (ia + ib), d * d);
   }
@@ -189,6 +201,7 @@ const FOG = /* glsl */ `
   void main() {
     vec4 g = texture2D(gbuf, vUv);
     vec3 col = texture2D(tex, vUv).rgb;
+    if (scatterK <= 0.0 && extinction <= 0.0) { gl_FragColor = vec4(col, 1.0); return; }
     vec4 pv = invProj * vec4(vUv * 2.0 - 1.0, 0.0, 1.0);
     vec3 dirV = normalize(vec3(pv.xy / -pv.z, -1.0));
     vec3 dir = normalize(mat3(camWorld) * dirV);
@@ -245,9 +258,10 @@ const UP = /* glsl */ `
 `;
 
 const FINAL = /* glsl */ `
-  uniform sampler2D tex; uniform sampler2D bloom;
-  uniform float exposure; uniform float bloomStrength; uniform float k1; uniform float zoom; uniform float ca;
+  uniform sampler2D tex; uniform sampler2D bloom; uniform sampler2D halo;
+  uniform float exposure; uniform float bloomStrength; uniform float haloStrength; uniform float k1; uniform float zoom; uniform float ca;
   uniform float vignette; uniform float grain; uniform float seed; uniform float aspect; uniform vec2 res; uniform float sat;
+  uniform float soft; uniform float black; uniform float contrast; uniform vec3 balance;
   varying vec2 vUv;
   vec3 RRTAndODTFit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
   vec3 aces(vec3 color) {
@@ -259,33 +273,66 @@ const FINAL = /* glsl */ `
   }
   vec3 toSRGB(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
   float h21(vec2 p, float s) { vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973) + s * 0.137); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+  // value noise, for grain with the soft clumps of the site's film layer (an SVG turbulence at
+  // 0.9 cycles a pixel, two octaves): not one independent value per pixel
+  float vn(vec2 p, float s) {
+    vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(h21(i, s), h21(i + vec2(1.0, 0.0), s), f.x), mix(h21(i + vec2(0.0, 1.0), s), h21(i + vec2(1.0, 1.0), s), f.x), f.y);
+  }
   vec2 distort(vec2 uv, float k) {
     vec2 c = (uv - 0.5) * vec2(aspect, 1.0);
     float r2 = dot(c, c);
     c *= (1.0 + k * r2) * zoom;
     return c / vec2(aspect, 1.0) + 0.5;
   }
-  vec3 sampleHdr(vec2 uv) { return texture2D(tex, uv).rgb + bloomStrength * texture2D(bloom, uv).rgb; }
+  // the warm glow of the bulbs spread wide by the lens and the emulsion (halation is red-orange)
+  vec3 glow(vec2 uv) { return bloomStrength * texture2D(bloom, uv).rgb + haloStrength * texture2D(halo, uv).rgb * vec3(1.0, 0.42, 0.16); }
+  // A lens is sharp in the middle and soft towards the corners: a small disc of taps whose
+  // radius grows with the square of the image height, stretched along the radius (coma, field
+  // curvature), on top of whatever the aperture already did in the tracer.
+  vec3 sampleHdr(vec2 uv, float r2n, vec2 dir) {
+    vec3 c = texture2D(tex, uv).rgb;
+    float rad = soft * r2n;
+    if (rad > 0.15) {
+      vec2 px = 1.0 / res;
+      vec2 tang = vec2(-dir.y, dir.x);
+      vec3 acc = c; float w = 1.0;
+      for (int i = 0; i < 8; i++) {
+        float a = (float(i) + 0.5) * 0.7853982;
+        float rr = (i < 4 ? 1.0 : 0.55) * rad;
+        vec2 o = (dir * cos(a) * 1.45 + tang * sin(a) * 0.8) * rr;
+        acc += texture2D(tex, uv + o * px).rgb; w += 1.0;
+      }
+      c = acc / w;
+    }
+    return c + glow(uv);
+  }
   void main() {
-    // barrel distortion, a touch more for red than for blue: lateral chromatic aberration
-    vec3 col;
-    col.r = sampleHdr(distort(vUv, k1 + ca)).r;
-    col.g = sampleHdr(distort(vUv, k1)).g;
-    col.b = sampleHdr(distort(vUv, k1 - ca)).b;
     vec2 c = (vUv - 0.5) * vec2(aspect, 1.0);
     float r2 = dot(c, c) / (0.25 * (aspect * aspect + 1.0));
+    vec2 dir = length(c) > 1e-5 ? normalize(c) : vec2(1.0, 0.0);
+    // barrel distortion, a touch more for red than for blue: lateral chromatic aberration
+    vec3 col;
+    col.r = sampleHdr(distort(vUv, k1 + ca), r2, dir).r;
+    col.g = sampleHdr(distort(vUv, k1), r2, dir).g;
+    col.b = sampleHdr(distort(vUv, k1 - ca), r2, dir).b;
     col *= 1.0 / pow(1.0 + vignette * r2, 2.0);
+    col *= balance;
     col = aces(col);
     // a photograph's colour, not a renderer's: a little of the saturation taken out after the curve
     col = max(mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, sat), 0.0);
+    // the toe of a negative printed for the night: what is dark goes black
+    col = max(col - black, 0.0) / (1.0 - black);
+    col = pow(col, vec3(contrast));
     col = toSRGB(col);
-    // grain: two octaves, stronger in the shadows and midtones than in the highlights
+    // grain, matched to the film layer the site lays over its hero: fine, a little clumped,
+    // nearly monochrome, strongest in the lower midtones and still there in the blacks
     vec2 p = gl_FragCoord.xy;
-    // the coarse octave (2 px clumps) is the one that survives compression in the shadows
-    float n = (h21(p, seed) + h21(p + 17.0, seed + 3.0) - 1.0) * 0.6 + (h21(floor(p * 0.5), seed + 9.0) - 0.5) * 0.85;
+    float n = (vn(p * 0.9, seed) + vn(p * 1.8 + 31.0, seed + 3.0) * 0.6 - 0.8) * 1.5 + (h21(p, seed + 5.0) - 0.5) * 0.5;
     float l = dot(col, vec3(0.299, 0.587, 0.114));
-    float amt = grain * (0.35 + 0.65 * (1.0 - smoothstep(0.25, 0.95, l))) * (1.0 + 0.6 * (1.0 - smoothstep(0.02, 0.12, l)));
-    col += n * amt * vec3(1.0, 0.97, 0.92);
+    float amt = grain * (0.45 + 0.55 * (1.0 - smoothstep(0.3, 0.95, l)));
+    vec3 chroma = vec3(h21(p + 7.0, seed + 11.0), h21(p + 13.0, seed + 12.0), h21(p + 19.0, seed + 13.0)) - 0.5;
+    col += (n * vec3(1.0, 0.98, 0.94) + chroma * 0.35) * amt;
     gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
   }
 `;
@@ -333,6 +380,15 @@ export class Pipeline {
     const tracing = pt._pathTracer.material;
     if (!tracing.fragmentShader.includes('#define RAY_OFFSET 1e-4')) throw new Error('RAY_OFFSET not found in the tracing shader');
     tracing.fragmentShader = tracing.fragmentShader.replace('#define RAY_OFFSET 1e-4', '#define RAY_OFFSET 3e-5');
+    // The tracer focuses on a sphere round the lens (a fixed distance along every ray). A lens
+    // focuses on a plane, and the raster G-buffers below are taken through a plane-focus lens:
+    // make the tracer agree, or the denoiser divides a blurred edge by a sharp one.
+    const sphere = 'vec3 focalPoint = ray.origin + normalize( ray.direction ) * physicalCamera.focusDistance;';
+    if (!tracing.fragmentShader.includes(sphere)) throw new Error('focal point not found in the tracing shader');
+    tracing.fragmentShader = tracing.fragmentShader.replace(
+      sphere,
+      'vec3 camFwd = normalize( ( cameraWorldMatrix * vec4( 0.0, 0.0, - 1.0, 0.0 ) ).xyz ); vec3 focalPoint = ray.origin + normalize( ray.direction ) * ( physicalCamera.focusDistance / max( dot( normalize( ray.direction ), camFwd ), 0.05 ) );',
+    );
     tracing.needsUpdate = true;
     this.pt = pt;
 
@@ -399,6 +455,12 @@ export class Pipeline {
         aspect: { value: 1 },
         res: { value: new THREE.Vector2() },
         sat: { value: 0.88 },
+        halo: { value: null },
+        haloStrength: { value: 0 },
+        soft: { value: 0 },
+        black: { value: 0 },
+        contrast: { value: 1 },
+        balance: { value: new THREE.Vector3(1, 1, 1) },
       }),
     };
     this.gbufMat = new THREE.ShaderMaterial({ vertexShader: GBUF_VERT, fragmentShader: GBUF_FRAG, side: THREE.DoubleSide });
@@ -448,8 +510,17 @@ export class Pipeline {
         hidden.push(o);
       }
     });
+    // a fog volume is for the tracer only: the raster passes must never draw its box
+    const volumes = [];
+    scene.traverse((o) => {
+      if (o.userData.volume) {
+        volumes.push(o);
+        o.visible = o.userData.volumeOn !== false;
+      }
+    });
     this.pt.setScene(scene, camera);
     for (const o of hidden) o.visible = true;
+    for (const o of volumes) o.visible = false;
   }
   // The tracing shader is compiled for the features the scene uses; wait for it, a sample
   // asked for while it compiles is silently dropped.
@@ -487,15 +558,35 @@ export class Pipeline {
   }
 
   // Raster a pass over the scene with sub-pixel jitter, averaged into `target`.
+  // With an aperture (camera.bokehSize, millimetres) each pass is also taken from another point
+  // of the lens, the frustum sheared so the plane of focus stays put: the buffers get the same
+  // depth of field as the traced image.
   accumulate(camera, target, tmp, n, draw, clearAlpha = 1) {
     const { renderer, w, h } = this;
     renderer.setClearColor(0x000000, clearAlpha);
     renderer.setRenderTarget(target);
     renderer.clear();
     const r = mulberry(1234);
+    const R = ((camera.bokehSize ?? 0) * 0.5) / 1000;
+    const lens = R > 0 && n > 1;
+    const home = camera.position.clone();
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3();
+    camera.matrixWorld.extractBasis(right, up, new THREE.Vector3());
+    const P = h / (2 * Math.tan((camera.fov * Math.PI) / 360)) / (camera.focusDistance ?? 1);
     for (let i = 0; i < n; i++) {
-      const jx = n === 1 ? 0 : r() - 0.5;
-      const jy = n === 1 ? 0 : r() - 0.5;
+      let jx = n === 1 ? 0 : r() - 0.5;
+      let jy = n === 1 ? 0 : r() - 0.5;
+      if (lens) {
+        const a = r() * Math.PI * 2;
+        const d = Math.sqrt(r()) * R;
+        const dx = Math.cos(a) * d;
+        const dy = Math.sin(a) * d;
+        camera.position.copy(home).addScaledVector(right, dx).addScaledVector(up, dy);
+        camera.updateMatrixWorld(true);
+        jx -= dx * P;
+        jy += dy * P;
+      }
       camera.setViewOffset(w, h, jx, jy, w, h);
       renderer.setRenderTarget(tmp);
       renderer.clear();
@@ -507,6 +598,10 @@ export class Pipeline {
       renderer.autoClear = true;
     }
     camera.clearViewOffset();
+    if (lens) {
+      camera.position.copy(home);
+      camera.updateMatrixWorld(true);
+    }
   }
 
   // opts: { camera, poses(sample 0..1) -> applies the camera pose for that shutter time,
@@ -514,6 +609,8 @@ export class Pipeline {
   render(opts) {
     const { renderer, pt, rt, q, scene, w, h } = this;
     const { camera, samples = 32, seed = 1, exposure = 1, lamps = [], shutter } = opts;
+    if (opts.bounces && pt.bounces !== opts.bounces) pt.bounces = opts.bounces;
+    const taps = (camera.bokehSize ?? 0) > 0 ? 64 : 12;
     const t0 = performance.now();
     seedRandom(seed);
     pt._pathTracer.material.seed = (seed * 7919) % 100000;
@@ -565,7 +662,7 @@ export class Pipeline {
     // albedo, antialiased like the traced image
     for (const o of overlays) o.visible = false;
     for (const [o, m] of meshes) o.material = this.albedoFor(m);
-    this.accumulate(camera, rt.albedo, rt.albedoTmp, 12, () => renderer.render(scene, camera));
+    this.accumulate(camera, rt.albedo, rt.albedoTmp, taps, () => renderer.render(scene, camera));
     // view normal + depth: one centre sample, decals left out
     for (const [o, m] of meshes) {
       o.material = m;
@@ -577,7 +674,7 @@ export class Pipeline {
     renderer.clear();
     renderer.render(scene, camera);
     // the same again, jittered and averaged: where it disagrees with the centre sample there is an edge
-    this.accumulate(camera, rt.gbufAA, rt.gbuf2, 12, () => renderer.render(scene, camera), 0);
+    this.accumulate(camera, rt.gbufAA, rt.gbuf2, taps, () => renderer.render(scene, camera), 0);
     renderer.setClearColor(0x000000, 1);
     scene.overrideMaterial = null;
     // overlay: the scene in black as an occluder, the glowing things as they are
@@ -586,7 +683,7 @@ export class Pipeline {
       o.material = this.blackMat;
     }
     for (const o of overlays) o.visible = true;
-    this.accumulate(camera, rt.overlay, rt.overlayTmp, 12, () => renderer.render(scene, camera));
+    this.accumulate(camera, rt.overlay, rt.overlayTmp, taps, () => renderer.render(scene, camera));
     for (const [o, m] of meshes) {
       o.material = m;
       o.visible = true;
@@ -656,8 +753,8 @@ export class Pipeline {
         u.lampCol.value[i].copy(l.color);
         u.lampCone.value[i].set(l.cone[0], l.cone[1], l.omni ? 1 : 0, 0);
       });
-      u.scatterK.value = opts.scatter ?? 0.00045;
-      u.extinction.value = opts.extinction ?? 0.006;
+      u.scatterK.value = opts.scatter ?? 0;
+      u.extinction.value = opts.extinction ?? 0;
       u.halfWidth.value = opts.halfWidth ?? 1;
       u.seed.value = seed % 977;
       u.ambient.value.set(...(opts.fogAmbient ?? [0, 0, 0]));
@@ -687,6 +784,7 @@ export class Pipeline {
         up = this.mipsUp[i];
       }
       this.bloomTex = up.texture;
+      this.haloTex = this.mipsUp[Math.min(3, this.mipsUp.length - 2)].texture;
     }
 
     // 6. lens, tone, grain
@@ -696,15 +794,22 @@ export class Pipeline {
       u.tex.value = rt.fog.texture;
       u.bloom.value = this.bloomTex;
       u.exposure.value = exposure;
-      u.bloomStrength.value = post.bloom ?? 0.055;
+      u.bloomStrength.value = post.bloom ?? LOOK.bloom;
+      u.halo.value = this.haloTex;
+      u.haloStrength.value = post.halo ?? LOOK.halo;
+      u.soft.value = (post.soft ?? LOOK.soft) * (h / 900);
+      u.black.value = post.black ?? LOOK.black;
+      u.contrast.value = post.contrast ?? LOOK.contrast;
+      u.balance.value.set(...(post.balance ?? LOOK.balance));
       u.k1.value = post.k1 ?? LENS.k1;
       u.ca.value = post.ca ?? LENS.ca;
-      u.vignette.value = post.vignette ?? 0.5;
-      u.grain.value = post.grain ?? 0.02;
+      u.vignette.value = post.vignette ?? LOOK.vignette;
+      // more gain, more grain: the exposure opens up in the dark and the film shows it
+      u.grain.value = (post.grain ?? LOOK.grain) * (opts.grainGain ?? 1);
       u.seed.value = seed % 1000;
       u.aspect.value = w / h;
       u.res.value.set(w, h);
-      u.sat.value = post.sat ?? 0.88;
+      u.sat.value = post.sat ?? LOOK.sat;
       // zoom so the barrel-distorted frame still fills its corners
       u.zoom.value = lensZoom(w / h, u.k1.value + Math.abs(u.ca.value));
       this.pass(q.final, null);
@@ -729,7 +834,21 @@ export class Pipeline {
   }
 }
 
-export const LENS = { k1: 0.055, ca: 0.0025 };
+export const LENS = { k1: 0.055, ca: 0.0032 };
+// The look of the film and the lens, in one place.
+export const LOOK = {
+  bloom: 0.05,
+  halo: 0.045,
+  soft: 3.2, // radius of the corner softness, pixels at the corner of a 900 px high frame
+  vignette: 0.75,
+  black: 0.012,
+  contrast: 1.06,
+  sat: 0.84,
+  grain: 0.03,
+  // white balance: a tungsten bulb half corrected, so the paper is cream, not orange, and the
+  // red of the runner and the green of the exit sign stay colours
+  balance: [0.9, 1.0, 1.22],
+};
 // Barrel distortion samples outside the source towards the corners: zoom in just enough.
 export const lensZoom = (aspect, k) => 1 / (1 + k * 0.25 * (aspect * aspect + 1));
 

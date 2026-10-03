@@ -1,8 +1,9 @@
 // Harness entry. The node driver (render.mjs) calls window.corridor.* through Playwright.
 import * as THREE from 'three';
+import { PhysicalCamera } from 'three-gpu-pathtracer';
 import { Pipeline, LENS, lensZoom, lensForward } from './pipeline.js';
 import { buildScene } from './scene.js';
-import { SETS, cameraPose, frameS, exposureStops, scareOpen, scareLean, HW } from './layout.js';
+import { SETS, cameraPose, frameS, exposureStops, scareOpen, scareLean, HW, FSTOP, focusDistance } from './layout.js';
 
 const canvas = document.getElementById('c');
 let pipe;
@@ -10,7 +11,8 @@ let world;
 let camera;
 let built = false;
 
-const BASE_EXPOSURE = 0.62;
+// Exposed for the pools of light under the lamps: what they do not reach is left to go black.
+const BASE_EXPOSURE = 0.72;
 
 function setPose(s, set) {
   const p = cameraPose(s, set);
@@ -34,11 +36,11 @@ function prepare({ set, index, s, scale = 1 }) {
 }
 
 window.corridor = {
-  async init({ textureSize = 2048 } = {}) {
+  async init({ textureSize = 2048, haze } = {}) {
     pipe = new Pipeline(canvas);
     pipe.pt.textureSize.set(textureSize, textureSize);
-    world = await buildScene({ textureSize });
-    camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.08, 80);
+    world = await buildScene({ textureSize, haze });
+    camera = new PhysicalCamera(45, 16 / 9, 0.08, 80);
     world.scene.add(camera);
     return { gpu: pipe.gpu, triangles: Math.round(world.triangles) };
   },
@@ -49,6 +51,9 @@ window.corridor = {
     const { at, ds, w, h } = prepare(opts);
     const state = world.apply(at, scare ? { angle: scareOpen(scare.j), lean: scareLean(scare.j), variant: scare.variant } : null);
     setPose(at, set);
+    // the lens: nearly wide open, focused on what the walker is looking at
+    camera.fStop = opts.fStop ?? FSTOP[set];
+    camera.focusDistance = opts.focus ?? focusDistance(at);
     // debug view: cam = { p: [x, y, s], t: [x, y, s], fov }
     const free = opts.cam;
     if (free) {
@@ -59,6 +64,7 @@ window.corridor = {
         camera.fov = free.fov;
         camera.updateProjectionMatrix();
       }
+      camera.focusDistance = opts.focus ?? Math.hypot(free.p[0] - free.t[0], free.p[1] - free.t[1], free.p[2] - free.t[2]);
     }
     camera.updateMatrixWorld(true);
     const t0 = performance.now();
@@ -77,6 +83,8 @@ window.corridor = {
       samples,
       seed,
       exposure: BASE_EXPOSURE * Math.pow(2, exposureStops(at)) * (opts.exposureScale ?? 1),
+      grainGain: 1 + 0.22 * Math.max(0, exposureStops(at)),
+      bounces: opts.bounces ?? 7,
       lamps: world.fogLamps(state.lamps),
       shutter: shutterLen > 0 && !free ? (u) => setPose(at + (u - 0.5) * shutterLen, set) : null,
       halfWidth: HW,
@@ -90,7 +98,7 @@ window.corridor = {
       post: opts.post,
       debug: opts.debug,
     });
-    return { ...res, scene: tScene, s: at, w, h, lamps: state.lamps.length };
+    return { ...res, scene: tScene, s: at, w, h, lamps: state.lamps.length, focus: camera.focusDistance };
   },
 
   // Debug: the meshes whose name matches, with their vertex count and bounds.
