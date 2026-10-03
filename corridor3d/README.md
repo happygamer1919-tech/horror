@@ -51,7 +51,9 @@ node corridor3d/encode.mjs --dummy    # numbered placeholder frames, no GPU need
 3. **Dust.** The lamp cones are ray-marched against the depth buffer: thin haze, thicker in the
    light, with slow density noise.
 4. **Lens and film.** Bloom, slight barrel distortion, a little lateral chromatic aberration,
-   vignette, ACES filmic tone mapping, fine grain. Exposure follows the walk: the eye opens up by
+   vignette, ACES filmic tone mapping, grain (stronger and coarser in the shadows, where the
+   encoders would otherwise flatten them into blocks; dark frames are also encoded at a higher
+   quality). Exposure follows the walk: the eye opens up by
    three stops when the lamps are gone.
 
 Everything is deterministic: progress in, pixels out. `Math.random` is replaced by a seeded
@@ -84,7 +86,7 @@ Things the tracer needed:
 | Lens | 43.5 degrees vertical, about 26 mm | 80 degrees vertical, so floor, both walls and the lamps fit a phone |
 | Frames | 168 | 112 |
 | Render time | about 25 s a frame, 72 min | about 20 s a frame, 37 min |
-| Format | AVIF, quality 56 | WebP, quality 56 |
+| Format | AVIF, quality 56 (up to 68 for dark frames) | WebP, quality 56 (up to 68 for dark frames) |
 
 They are two renders with their own cameras, not one render cropped.
 
@@ -105,26 +107,36 @@ without AVIF gets the phone set (the scrubber switches when a frame fails to dec
 
 ## The scare
 
-Door 308 is hinged on the walker's side and opens inwards, so the gap appears at the far jamb
-and can be seen into from the corridor. Lamp 4 hangs just in front of it and is the last lamp
-still alight: its light goes through the gap past the jamb and lands on a strip next to the
-door edge, which is where one eye is.
+Door 308 is hinged on the walker's side and opens inwards, so the gap appears at the far jamb.
+On the way to it the walker drifts towards the right wall and turns the head to the door (a
+quarter turn on the phone, whose frame is narrow): when it opens, the gap is near the middle of
+the picture and about 1.8 m away. Lamp 4, tired and dim, hangs right over the walker there and
+is still alight; the wave of dying lamps starts the moment the door has shut.
 
-The stand-in behind the door is a child of about ten: a displaced head with sunken, half-lidded
-eyes, lank wet hair as about 200 thin strands that hang across one side of the face, a dark
-nightdress that stays in the shadow of the leaf, and four fingers hooked round the free edge of
-the door above the face, nails bitten short. Only the strip of lamp light that comes through
-the gap reaches it. On screen the visible part of the face is about 35 px wide on a desktop and
-20 px on a phone, and it is there for half a second: it is built to read as a pale face and one
-eye in the dark, not to survive a close look.
+The stand-in behind the door is a thin girl standing in the dark room beyond the door edge.
+She holds the edge with one hand, four fingers hooked round it onto the corridor face of the
+door, and leans her head out past it: one eye and one cheek come out, the rest of her face stays
+behind the door. Long, wet hair, parted in the middle, hangs beside the face. The lamp lights
+her from above and in front, as it would through that gap; two cheats shape it, as on a film set:
 
-The scare plays in real time (15 frames at 24 fps, 625 ms) over a walk frame that is held
-still. The scare frames are full renders from that held camera with the same seed and sample
-count, so they are identical to the walk frame except around the door; `encode.mjs` finds the
-region that changed, feathers its edge and ships only that patch. Two variants are rendered:
-`f` with the 3D stand-in face, and `g` with hand and empty gap for when a photograph is supplied
-(`src/assets/scare/README.md`). The manifest carries, per scare frame, the quad the photograph
-is drawn into and the outline of the gap it is clipped to, projected through the lens model.
+- a cold rim light from deeper in the room (as from a window), which draws the edge of the hair
+  and the far cheek against the black;
+- the catchlight in the open eye is drawn in the overlay pass (where the bulbs are), occluded by
+  everything in front of it. A path-traced eye this small catches the lamp on a pixel at most.
+
+On screen the visible part of the face is about 60 to 80 px wide on a desktop and 35 to 45 CSS px
+on a 390 px phone, and it is there for about half a second. It is built to read as a pale face
+and one wet eye in the dark at that size, not to survive a close look.
+
+The scare plays in real time (15 frames at 24 fps, 625 ms) over a walk frame that is held, while
+the page pushes the picture in slowly towards the door with a CSS transform (so the walk never
+looks frozen to someone still scrolling). The scare frames are full renders from that held camera
+with the same seed and sample count, so they are identical to the walk frame except around the
+door; `encode.mjs` finds the region that changed, feathers its edge and ships only that patch.
+Two variants are rendered: `f` with the 3D stand-in, and `g` with the hand and an empty gap for
+when a photograph is supplied (`src/assets/scare/README.md`). The manifest carries, per scare
+frame, the quad the photograph is drawn into and the outline of the gap it is clipped to,
+projected through the lens model.
 
 ## Changing something
 

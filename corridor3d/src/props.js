@@ -46,7 +46,8 @@ function peel(bag, frame, side, sOfX, x0, y0, w, len, { seed = 1, curl = 2.9, tu
   // flap is a ragged triangle and not a tidy roll. The torn top edge is jagged.
   const lean = r() < 0.5 ? 1 : -1;
   const lift = (u) => (lean > 0 ? u : 1 - u);
-  const tear = (u) => 0.82 + 0.18 * fbm(u * 9 + seed, seed * 0.37, seed + 5, 3) + 0.06 * Math.sin(u * 37 + seed);
+  // a torn top edge: ragged at every scale, with a notch or two
+  const tear = (u) => 0.74 + 0.26 * fbm(u * 7 + seed, seed * 0.37, seed + 5, 4) + 0.05 * Math.sin(u * 61 + seed) + 0.03 * (noise2(u * 140, seed, seed + 2) - 0.5) - 0.18 * Math.exp(-Math.pow((u - 0.3 - 0.4 * ((seed * 0.37) % 1)) / 0.05, 2));
   const lenAt = (u) => len * (0.35 + 0.65 * Math.pow(lift(u), 0.7)) * tear(u);
   for (let iu = 0; iu <= NU; iu++) {
     const u = iu / NU;
@@ -83,8 +84,8 @@ function peel(bag, frame, side, sOfX, x0, y0, w, len, { seed = 1, curl = 2.9, tu
       uv.push(sx, sy);
       // grimy towards the torn edge, paste-stained near where it still holds
       const t = it / NT;
-      const k = (0.72 + 0.28 * fbm(sx * 3, sy * 3, seed, 2)) * (1 - 0.35 * smooth(0.7, 1, t)) * (1 - 0.18 * smooth(0.15, 0, t));
-      col.push(k, k * 0.95, k * 0.84);
+      const k = (0.62 + 0.3 * fbm(sx * 5, sy * 5, seed, 3)) * (1 - 0.4 * smooth(0.6, 1, t)) * (1 - 0.2 * smooth(0.15, 0, t));
+      col.push(k, k * 0.93, k * 0.8);
     };
     for (let iu = 0; iu < NU; iu++) {
       for (let it = 0; it < NT; it++) {
@@ -108,10 +109,10 @@ function peel(bag, frame, side, sOfX, x0, y0, w, len, { seed = 1, curl = 2.9, tu
   const place = M(rotZ(turn), frame);
   bag.add('wallpaperPeel', build(false), place);
   bag.add('paperBack', build(true), place);
-  // the plaster it left behind
-  const pw = w * 1.12;
-  const ph = len * 1.05;
-  decal(bag, seed % 2 ? 'plaster1' : 'plaster2', place, x0 + w / 2, y0 + len * 0.52, pw, ph, { zFn: (x, y) => wallBulge(side, side < 0 ? x : -x, y), lift: 0.003, tint: plasterTint, n: 8 });
+  // what it left behind: grey plaster, brown paste, scraps of the paper's back
+  const pw = w * 1.3;
+  const ph = len * 1.08;
+  decal(bag, 'paste', place, x0 + w / 2, y0 + len * 0.5, pw, ph, { zFn: (x, y) => wallBulge(side, side < 0 ? x : -x, y), lift: 0.003, tint: plasterTint, n: 8 });
 }
 
 // --- the child's shoe ----------------------------------------------------------------------------
@@ -216,8 +217,8 @@ function shoe() {
           // scuffed at the toe and along the welt, dirt in the creases
           const uu = p[0] / L;
           const scuff = smooth(0.8, 1, uu) * 0.35 + smooth(0.018, 0.006, p[1] - soleT(uu)) * 0.3;
-          const k = (0.9 + 0.2 * fbm(p[0] * 60, p[2] * 60 + p[1] * 40, 9, 3)) * (1 - scuff);
-          col.push(k, k * 0.97, k * 0.92);
+          const k = (0.9 + 0.2 * fbm(p[0] * 60, p[2] * 60 + p[1] * 40, 9, 3)) * (1 + 5 * scuff);
+          col.push(k, k * 0.97, k * 0.94);
         }
       }
     }
@@ -250,11 +251,10 @@ function shoe() {
       g2.computeVertexNormals();
       b.add('leather', smoothNormals(g2, 0.3), null, [0.92, 0.9, 0.86]);
     };
-    band(0.36, 0.44, 0.42, Math.PI - 0.42, 16, 0.0016, false); // strap across
-    band(0.44, 0.63, Math.PI / 2 - 0.2, Math.PI / 2 + 0.2, 16, 0.0016, true); // bar to the vamp
+    band(0.34, 0.43, 0.32, Math.PI - 0.32, 16, 0.0018, false); // the strap across the instep
     // buckle
     const w = halfW(0.4);
-    b.add('brassDull', new THREE.TorusGeometry(0.0055, 0.0012, 6, 12), M(rotY(Math.PI / 2), rotX(0.5), move(0.4 * L, soleT(0.4) + 0.024, centre(0.4) - w * 0.93)));
+    b.add('steel', new THREE.TorusGeometry(0.0062, 0.0014, 8, 16), M(rotY(Math.PI / 2), rotX(0.5), move(0.385 * L, soleT(0.385) + 0.022, centre(0.385) - w * 0.95)));
     // insole, dark with wear
     const ins = [];
     for (let i = 2; i < NU - 6; i++) {
@@ -269,7 +269,7 @@ function shoe() {
     const gi = new THREE.BufferGeometry();
     gi.setAttribute('position', new THREE.Float32BufferAttribute(ins, 3));
     gi.computeVertexNormals();
-    b.add('sole', gi, null, [0.5, 0.45, 0.4]);
+    b.add('cream', gi, null, [0.85, 0.74, 0.58]); // the lining, pale and grubby
   }
   return b;
 }
@@ -368,18 +368,18 @@ export async function buildProps(bag, materials, T, doorMeta) {
   }
 
   // ---- old dried blood at handle height: door 306 and the wall beside it ----
+  // A hand pressed flat on the door beside the handle and dragged down; three fingers drawn
+  // down the panel below; a wipe off the edge onto the architrave and the wall.
   {
     const d = doorByNo(306);
     const m = doorMeta[306];
     const hx = m.handleSide * (DOOR.w / 2 - 0.06);
-    decal(bag, 'blood1', leafPlace(306), hx - m.handleSide * 0.13, 0.9, 0.36, 0.46, { zFn: onLeaf, lift: 0.0045, n: 24, flip: m.handleSide > 0 });
-    decal(bag, 'blood3', leafPlace(306), hx - m.handleSide * 0.3, 0.52, 0.3, 0.36, { zFn: onLeaf, lift: 0.003, n: 20 });
-    // dragged off the door, across the architrave and along the wainscot towards the walker
+    decal(bag, 'blood1', leafPlace(306), hx - m.handleSide * 0.2, 1.06, 0.42, 0.54, { zFn: onLeaf, lift: 0.0045, n: 28, flip: m.handleSide > 0, rot: m.handleSide * 0.08 });
+    decal(bag, 'blood3', leafPlace(306), hx - m.handleSide * 0.27, 0.58, 0.36, 0.5, { zFn: onLeaf, lift: 0.004, n: 24 });
     const frame = wallFrame(d.side, d.s + DOOR.w / 2);
-    const jx = m.handleSide * (DOOR.w / 2 + 0.085 + 0.25);
+    const jx = m.handleSide * (DOOR.w / 2 + 0.085 + 0.2);
     const sAt = (x) => d.s + DOOR.w / 2 + (d.side < 0 ? x : -x);
-    decal(bag, 'blood2', frame, jx, 1.2, 0.46, 0.3, { zFn: (x, y) => wallBulge(d.side, sAt(x), y), lift: 0.003, rot: m.handleSide > 0 ? 0 : Math.PI, n: 8 });
-    decal(bag, 'blood3', frame, jx + m.handleSide * 0.1, 0.62, 0.34, 0.4, { lift: 0.003, rot: 2.2, n: 2 });
+    decal(bag, 'blood2', frame, jx, 1.18, 0.46, 0.3, { zFn: (x, y) => wallBulge(d.side, sAt(x), y), lift: 0.003, rot: m.handleSide > 0 ? 0 : Math.PI, n: 8 });
   }
 
   // ---- gouges round the frame of the clawed door, and on the wall by the scare door ----
@@ -424,6 +424,12 @@ export async function buildProps(bag, materials, T, doorMeta) {
     [1, 13.3, 0.9],
     [-1, 19.3, 1.1],
     [1, 23.8, 1.2],
+    [1, 2.7, 0.8],
+    [-1, 10.4, 1.25],
+    [1, 6.0, 0.7],
+    [-1, 14.2, 0.9],
+    [1, 20.1, 1.0],
+    [-1, 25.1, 0.8],
   ];
   for (const [side, s, len] of runs) {
     const frame = wallFrame(side, s);
@@ -440,18 +446,28 @@ export async function buildProps(bag, materials, T, doorMeta) {
   ];
   for (const [name, x, s, w, h, rot] of cstains) decal(bag, name, floorM, x, s, w, h, { rot, zFn: carpetHeight, lift: 0.003, n: 14, soft: true });
 
-  // ---- peeling wallpaper ----
+  // ---- peeling wallpaper: narrow strips coming away at the seams, under the cornice ----
   {
     const left = wallFrame(-1, 0);
     const right = wallFrame(1, 0);
-    const lx = (s) => alongWall(-1, 0, s);
-    const rx = (s) => alongWall(1, 0, s);
-    peel(bag, left, -1, null, lx(8.55), 1.92, 0.5, 0.56, { seed: 3, curl: 3.0 });
-    peel(bag, right, 1, null, rx(15.75), 1.78, 0.44, 0.7, { seed: 8, curl: 2.8 });
-    peel(bag, left, -1, null, lx(17.6), 1.7, 0.53, 0.8, { seed: 5, curl: 3.1 });
-    peel(bag, right, 1, null, rx(1.9), 2.1, 0.32, 0.4, { seed: 12, curl: 2.6 });
-    peel(bag, right, 1, null, rx(23.3), 1.6, 0.5, 0.9, { seed: 21, curl: 3.0 });
-    peel(bag, left, -1, null, lx(26.4), 2.0, 0.4, 0.5, { seed: 14, curl: 2.7 });
+    const SEAM = 0.53;
+    // a strip that starts at the seam nearest to s, on its `dir` side (+1 or -1 in wall x)
+    const strip = (side, s, dir, y0, w, len, seed, curl) => {
+      const lx = alongWall(side, 0, s);
+      const seam = Math.round(lx / SEAM) * SEAM;
+      const x0 = dir > 0 ? seam : seam - w;
+      peel(bag, side < 0 ? left : right, side, null, x0, y0, w, len, { seed, curl });
+    };
+    strip(-1, 8.5, 1, 1.95, 0.13, 0.52, 3, 2.6);
+    strip(-1, 8.5, -1, 2.1, 0.08, 0.36, 4, 2.2);
+    strip(-1, 4.1, 1, 2.12, 0.09, 0.34, 6, 2.3);
+    strip(1, 1.9, 1, 2.1, 0.08, 0.36, 12, 2.4);
+    strip(1, 11.3, -1, 2.0, 0.11, 0.48, 9, 2.5);
+    strip(1, 15.8, 1, 1.92, 0.14, 0.56, 8, 2.7);
+    strip(-1, 17.6, 1, 1.85, 0.16, 0.66, 5, 2.8);
+    strip(-1, 17.6, -1, 2.08, 0.07, 0.4, 15, 2.2);
+    strip(1, 23.3, -1, 1.8, 0.15, 0.7, 21, 2.7);
+    strip(-1, 26.4, 1, 2.02, 0.1, 0.44, 14, 2.4);
   }
 
   // ---- boards nailed across door 312 ----
@@ -495,13 +511,15 @@ export async function buildProps(bag, materials, T, doorMeta) {
     });
   }
 
-  // ---- the child's shoe, on the runner ----
+  // ---- the child's shoe, on the runner, fallen over ----
   {
     const sh = shoe();
-    const s = 8.15;
-    const x = 0.24;
-    // side on to the walker, so heel, strap and toe read as a shoe and not a white blot
-    bag.addBag(sh, M(move(-0.08, 0, 0), rotX(0.09), rotY(-0.12), move(x, carpetHeight(x, s) - 0.0005, -s)));
+    const s = 7.9;
+    const x = 0.12;
+    const k = 1.22; // about a size 31
+    // centred on its own length, fallen onto its side: the profile (heel, sole, strap, toe)
+    // faces up at the walker and the opening tips towards him; the toe points at the right wall
+    bag.addBag(sh, M(move(-0.08, 0, 0), scale(k), rotX(1.18), move(0, 0.031 * k, 0), rotY(0.4), move(x, carpetHeight(x, s) - 0.001, -s)));
   }
 
   // ---- trolley, parked against the left wall in the dark part ----
@@ -568,7 +586,7 @@ export async function buildProps(bag, materials, T, doorMeta) {
     bag.addBag(b, M(rotY(0.03), move(0.3, y, -s)));
     // what the sign throws on the walls: nothing in a lit corridor, the only colour in a dark one
     for (const sgn of [-1, 1]) {
-      const glow = new THREE.PointLight(new THREE.Color(0.22, 1.0, 0.42), 0.13, 0, 2);
+      const glow = new THREE.PointLight(new THREE.Color(0.4, 1.0, 0.55), 0.045, 0, 2);
       glow.position.set(0.3, y - 0.02, -s + sgn * 0.14);
       objects.push(glow);
     }

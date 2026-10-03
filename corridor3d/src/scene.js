@@ -69,7 +69,10 @@ export async function buildScene({ textureSize = 2048 } = {}) {
       plateTilt: (r() - 0.5) * (d.no === 309 ? 0.5 : 0.05),
       gap: kind === 'light' ? 0.02 : 0.004,
     });
-    const tint = 0.82 + 0.3 * r();
+    // no two leaves the same: walnut to mahogany, some darker with old varnish
+    const tk = 0.78 + 0.34 * r();
+    const red = r();
+    const tint = [tk, tk * (0.84 + 0.12 * red), tk * (0.78 + 0.18 * red)];
     doorMeta[d.no] = { frame, hingeSide, handleSide: -hingeSide, angle, outward, dynamic: kind === 'scare' };
     if (kind === 'scare') {
       // its own group so it can swing
@@ -87,7 +90,7 @@ export async function buildScene({ textureSize = 2048 } = {}) {
     } else {
       const lb = new Bag();
       lb.addBag(leaf, M(leafMatrix({ hingeSide, angle, outward }), frame));
-      for (const [mat, list] of lb.items) for (const g of list) bag.add(mat, g, null, mat === 'door' ? [tint, tint, tint] : null);
+      for (const [mat, list] of lb.items) for (const g of list) bag.add(mat, g, null, mat === 'door' ? tint : null);
     }
     if (kind === 'scratched' || kind === 'scare' || kind === 'light') room(bag, d.side, d.s);
   }

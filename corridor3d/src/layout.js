@@ -44,8 +44,9 @@ export const LAMP_DROP = 0.42; // ceiling to bulb centre
 export const LAMP_Y = CH - LAMP_DROP;
 
 // Camera position (s) at which each lamp dies. Far lamps first; the wave reaches the walker
-// just after the scare door (lamp 4 hangs in front of it), then runs on behind him.
-export const FAIL_AT = { 6: 2.4, 5: 5.2, 4: 16.0, 3: 16.5, 2: 16.9, 1: 17.3, 0: 17.7 };
+// just after the scare door (lamp 4 hangs in front of it and is still alight while the door
+// opens), then runs on behind him.
+export const FAIL_AT = { 6: 2.4, 5: 5.2, 4: 16.95, 3: 17.4, 2: 17.8, 1: 18.2, 0: 18.6 };
 export const FADE_LEN = 0.55; // metres of walking a lamp takes to die
 
 export const WALK_FROM = 0.35;
@@ -75,7 +76,7 @@ export function lampLevel(k, s) {
   // not a clean fade: a dip, a short recovery, then out. Monotone enough that nothing strobes.
   const level = t <= 0 ? 1 : t >= 1 ? 0 : (1 - t) * (1 - t) * (0.55 + 0.45 * Math.cos(t * 5.2)) * (1 - smooth(0.75, 1, t));
   // lamp 4 is already tired when the walker reaches it
-  const tired = k === 4 ? 1 - 0.22 * smooth(11.5, 14, s) : 1;
+  const tired = k === 4 ? 1 - 0.4 * smooth(11.5, 15.8, s) : 1;
   return Math.max(0, level) * tired;
 }
 
@@ -90,7 +91,7 @@ export function swing(s) {
 }
 
 // Exposure in stops relative to the lit corridor: the eye opens up when the lamps are gone.
-export const exposureStops = (s) => 0.25 * smooth(5, 8, s) + 3.0 * smooth(16.0, 18.4, s) - 2.45 * smooth(20.2, 25.7, s);
+export const exposureStops = (s) => 0.25 * smooth(5, 8, s) + 3.0 * smooth(16.95, 19.3, s) - 2.45 * smooth(20.6, 25.7, s);
 
 // Camera pose. Slow sway and bob (long periods: frames are 15 to 25 cm apart, a real 0.7 m
 // stride would alias into a shake), and small glances at the things worth seeing.
@@ -104,13 +105,16 @@ export function cameraPose(s, set) {
   let x = sway;
   // the shoe, low on the right
   yaw -= 0.04 * bump(5.7, 2.0, s);
-  pitch -= (mobile ? 0.3 : 0.19) * bump(5.7, 2.3, s); // the tall frame has room to look down further
+  pitch -= (mobile ? 0.3 : 0.27) * bump(5.75, 2.3, s); // the tall frame has room to look down further
   // the scratched door hanging open on the left: look at it, then walk round it
   yaw += 0.1 * bump(9.0, 1.6, s);
   x += 0.4 * bump(10.7, 2.7, s);
-  // drift left and look right towards door 308 before it moves
-  x -= 0.2 * bump(15.2, 2.6, s);
-  yaw -= (mobile ? 0.19 : 0.1) * bump(15.35, 1.9, s);
+  // drift left and turn the head to door 308 before it moves: the gap must be near the middle
+  // of the picture when it opens. The tall phone frame is narrow, so it turns further.
+  const L = globalThis.__look308 ?? {};
+  x += (L.x ?? 0.22) * bump(L.xc ?? 16.6, L.xw ?? 2.6, s);
+  yaw -= (mobile ? (L.ym ?? 0.74) : (L.yd ?? 0.46)) * bump(L.c ?? 16.75, L.w ?? 2.4, s);
+  pitch -= (mobile ? (L.pm ?? 0.06) : (L.pd ?? 0.03)) * bump(L.c ?? 16.75, L.w ?? 2.4, s);
   // the line of light under 311, low on the left
   yaw += 0.05 * bump(21.6, 1.5, s);
   pitch -= 0.03 * bump(21.6, 1.5, s);
@@ -134,7 +138,7 @@ export const frameS = (set, i) => camS(i / (SETS[set].frames - 1));
 // The scare. It plays in real time over a held walk frame: SCARE_AT is the camera distance
 // that triggers it, each set snaps that to its nearest frame.
 export const SCARE_DOOR = 308;
-export const SCARE_AT = { desktop: 15.3, mobile: 15.2 };
+export const SCARE_AT = { desktop: 16.7, mobile: 16.8 };
 export const SCARE_FPS = 24;
 export const SCARE_FRAMES = 15; // 625 ms
 export function scareFrameIndex(set) {
@@ -147,9 +151,12 @@ export function scareFrameIndex(set) {
 export function scareOpen(j) {
   const t = j / (SCARE_FRAMES - 1);
   const a = smooth(0, 0.2, t) * (0.86 + 0.14 * smooth(0.2, 0.7, t)) * (1 - smooth(0.84, 1, t));
-  return a * 0.235;
+  return a * ((globalThis.__fig ?? {}).open ?? 0.3);
 }
 // How far the head leans into the gap, 0..1.
 export const scareLean = (j) => smooth(0.12, 0.55, j / (SCARE_FRAMES - 1));
+// Where the walker's eye is while the door opens (local coordinates of door 308 are worked out
+// from this in figure.js, to aim the face and put the catchlight in the eye).
+export const scareEye = (set) => cameraPose(frameS(set, scareFrameIndex(set)), set);
 
 export { clamp, smooth, bump };

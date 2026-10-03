@@ -8,7 +8,7 @@ import { Bag, M, move, rotX, mulberry } from './util.js';
 
 export const LAMP_COLOR = new THREE.Color(1.0, 0.8, 0.58); // tungsten, seen with a tungsten-ish white balance
 export const LAMP_CD = 46; // candela at full level
-const SHADE_GLOW = 11;
+const SHADE_GLOW = 5;
 
 function pendant(r) {
   const b = new Bag();
@@ -30,13 +30,13 @@ function pendant(r) {
   b.add('brassDull', new THREE.CylinderGeometry(0.03, 0.03, 0.008, 24), move(0, -(drop - 0.05), 0));
   // shade: a shallow opal glass coolie, ribbed, chipped rim
   const prof = [];
-  for (let i = 0; i <= 14; i++) {
-    const t = i / 14;
+  for (let i = 0; i <= 28; i++) {
+    const t = i / 28;
     const rad = 0.03 + 0.165 * Math.pow(t, 0.82);
     const y = -(drop - 0.055) - 0.115 * Math.pow(t, 1.25);
     prof.push(new THREE.Vector2(rad, y));
   }
-  const shade = new THREE.LatheGeometry(prof, 48);
+  const shade = new THREE.LatheGeometry(prof, 128);
   const pos = shade.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -48,7 +48,11 @@ function pendant(r) {
     pos.setZ(i, z * k);
   }
   shade.computeVertexNormals();
-  b.add('shade', shade, new THREE.Matrix4().makeRotationY(r() * 6));
+  const turn = new THREE.Matrix4().makeRotationY(r() * 6);
+  b.add('shade', shade, turn);
+  // the rolled glass rim
+  const rimY = -(drop - 0.055) - 0.115;
+  b.add('shade', new THREE.TorusGeometry(0.195, 0.0035, 10, 128), M(rotX(Math.PI / 2), move(0, rimY, 0)));
   return b;
 }
 

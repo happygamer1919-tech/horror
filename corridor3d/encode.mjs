@@ -23,9 +23,16 @@ const exists = (p) => stat(p).then(() => true, () => false);
 
 // Format per set. Desktop: AVIF (dark, grainy footage is where it wins: about a third smaller
 // than WebP at the same quality). Mobile: WebP, which phones decode faster.
+// Dark frames get a higher quality: at the base setting the encoders smooth the grain out of
+// the shadows and leave flat, blocky steps there. `dark` is the mean luma (0..255) of the frame.
+const darkBoost = (dark) => (dark < 22 ? 12 : dark < 40 ? 8 : dark < 60 ? 4 : 0);
 const FORMAT = {
-  desktop: { ext: 'avif', encode: (img) => img.avif({ quality: 56, effort: 7, chromaSubsampling: '4:2:0' }) },
-  mobile: { ext: 'webp', encode: (img) => img.webp({ quality: 56, effort: 6, smartSubsample: true }) },
+  desktop: { ext: 'avif', encode: (img, dark = 255) => img.avif({ quality: 56 + darkBoost(dark), effort: 7, chromaSubsampling: '4:2:0' }) },
+  mobile: { ext: 'webp', encode: (img, dark = 255) => img.webp({ quality: 56 + darkBoost(dark), effort: 6, smartSubsample: true }) },
+};
+const meanLuma = async (file) => {
+  const { channels } = await sharp(file).stats();
+  return 0.299 * channels[0].mean + 0.587 * channels[1].mean + 0.114 * channels[2].mean;
 };
 const POSTER = { desktop: [640, 360], mobile: [360, 720] };
 
@@ -163,7 +170,7 @@ for (const [set, def] of Object.entries(SETS)) {
   await Promise.all(
     Array.from({ length: 6 }, async () => {
       for (let f = queue.shift(); f; f = queue.shift()) {
-        const buf = await fmt.encode(sharp(join(src, f))).toBuffer();
+        const buf = await fmt.encode(sharp(join(src, f)), await meanLuma(join(src, f))).toBuffer();
         await writeFile(join(dst, f.replace('.png', `.${fmt.ext}`)), buf);
         bytes += buf.length;
         count++;
@@ -186,6 +193,7 @@ for (const [set, def] of Object.entries(SETS)) {
     const rect = found && (await withBase(found, join(src, `${pad(meta.index)}.png`)));
     if (rect) {
       const has = { face: [], gap: [] };
+      const holdLuma = await meanLuma(join(src, `${pad(meta.index)}.png`)).catch(() => 255);
       for (const variant of ['face', 'gap']) {
         for (let j = 0; j < SCARE_FRAMES; j++) {
           const f = `${variant}-${pad(j)}.png`;
@@ -194,7 +202,7 @@ for (const [set, def] of Object.entries(SETS)) {
             continue;
           }
           const img = await patch(sdir, f, rect, def.w, def.h);
-          const buf = await fmt.encode(img).toBuffer();
+          const buf = await fmt.encode(img, holdLuma).toBuffer();
           await writeFile(join(dst, 's', `${variant[0]}-${pad(j, 2)}.${fmt.ext}`), buf);
           sbytes += buf.length;
           scount++;

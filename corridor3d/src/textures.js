@@ -161,10 +161,15 @@ function wallpaper(grunge, S) {
   tile(g, grunge, 1, S);
   g.filter = 'none';
   g.globalCompositeOperation = 'source-over';
-  // seams between the lengths of paper: a faint dark line
+  // seams between the lengths of paper: the butt joint has opened a little and one edge has
+  // lifted, so it catches the light on one side and holds dirt on the other
   for (const x of [0, S / 2]) {
-    g.fillStyle = 'rgba(40,34,20,0.3)';
-    g.fillRect(x - 1, 0, 2.5, S);
+    g.fillStyle = 'rgba(34,28,16,0.55)';
+    g.fillRect(x - 1.5, 0, 3 * k + 1.5, S);
+    g.fillStyle = 'rgba(214,202,160,0.28)';
+    g.fillRect(x + 3 * k, 0, 4 * k, S);
+    g.fillStyle = 'rgba(60,50,30,0.16)';
+    g.fillRect(x - 14 * k, 0, 12 * k, S);
   }
   return c;
 }
@@ -265,7 +270,7 @@ export const cell = (i) => {
   const y = Math.floor(i / n);
   return { u0: x / n, v0: 1 - (y + 1) / n, u1: (x + 1) / n, v1: 1 - y / n };
 };
-export const DECAL = { blood1: 0, blood2: 1, blood3: 2, water1: 3, water2: 4, water3: 5, grime1: 6, grime2: 7, gouge1: 8, gouge2: 9, plaster1: 10, plaster2: 11, stain1: 12, stain2: 13, drip1: 14, soot1: 15 };
+export const DECAL = { blood1: 0, blood2: 1, blood3: 2, water1: 3, water2: 4, water3: 5, grime1: 6, grime2: 7, gouge1: 8, gouge2: 9, plaster1: 10, plaster2: 11, stain1: 12, stain2: 13, drip1: 14, paste: 15 };
 
 function blob(g, R, cx, cy, r, rough, seed, fill) {
   // an irregular closed shape
@@ -308,50 +313,121 @@ function decalAtlas(plaster, S) {
       const t = i / steps;
       const a = seedAlpha * (1 - t) * (1 - t) * (0.55 + 0.45 * noise2(t * 9, x * 0.05, 7));
       const ww = w * (1 - 0.55 * t);
-      g.fillStyle = `rgba(${66 + 26 * t},${20 + 6 * t},${11 + 4 * t},${a})`;
+      g.fillStyle = `rgba(${46 + 30 * t},${12 + 8 * t},${8 + 4 * t},${a})`;
       g.beginPath();
       g.ellipse(x + lean * t * len + Math.sin(t * 7 + x) * 1.5, y + t * len, ww, ww * 1.6, 0, 0, Math.PI * 2);
       g.fill();
     }
   };
+  // dried: nearly black where it was thick, rust at the thin edges, a darker rim where it dried
+  const smear = (draw, alpha = 0.9) => {
+    g.save();
+    g.filter = 'blur(2.5px)';
+    g.globalAlpha = alpha * 0.55;
+    draw('rgb(92,30,16)', 1.1);
+    g.filter = 'blur(1px)';
+    g.globalAlpha = alpha;
+    draw('rgb(46,11,7)', 1);
+    g.globalAlpha = alpha * 0.8;
+    draw('rgb(28,6,4)', 0.82);
+    g.restore();
+  };
   const bloodMark = (variant) => {
-    g.filter = 'blur(1.2px)';
     if (variant === 0) {
-      // a hand that slid down: palm smear and four fingers
-      blob(g, R, C * 0.5, C * 0.3, C * 0.13, 0.35, 11, 'rgba(72,22,12,0.62)');
-      blob(g, R, C * 0.52, C * 0.31, C * 0.08, 0.4, 12, 'rgba(48,13,8,0.5)');
-      for (let f = 0; f < 4; f++) drag(C * (0.36 + f * 0.085), C * (0.2 + 0.03 * Math.abs(f - 1.5)), C * (0.55 + 0.1 * R()), C * 0.017, 0.12 - f * 0.03, 0.75);
-      drag(C * 0.7, C * 0.36, C * 0.2, C * 0.02, 0.5, 0.6);
+      // a left hand pressed flat at handle height and then dragged down the door
+      const hx = C * 0.5;
+      const hy = C * 0.3;
+      const fingers = [
+        [-0.075, -0.13, 0.018, 0.07, -0.16],
+        [-0.025, -0.155, 0.019, 0.08, -0.05],
+        [0.025, -0.15, 0.019, 0.078, 0.04],
+        [0.07, -0.125, 0.016, 0.062, 0.14],
+      ];
+      smear((col, k) => {
+        g.fillStyle = col;
+        // palm
+        blob(g, R, hx, hy, C * 0.085 * k, 0.18, 11, col);
+        // fingers and thumb
+        for (const [dx, dy, w, l, a] of fingers) {
+          g.beginPath();
+          g.ellipse(hx + dx * C, hy + dy * C, w * C * k, l * C * k, a, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.beginPath();
+        g.ellipse(hx - 0.115 * C, hy + 0.015 * C, 0.02 * C * k, 0.055 * C * k, 0.9, 0, Math.PI * 2);
+        g.fill();
+        // the slide: the hand went down, the fingers left long tracks, the palm a broad smear
+        for (const [dx, , w] of fingers) {
+          const x0 = hx + dx * C;
+          for (let t = 0; t < 1; t += 0.01) {
+            const ww = w * C * k * (1 - 0.6 * t) * (0.7 + 0.3 * noise2(t * 14, dx * 40, 5));
+            g.globalAlpha *= 1;
+            g.beginPath();
+            g.ellipse(x0 + Math.sin(t * 5 + dx * 30) * 2 + t * 6, hy + t * C * 0.5, ww, ww * 1.8, 0, 0, Math.PI * 2);
+            g.fill();
+          }
+        }
+        for (let t = 0; t < 1; t += 0.02) {
+          const ww = C * 0.07 * k * (1 - 0.75 * t);
+          g.beginPath();
+          g.ellipse(hx + t * 4, hy + t * C * 0.32, ww, ww * 0.7, 0, 0, Math.PI * 2);
+          g.fill();
+        }
+      }, 0.92);
     } else if (variant === 1) {
-      // sideways wipe along a frame
+      // a sideways wipe along the frame
       g.translate(C / 2, C / 2);
       g.rotate(-1.25);
       g.translate(-C / 2, -C / 2);
-      for (let f = 0; f < 3; f++) drag(C * (0.4 + f * 0.09), C * 0.16, C * 0.7, C * 0.02, 0.05, 0.6);
-      blob(g, R, C * 0.5, C * 0.2, C * 0.09, 0.4, 21, 'rgba(68,20,11,0.55)');
+      for (let f = 0; f < 3; f++) drag(C * (0.4 + f * 0.09), C * 0.16, C * 0.7, C * 0.022, 0.05, 0.85);
+      blob(g, R, C * 0.5, C * 0.2, C * 0.09, 0.4, 21, 'rgba(48,13,8,0.75)');
     } else {
-      // spots and one thumb-wide drag
-      for (let i = 0; i < 22; i++) blob(g, R, C * (0.2 + 0.6 * R()), C * (0.15 + 0.6 * R()), C * (0.006 + 0.02 * R() * R()), 0.3, 30 + i, `rgba(70,21,12,${0.45 + 0.4 * R()})`);
-      drag(C * 0.45, C * 0.3, C * 0.5, C * 0.026, -0.1, 0.7);
+      // three fingers drawn down the door, and drops that ran
+      smear((col, k) => {
+        g.fillStyle = col;
+        for (let f = 0; f < 3; f++) {
+          const x0 = C * (0.38 + f * 0.085);
+          for (let t = 0; t < 1; t += 0.008) {
+            const ww = C * 0.016 * k * (1 - 0.5 * t) * (0.6 + 0.4 * noise2(t * 12, f * 7, 9));
+            g.beginPath();
+            g.ellipse(x0 + Math.sin(t * 4 + f) * 3 - t * 10, C * (0.12 + 0.72 * t * (0.85 + 0.1 * f)), ww, ww * 1.6, 0, 0, Math.PI * 2);
+            g.fill();
+          }
+        }
+        for (let i = 0; i < 14; i++) blob(g, R, C * (0.25 + 0.5 * R()), C * (0.1 + 0.4 * R()), C * (0.004 + 0.012 * R()) * k, 0.3, 30 + i, col);
+      }, 0.85);
     }
-    g.filter = 'none';
   };
   inCell(DECAL.blood1, () => bloodMark(0));
   inCell(DECAL.blood2, () => bloodMark(1));
   inCell(DECAL.blood3, () => bloodMark(2));
 
-  // Water stains: a tide line, a paler middle, older rings inside.
+  // Water stains: an irregular tide line where the water stopped spreading, a paler, patchy
+  // middle, and a second, broken line inside from a later leak. Never concentric rings.
   const water = (seed) => {
-    g.filter = `blur(${C * 0.006}px)`;
-    for (let ring = 0; ring < 3; ring++) {
-      const r = C * (0.4 - ring * 0.1);
-      blob(g, R, C * (0.5 + 0.03 * ring), C * (0.5 - 0.02 * ring), r, 0.3, seed + ring * 3, 'rgba(84,56,22,0.42)');
-      g.globalCompositeOperation = 'destination-out';
-      blob(g, R, C * (0.5 + 0.03 * ring), C * (0.5 - 0.02 * ring), r * 0.955, 0.3, seed + ring * 3, 'rgba(0,0,0,0.86)');
-      g.globalCompositeOperation = 'source-over';
+    const img = g.createImageData(C, C);
+    for (let y = 0; y < C; y++) {
+      for (let x = 0; x < C; x++) {
+        const u = x / C - 0.5;
+        const v = y / C - 0.5;
+        const r = Math.hypot(u * (1 + 0.25 * Math.sin(seed)), v) * 2;
+        const f = (1 - r) * 1.15 + 0.6 * (fbm(x / C * 2.6 + seed, y / C * 2.6, seed, 5) - 0.5) + 0.12 * (fbm(x / C * 9, y / C * 9, seed + 3, 3) - 0.5);
+        const inside = smooth(0.1, 0.14, f);
+        const tide = Math.exp(-Math.pow((f - 0.12) / 0.016, 2));
+        const tide2 = Math.exp(-Math.pow((f - 0.4) / 0.018, 2)) * smooth(0.48, 0.62, fbm(x / C * 4, y / C * 4, seed + 9, 3));
+        const fill = inside * (0.1 + 0.16 * fbm(x / C * 6, y / C * 6, seed + 5, 3));
+        const a = clamp(fill + tide * 0.5 + tide2 * 0.32, 0, 0.8);
+        const t = clamp((tide + tide2) / Math.max(1e-3, tide + tide2 + fill * 3), 0, 1);
+        const i = (y * C + x) * 4;
+        img.data[i] = 120 - 40 * t;
+        img.data[i + 1] = 92 - 34 * t;
+        img.data[i + 2] = 50 - 26 * t;
+        img.data[i + 3] = a * 255;
+      }
     }
-    blob(g, R, C * 0.5, C * 0.5, C * 0.38, 0.3, seed, 'rgba(120,92,48,0.1)');
-    g.filter = 'none';
+    const tmp = canvas(C);
+    tmp.getContext('2d').putImageData(img, 0, 0);
+    g.drawImage(tmp, 2, 2, C - 4, C - 4);
   };
   inCell(DECAL.water1, () => water(101));
   inCell(DECAL.water2, () => water(140));
@@ -380,7 +456,6 @@ function decalAtlas(plaster, S) {
   };
   inCell(DECAL.grime1, () => grime(301, [22, 17, 12]));
   inCell(DECAL.grime2, () => grime(377, [30, 24, 16]));
-  inCell(DECAL.soot1, () => grime(412, [10, 9, 8]));
 
   // Gouges: fingernail tracks cut through to raw wood or plaster, with a dark lip.
   const gouges = (seed, n, pale) => {
@@ -421,6 +496,34 @@ function decalAtlas(plaster, S) {
   };
   inCell(DECAL.plaster1, () => bare(801));
   inCell(DECAL.plaster2, () => bare(844));
+  // Where a strip of paper came off: grey plaster, old brown paste in streaks, and scraps of
+  // the paper's back still stuck to it. Taller than wide, ragged at the edges.
+  inCell(DECAL.paste, () => {
+    const tmp = canvas(C);
+    const t = tmp.getContext('2d');
+    t.filter = 'grayscale(0.6) brightness(0.95)';
+    t.drawImage(plaster, 0, 0, C, C);
+    t.filter = 'none';
+    const img = t.getImageData(0, 0, C, C);
+    for (let y = 0; y < C; y++) {
+      for (let x = 0; x < C; x++) {
+        const i = (y * C + x) * 4;
+        const n = fbm(x / C * 6, y / C * 18, 607, 4);
+        const paste = smooth(0.5, 0.62, n);
+        const scrap = smooth(0.66, 0.7, fbm(x / C * 9 + 3, y / C * 5, 611, 4));
+        img.data[i] = img.data[i] * (1 - 0.35 * paste) * (1 - scrap) + 150 * scrap;
+        img.data[i + 1] = img.data[i + 1] * (1 - 0.42 * paste) * (1 - scrap) + 134 * scrap;
+        img.data[i + 2] = img.data[i + 2] * (1 - 0.55 * paste) * (1 - scrap) + 96 * scrap;
+        // ragged outline, a strip shape
+        const u = Math.abs(x / C - 0.5) * 2;
+        const v = Math.abs(y / C - 0.5) * 2;
+        const edge = Math.max(u * (1 + 0.25 * (fbm(y / C * 14, 1, 612, 3) - 0.5)), v * (1 + 0.3 * (fbm(x / C * 14, 2, 613, 3) - 0.5)));
+        img.data[i + 3] = 255 * smooth(0.98, 0.9, edge);
+      }
+    }
+    t.putImageData(img, 0, 0);
+    g.drawImage(tmp, 0, 0);
+  });
 
   // Carpet stains: dark, soaked, with satellites.
   const stain = (seed) => {
@@ -438,13 +541,14 @@ function decalAtlas(plaster, S) {
   inCell(DECAL.drip1, () => {
     g.filter = `blur(${C * 0.004}px)`;
     const r = mulberry(77);
-    for (let i = 0; i < 9; i++) {
-      const x = C * (0.15 + 0.7 * r());
-      const len = C * (0.3 + 0.6 * r());
-      const w = C * (0.006 + 0.012 * r());
+    for (let i = 0; i < 12; i++) {
+      const x = C * (0.12 + 0.76 * r());
+      const len = C * (0.35 + 0.62 * r());
+      const w = C * (0.006 + 0.016 * r());
       const grad = g.createLinearGradient(0, 0, 0, len);
-      grad.addColorStop(0, 'rgba(70,46,18,0.5)');
-      grad.addColorStop(1, 'rgba(70,46,18,0)');
+      grad.addColorStop(0, 'rgba(78,50,18,0.62)');
+      grad.addColorStop(0.85, 'rgba(70,44,16,0.3)');
+      grad.addColorStop(1, 'rgba(60,38,14,0)');
       g.fillStyle = grad;
       g.fillRect(x, 4, w, len);
     }
@@ -461,6 +565,11 @@ function clawedDoor(wood, W, H) {
   g.filter = 'brightness(0.95)';
   g.drawImage(wood, 0, 0, W, H);
   g.filter = 'none';
+  // the same walnut as the corridor side of the leaves, so the raw wood in the cuts shows pale
+  g.globalCompositeOperation = 'multiply';
+  g.fillStyle = 'rgb(110,76,58)';
+  g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = 'source-over';
   const hc = canvas(W, H);
   const hg = hc.getContext('2d');
   hg.fillStyle = '#808080';
@@ -469,63 +578,73 @@ function clawedDoor(wood, W, H) {
   const px = W / 0.86; // pixels per metre
   // canvas y runs down from the top of the door
   const yOf = (metres) => H - metres * px;
+  // One gouge: a groove cut through the varnish into raw, pale wood. The lip on the lit side is
+  // bright, the far wall of the groove is in shadow, fibres are torn up along the edges, and
+  // the height map gives it real depth for the normal map.
   const track = (x, y, len, lean, w, depth) => {
-    const x1 = x + lean * len;
-    const y1 = y + len;
-    const cx1 = x + lean * len * 0.2 + (r() - 0.5) * 0.02 * px;
-    const cx2 = x + lean * len * 0.85 + (r() - 0.5) * 0.02 * px;
-    const path = () => {
-      g.beginPath();
-      g.moveTo(x, y);
-      g.bezierCurveTo(cx1, y + len * 0.3, cx2, y + len * 0.7, x1, y1);
+    // a nail skids: the line wavers, bites deeper in places and lifts off at the end
+    const N = 24;
+    const pts = [];
+    const wob = r() * 10;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      pts.push([x + lean * len * t + Math.sin(t * 5 + wob) * w * 1.2 + (r() - 0.5) * w * 0.3, y + len * t]);
+    }
+    const bite = (t) => (0.35 + 0.65 * Math.sin(Math.min(1, t * 1.4) * Math.PI * 0.5)) * (1 - smooth(0.75, 1, t)) * (0.7 + 0.3 * Math.sin(t * 9 + wob));
+    const seg = (ctx, i, width, style, dx = 0) => {
+      ctx.strokeStyle = style;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(pts[i][0] + dx, pts[i][1]);
+      ctx.lineTo(pts[i + 1][0] + dx, pts[i + 1][1]);
+      ctx.stroke();
     };
-    // bruised varnish around the cut
     g.lineCap = 'round';
-    g.strokeStyle = 'rgba(40,20,8,0.34)';
-    g.lineWidth = w * 2.2;
-    path();
-    g.stroke();
-    // raw, splintered wood
-    g.strokeStyle = `rgba(${214 + 20 * r()},${198 + 16 * r()},${164 + 16 * r()},${0.8 + 0.15 * depth})`;
-    g.lineWidth = w;
-    path();
-    g.stroke();
-    // years of dirt in the bottom of the groove
-    g.strokeStyle = `rgba(30,13,7,${0.7 + 0.25 * depth})`;
-    g.lineWidth = w * 0.7;
-    path();
-    g.stroke();
     hg.lineCap = 'round';
-    hg.strokeStyle = `rgba(0,0,0,${0.55 + 0.4 * depth})`;
-    hg.lineWidth = w * 1.1;
-    hg.beginPath();
-    hg.moveTo(x, y);
-    hg.bezierCurveTo(cx1, y + len * 0.3, cx2, y + len * 0.7, x1, y1);
-    hg.stroke();
+    for (let i = 0; i < N; i++) {
+      const b = bite(i / N) * depth;
+      // crushed varnish either side, raw wood in the groove, its far wall in shadow
+      seg(g, i, w * 2.6, `rgba(40,20,8,${0.22 * b})`);
+      seg(g, i, w * (0.6 + 0.6 * b), `rgba(${178 + 22 * b},${146 + 18 * b},${104 + 14 * b},${0.35 + 0.5 * b})`);
+      seg(g, i, w * 0.35, `rgba(36,18,7,${0.55 * b})`, w * 0.4);
+      seg(hg, i, w * (0.8 + 0.6 * b), `rgba(0,0,0,${0.35 + 0.6 * b})`);
+    }
+    // a splinter or two torn up at the deepest point
+    for (let i = 0; i < 3; i++) {
+      const t = 0.2 + 0.5 * r();
+      const k = Math.floor(t * N);
+      g.strokeStyle = `rgba(214,186,140,${0.45 + 0.3 * r()})`;
+      g.lineWidth = Math.max(1, w * 0.3);
+      g.beginPath();
+      g.moveTo(pts[k][0], pts[k][1]);
+      g.lineTo(pts[k][0] + (r() - 0.5) * w * 3, pts[k][1] + w * (2 + 3 * r()));
+      g.stroke();
+    }
   };
   // where the hands worked longest the varnish is rubbed away: pale, matt patches
   g.filter = `blur(${px * 0.012}px)`;
-  for (let i = 0; i < 18; i++) {
-    g.fillStyle = `rgba(206,190,158,${0.14 + 0.16 * r()})`;
+  for (let i = 0; i < 10; i++) {
+    g.fillStyle = `rgba(190,160,120,${0.06 + 0.08 * r()})`;
     g.beginPath();
     g.ellipse((0.12 + r() * 0.62) * px, yOf(0.5 + r() * 0.9), (0.04 + r() * 0.07) * px, (0.08 + r() * 0.16) * px, (r() - 0.5) * 0.4, 0, Math.PI * 2);
     g.fill();
   }
   g.filter = 'none';
-  // a few deep, long gouges
-  for (let i = 0; i < 7; i++) track((0.12 + r() * 0.62) * px, yOf(1.0 + r() * 0.6), (0.4 + r() * 0.45) * px, (r() - 0.5) * 0.3, (0.005 + r() * 0.003) * px, 1);
-  // sets of four fingers, most of them between knee and shoulder height of a child
-  const sets = 34;
-  for (let s = 0; s < sets; s++) {
-    const low = r() < 0.72;
-    const top = low ? 0.55 + r() * 0.75 : 1.2 + r() * 0.65;
-    const x = (0.08 + r() * 0.7) * px;
-    const len = (0.12 + r() * (low ? 0.42 : 0.3)) * px;
-    const lean = (r() - 0.5) * 0.35;
-    const spread = (0.016 + r() * 0.008) * px;
-    const fingers = r() < 0.2 ? 3 : 4;
+  // sets of three or four nails dragged down together, most of them at a child's height,
+  // a few long ones from higher up; fewer than before, and each one cut deep
+  const sets = 30;
+  for (let s2 = 0; s2 < sets; s2++) {
+    const low = s2 < 21;
+    const top = low ? 0.5 + r() * 0.75 : 1.15 + r() * 0.55;
+    const x = (0.1 + r() * 0.66) * px;
+    const len = (low ? 0.08 + r() * 0.3 : 0.2 + r() * 0.3) * px;
+    const lean = (r() - 0.5) * 0.9;
+    const spread = (0.015 + r() * 0.007) * px;
+    const fingers = r() < 0.35 ? 3 : 4;
+    const w = (0.0026 + r() * 0.0018) * px;
+    const depth = 0.45 + 0.55 * r();
     for (let f = 0; f < fingers; f++) {
-      track(x + f * spread, yOf(top) + Math.abs(f - 1.5) * 0.012 * px + r() * 6, len * (0.75 + 0.25 * r()), lean, (0.0026 + r() * 0.0018) * px, r());
+      track(x + f * spread, yOf(top) + Math.abs(f - 1.5) * 0.012 * px + r() * 5, len * (0.65 + 0.35 * r()) * (f === 3 ? 0.8 : 1), lean + (r() - 0.5) * 0.06, w * (f === 3 ? 0.8 : 1), depth * (0.8 + 0.2 * r()));
     }
   }
   // around the handle side edge the varnish is gone altogether
@@ -821,9 +940,9 @@ function paperBack(S) {
       // off-white lining paper gone yellow, faint tide marks of old paste
       const k = 0.9 + 0.12 * n - 0.07 * smooth(0.55, 0.85, p);
       const paste = smooth(0.6, 0.9, n);
-      img.data[i] = 174 * k - 8 * paste;
-      img.data[i + 1] = 161 * k - 14 * paste;
-      img.data[i + 2] = 130 * k - 20 * paste;
+      img.data[i] = 148 * k - 10 * paste;
+      img.data[i + 1] = 128 * k - 16 * paste;
+      img.data[i + 2] = 88 * k - 20 * paste;
       img.data[i + 3] = 255;
     }
   }
@@ -854,12 +973,27 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
   T.decals = tex(decalAtlas(img['worn_plaster_wall/Diffuse'], size), { srgb: true, repeat: false });
   const claw = clawedDoor(img['oak_veneer_01/Diffuse'], Math.round(size * 0.5), Math.round((size * 0.5 * 2.03) / 0.86));
   T.claw = tex(claw.albedo, { srgb: true, repeat: false });
-  T.clawNormal = tex(heightToNormal(claw.height, 5, false), { repeat: false });
+  T.clawNormal = tex(heightToNormal(claw.height, 9, false), { repeat: false });
   const pl = plates(small);
   T.plates = tex(pl.albedo, { srgb: true, repeat: false });
   T.platesOrm = tex(pl.orm, { repeat: false });
   T.platesNormal = tex(heightToNormal(pl.height, 3, false), { repeat: false });
   T.signs = tex(signs(small), { srgb: true, repeat: false });
   T.paperBack = tex(paperBack(512), { srgb: true });
+  {
+    // emissive map for the lamp shades (lathe v: 0 at the holder, 1 at the rim): frosted glass
+    // glows brightest round the bulb and dims towards the rim
+    const c = canvas(64, 256);
+    const gg = c.getContext('2d');
+    const grad = gg.createLinearGradient(0, 256, 0, 0);
+    grad.addColorStop(0, 'rgb(150,150,150)');
+    grad.addColorStop(0.18, 'rgb(255,255,255)');
+    grad.addColorStop(0.45, 'rgb(200,200,200)');
+    grad.addColorStop(0.8, 'rgb(105,105,105)');
+    grad.addColorStop(1, 'rgb(70,70,70)');
+    gg.fillStyle = grad;
+    gg.fillRect(0, 0, 64, 256);
+    T.shadeGlow = tex(c, { srgb: true });
+  }
   return T;
 }

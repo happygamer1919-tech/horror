@@ -70,14 +70,14 @@ export function makeMaterials(T) {
     P({
       map: T.oak_veneer_01.map,
       normalMap: T.oak_veneer_01.normalMap,
-      color: new THREE.Color(0.55, 0.48, 0.41), // forty years of varnish and hands
-      roughness: 0.56,
+      color: new THREE.Color(0.25, 0.165, 0.12), // walnut veneer under forty years of varnish and hands
+      roughness: 0.5,
       vertexColors: true,
     }),
-    [1.83, 1.83],
+    [1.05, 1.05],
   );
   m.claw = sized(
-    P({ map: T.claw, normalMap: T.clawNormal, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.62, vertexColors: true }),
+    P({ map: T.claw, normalMap: T.clawNormal, normalScale: new THREE.Vector2(2.6, 2.6), roughness: 0.62, vertexColors: true }),
     [1, 1],
   );
   m.floor = sized(
@@ -130,7 +130,7 @@ export function makeMaterials(T) {
   m.plate = P({ map: T.plates, metalnessMap: T.platesOrm, roughnessMap: T.platesOrm, normalMap: T.platesNormal, metalness: 1, roughness: 1, vertexColors: true });
 
   // Lamps.
-  m.shade = P({ color: new THREE.Color(0.82, 0.74, 0.58), roughness: 0.45, emissive: new THREE.Color(1.0, 0.56, 0.2), emissiveIntensity: 0, side: THREE.DoubleSide, vertexColors: true });
+  m.shade = P({ color: new THREE.Color(0.8, 0.74, 0.62), roughness: 0.55, emissive: new THREE.Color(1.0, 0.56, 0.2), emissiveMap: T.shadeGlow, emissiveIntensity: 0, side: THREE.DoubleSide, vertexColors: true });
   m.cable = P({ color: new THREE.Color(0.05, 0.045, 0.04), roughness: 0.7, vertexColors: true });
   m.bakelite = P({ color: new THREE.Color(0.09, 0.06, 0.045), roughness: 0.4, vertexColors: true });
 
@@ -144,20 +144,20 @@ export function makeMaterials(T) {
 
   // Atlases.
   m.signs = P({ map: T.signs, roughness: 0.6, vertexColors: true });
-  m.exitGlow = P({ map: T.signs, emissiveMap: T.signs, emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 1.6, roughness: 0.4, vertexColors: true });
+  m.exitGlow = P({ map: T.signs, emissiveMap: T.signs, emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 1.15, roughness: 0.4, vertexColors: true });
   // the same atlas at half strength, for grime that should only be a suggestion
   m.decalSoft = P({ map: T.decals, transparent: true, opacity: 0.42, roughness: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, vertexColors: true });
   m.decal = P({ map: T.decals, transparent: true, roughness: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, vertexColors: true });
 
   // The shoe.
-  m.leather = P({ color: new THREE.Color(0.25, 0.225, 0.185), roughness: 0.5, side: THREE.DoubleSide, vertexColors: true });
-  m.sole = P({ color: new THREE.Color(0.3, 0.2, 0.12), roughness: 0.8, vertexColors: true });
+  m.leather = P({ color: new THREE.Color(0.022, 0.018, 0.017), roughness: 0.12, side: THREE.DoubleSide, vertexColors: true }); // black patent
+  m.sole = P({ color: new THREE.Color(0.2, 0.13, 0.08), roughness: 0.8, vertexColors: true });
 
   // The figure behind the door.
-  m.skin = P({ color: new THREE.Color(0.36, 0.355, 0.35), roughness: 0.46, sheen: 0.35, sheenRoughness: 0.5, sheenColor: new THREE.Color(0.7, 0.45, 0.4), vertexColors: true });
-  m.eye = P({ color: new THREE.Color(1, 1, 1), roughness: 0.08, vertexColors: true });
-  m.hair = P({ color: new THREE.Color(0.018, 0.015, 0.013), roughness: 0.78, side: THREE.DoubleSide, vertexColors: true });
-  m.nail = P({ color: new THREE.Color(0.7, 0.62, 0.55), roughness: 0.25, vertexColors: true });
+  m.skin = P({ color: new THREE.Color(0.3, 0.285, 0.275), roughness: 0.42, sheen: 0.3, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.75, 0.55, 0.5), vertexColors: true });
+  m.eye = P({ color: new THREE.Color(1, 1, 1), roughness: 0.03, vertexColors: true });
+  m.hair = P({ color: new THREE.Color(0.016, 0.014, 0.012), roughness: 0.34, side: THREE.DoubleSide, vertexColors: true });
+  m.nail = P({ color: new THREE.Color(0.72, 0.66, 0.6), roughness: 0.16, vertexColors: true });
   m.gown = P({ color: new THREE.Color(0.5, 0.48, 0.44), roughness: 1, side: THREE.DoubleSide, vertexColors: true });
 
   for (const [name, mat] of Object.entries(m)) {

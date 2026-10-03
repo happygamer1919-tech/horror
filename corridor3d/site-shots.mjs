@@ -84,7 +84,7 @@ try {
       await settle(page, f - 8);
       await page.waitForFunction(() => document.querySelector('[data-corridor]').dataset.scareReady === '1', null, { timeout: 30000 });
       await toFrame(page, f + 1, info.frames);
-      await page.waitForFunction(() => Number(document.querySelector('[data-corridor]').dataset.patch) >= 5, null, { timeout: 10000, polling: 'raf' });
+      await page.waitForFunction(() => Number(document.querySelector('[data-corridor]').dataset.patch) >= 8, null, { timeout: 10000, polling: 'raf' });
       await shot(page, '19-scare');
       console.log(`19-scare-${s.w}  frame ${f}, patch ${await page.evaluate(() => document.querySelector('[data-corridor]').dataset.patch)}`);
       await ctx.close();
