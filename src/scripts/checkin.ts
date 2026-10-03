@@ -45,7 +45,7 @@ export function initCheckin() {
   const prompt = form.querySelector<HTMLElement>('[data-book-prompt]');
   const hasLevels = form.querySelector('input[name="level"]') !== null;
 
-  // A whole number inside min..max of the field. The default value counts as chosen.
+  // A whole number inside min..max of the field. The field starts empty: the guest chooses.
   const teamOk = () => {
     const raw = team?.value.trim() ?? '';
     const n = Number(raw);
@@ -73,7 +73,8 @@ export function initCheckin() {
   // The total and both "ask a question" links follow the card as it is filled in. They do
   // not wait for a valid card: a guest may ask before choosing a level.
   const sync = () => {
-    if (out) out.textContent = totalText() || '...';
+    // No valid team size, no price: the neutral text the page was rendered with.
+    if (out) out.textContent = totalText() || (out.dataset.empty ?? '...');
     const message = [form.dataset.hello ?? '', summaryLine(labels, values())].filter(Boolean).join('\n');
     if (wa) wa.href = buildWhatsAppUrl(form.dataset.wa ?? '', message);
     if (tg) tg.dataset.message = message;

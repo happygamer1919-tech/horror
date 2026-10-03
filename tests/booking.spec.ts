@@ -245,8 +245,11 @@ for (const lang of LANGS) {
         await expect(book).not.toHaveAttribute('aria-describedby', /.*/);
       };
 
-      // On arrival: the default team size counts as chosen, the level has no default.
-      await expect(team).toHaveValue('4');
+      // On arrival nothing is chosen: the team size is empty and the level has no default.
+      await expect(team).toHaveValue('');
+      await off('nothing chosen');
+      // A team size alone is not enough.
+      await team.fill('4');
       await off('no level chosen');
       // Where the button, the prompt and everything after them sit on the card, measured
       // from the card's own corner (the card is still sliding in when the test gets here).
@@ -296,6 +299,89 @@ for (const lang of LANGS) {
       // And it books.
       await book.click();
       await expect(dialog).toBeVisible();
+    });
+
+    test('team size starts empty: the booking button is disabled while it is empty, and waits for both the team size and the level', async ({ page, context }) => {
+      await seal(context);
+      await open(page, lang);
+      const form = page.locator('[data-checkin]');
+      const dialog = page.locator('[data-booking]');
+      const book = form.locator('[data-book]');
+      const prompt = form.locator('[data-book-prompt]');
+      const team = form.locator('input[name="team"]');
+      const total = form.locator('[data-total]');
+      await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      const off = async (why: string) => {
+        await expect(book, why).toBeDisabled();
+        expect(await book.evaluate((b) => b.hasAttribute('disabled')), why).toBe(true);
+        await expect(prompt, why).toBeVisible();
+        await expect(prompt).toHaveText(CHOOSE[lang]);
+      };
+      // What the "ask a question" links carry: the greeting, then the summary line.
+      const asked = async () => {
+        const wa = new URL((await form.locator('[data-ask-wa]').getAttribute('href'))!).searchParams.get('text') ?? '';
+        const tg = (await form.locator('[data-ask-tg]').getAttribute('data-message')) ?? '';
+        expect(tg, 'Telegram carries the same message as WhatsApp').toBe(wa);
+        return wa.split('\n');
+      };
+
+      // On arrival: no team size, no level, no price, and the button is off. The page is
+      // rendered that way, before any script: the attribute is in the document itself.
+      await expect(team).toHaveValue('');
+      expect(await team.getAttribute('value'), 'no default in the markup').toBeNull();
+      await expect(team).toHaveAttribute('placeholder', '2-11');
+      expect(await form.locator('input[name="level"]:checked').count(), 'no default level').toBe(0);
+      await expect(total).toHaveText('...');
+      await expect(total).not.toContainText('MDL');
+      await off('on arrival');
+      const html = await (await page.request.get(page.url())).text();
+      expect(html).toMatch(/<button[^>]*\sdata-book\s[^>]*\bdisabled\b/);
+      // The question links are usable at once, and say nothing about a team that was not
+      // chosen: the greeting and the game language, no empty label, no stray hyphen.
+      const first = await asked();
+      expect(first).toHaveLength(2);
+      expect(first[0]).toContain(BRAND);
+      expect(first[1]).toBe(`${LABELS[lang].language}: ${LANG_NAMES[lang][lang]}`);
+      expect(first.join('\n')).not.toMatch(/undefined|NaN|null| - |: *$/m);
+
+      // Only a team size: still off. The price for that size shows.
+      await team.fill('5');
+      await expect(total).toHaveText(`${PRICES[5]} MDL`);
+      await off('team size only');
+      // Cleared again: back to the empty state.
+      await team.fill('');
+      await expect(total).toHaveText('...');
+      await off('team size cleared');
+
+      // Only a level: still off, no price, and the level is in the question line.
+      await form.locator('input[name="level"][value="none"]').check({ force: true });
+      await off('level only');
+      await expect(total).toHaveText('...');
+      const second = await asked();
+      expect(second[1]).toBe(`${LABELS[lang].level}: ${LEVELS[lang].none} - ${LABELS[lang].language}: ${LANG_NAMES[lang][lang]}`);
+      // A click on the disabled button opens nothing.
+      await book.click({ force: true });
+      await expect(dialog).toBeHidden();
+
+      // Both: the button comes on and the prompt goes.
+      await team.fill('5');
+      await expect(book).toBeEnabled();
+      expect(await book.evaluate((b) => b.hasAttribute('disabled'))).toBe(false);
+      await expect(prompt).toBeHidden();
+      await expect(total).toHaveText(`${PRICES[5]} MDL`);
+      expect((await asked())[1]).toBe(line(lang, { team: 5, level: 'none', game: lang }));
+
+      // Clearing the team size turns it off again.
+      await team.fill('');
+      await off('team size cleared with a level chosen');
+      await expect(total).toHaveText('...');
+
+      // And with both chosen again it books, with the line as before.
+      await team.fill('6');
+      await expect(book).toBeEnabled();
+      await book.click();
+      await expect(dialog).toBeVisible();
+      await expect(dialog.locator('[data-booking-line]')).toHaveText(line(lang, { team: 6, level: 'none', game: lang }));
     });
 
     test('the confirmation call is announced on the card, in the booking dialog and in the "How do I book?" answer', async ({ page, context }) => {
@@ -589,15 +675,21 @@ test('the 404 page has the floating control with both channels and the toast', a
   await expect(page.locator('[data-toast]')).toHaveText(TOAST.ro);
 });
 
-test('picking a level at the desk preselects it on the card and turns the booking button on', async ({ page, context }) => {
+test('picking a level at the desk preselects it on the card, and the booking button still waits for the team size', async ({ page, context }) => {
   await seal(context);
   await open(page, 'en');
-  // Until then the booking button on the card is off.
+  // On arrival the booking button on the card is off.
   await expect(page.locator('#checkin [data-book]')).toBeDisabled();
   await expect(page.locator('#checkin [data-book-prompt]')).toBeVisible();
   await page.locator('#keys input[data-level-input][value="hardcore"]').check({ force: true });
   await expect(page.locator('#checkin input[name="level"][value="hardcore"]')).toBeChecked();
-  // The level chosen at the desk counts on the card: the button is on, the prompt is gone.
+  // The level chosen at the desk counts on the card, but the team size is still empty:
+  // the button stays off and the prompt stays.
+  await expect(page.locator('#checkin input[name="team"]')).toHaveValue('');
+  await expect(page.locator('#checkin [data-book]')).toBeDisabled();
+  await expect(page.locator('#checkin [data-book-prompt]')).toBeVisible();
+  // With a team size it comes on, without touching the level on the card.
+  await page.locator('#checkin input[name="team"]').fill('5');
   await expect(page.locator('#checkin [data-book]')).toBeEnabled();
   await expect(page.locator('#checkin [data-book-prompt]')).toBeHidden();
   const href = (await page.locator('[data-ask-wa]').getAttribute('href'))!;
