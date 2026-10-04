@@ -149,9 +149,9 @@ After changing the wordmark, the hero or the subtitles, regenerate the share ima
 | Light on the hero before any touch, moving over 3 seconds | tested (about 98 px in 3 s) |
 | Scare plays once | tested on `wt/corridor` only, not on main |
 | `npm run test:perf` (phone emulation, 4x CPU throttle) | 0.2 percent dropped frames (worst 0.3), no long task; a scroll that starts during an 800 ms script hang waits 24 ms (was about 650 ms) |
-| Lighthouse mobile, live `/ro/` | Performance 93, Accessibility 100 |
-| Lighthouse mobile, live `/ru/` | Performance 95, Accessibility 100 |
-| Lighthouse mobile, live `/en/` | Performance 97, Accessibility 100 |
+| Lighthouse mobile, live `/ro/` | Performance 100, Accessibility 100 |
+| Lighthouse mobile, live `/ru/` | Performance 99, Accessibility 100 |
+| Lighthouse mobile, live `/en/` | Performance 98, Accessibility 100 |
 
 `npm run test:perf` is separate from `npm test` and is not part of the deploy gate. It was
 run on main after the scroll fix, not after a corridor merge, because the corridor is not merged.
