@@ -59,6 +59,24 @@
         "NormalGL",
         "Roughness"
       ]
+    },
+    "Smear002": {
+      "res": "1K-JPG",
+      "maps": [
+        "Color"
+      ]
+    },
+    "Fingerprints002": {
+      "res": "1K-JPG",
+      "maps": [
+        "Color"
+      ]
+    },
+    "Scratches001": {
+      "res": "2K-JPG",
+      "maps": [
+        "Color"
+      ]
     }
   }
 }

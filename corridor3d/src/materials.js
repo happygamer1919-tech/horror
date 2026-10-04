@@ -81,7 +81,7 @@ export function makeMaterials(T) {
     });
   }
   m.claw = sized(
-    P({ map: T.claw, normalMap: T.clawNormal, roughnessMap: T.clawRough, normalScale: new THREE.Vector2(3, 3), roughness: 1, vertexColors: true }),
+    P({ map: T.claw, normalMap: T.clawNormal, roughnessMap: T.clawRough, normalScale: new THREE.Vector2(2, 2), roughness: 1, vertexColors: true }),
     [1, 1],
   );
   m.floor = sized(
@@ -157,8 +157,8 @@ export function makeMaterials(T) {
 
   // The shoe.
   // a child's best shoe: pale leather gone cream, scuffed (black patent on a dark runner was a dark capsule)
-  m.leather = P({ color: new THREE.Color(0.045, 0.03, 0.024), roughness: 0.6, side: THREE.DoubleSide, vertexColors: true }); // oxblood, scuffed
-  m.sole = P({ color: new THREE.Color(0.2, 0.13, 0.08), roughness: 0.8, vertexColors: true });
+  m.leather = P({ color: new THREE.Color(0.13, 0.09, 0.066), roughness: 0.6, side: THREE.DoubleSide, vertexColors: true }); // oxblood, scuffed
+  m.sole = P({ color: new THREE.Color(0.34, 0.27, 0.19), roughness: 0.8, vertexColors: true }); // a pale sole line under a dark upper: what makes it a shoe at a glance
 
   // The figure behind the door.
   // (The torch is beside the lens, so anything smooth that faces the walker throws it straight back:

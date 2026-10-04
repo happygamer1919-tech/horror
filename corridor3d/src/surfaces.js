@@ -948,25 +948,63 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5, worn = 0 } =
   return c;
 }
 
-// The sheen of a leaf: old varnish, glossy where nothing touches it, dull where hands and shoes
-// do. One map for every leaf (handle on the left, like the skins).
-export function doorRough(S = 512) {
-  return field(S, S, (u, v) => {
+// The sheen of a leaf: old lacquer with a history. Glossy where nothing touches it, so a torch
+// draws a streaky glare across the wood; wipe marks all over it (ambientCG Smear002), a cloud of
+// fingerprints round the handle, the plate and where the door is pushed (Fingerprints002), the
+// kicked bottom rail matt. One map for every leaf (handle on the left, like the skins).
+export function doorRough(S, smear, prints) {
+  const c = canvas(S, S);
+  const g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(field(192, 384, (u, v) => {
     const x = -LW / 2 + u * LW;
     const y = (1 - v) * DOOR.h;
-    let k = 0.3 + 0.2 * fbm(x * 3, y * 1.5, 401, 3) + 0.14 * smooth(0.5, 0.8, fbm(x * 30, y * 0.6, 403, 3));
-    const dx = (x - HANDLE.x - 0.05) / 0.16;
-    const dy = (y - HANDLE.y - 0.06) / 0.25;
-    k += 0.36 * Math.exp(-dx * dx - dy * dy);
-    k += 0.38 * smooth(0.5, 0.05, y) * (0.5 + 0.5 * fbm(x * 4, y * 4, 405, 2));
-    // dust lies on every ledge that faces up (the lower bevel of each panel and of its raised
-    // field): matt, where a clean moulding would throw a white line back at the lamp
-    // the mouldings of both panels are matt all the way round (dust, and varnish that never got
-    // polished in the corners): a glossy bevel under a lamp is a white bar
-    // (Tried and dropped: mouldings matt all the way round. Against a glossy leaf under the lamp
-    // they showed as dark concentric rectangles. The whole leaf is a little duller instead, so a
-    // moulding gives a broad soft highlight, never a white bar.)
-    k += 0.3;
+    let k = 0.2 + 0.14 * fbm(x * 3, y * 1.5, 401, 3) + 0.1 * smooth(0.5, 0.8, fbm(x * 30, y * 0.6, 403, 3));
+    k += 0.4 * smooth(0.5, 0.05, y) * (0.5 + 0.5 * fbm(x * 4, y * 4, 405, 2));
     return [k, k, k];
-  });
+  }), 0, 0, S, S);
+  const kx = S / LW;
+  const ky = S / DOOR.h;
+  // wipe marks: the whole face
+  g.globalCompositeOperation = 'lighter';
+  g.globalAlpha = 0.85;
+  {
+    const pat = g.createPattern(smear, 'repeat');
+    pat.setTransform(new DOMMatrix().scale((0.75 * kx) / smear.width, (0.75 * ky) / smear.height));
+    g.fillStyle = pat;
+    g.fillRect(0, 0, S, S);
+  }
+  // fingerprints: where hands go
+  const P = canvas(S, S);
+  const pg = P.getContext('2d');
+  {
+    const pat = pg.createPattern(prints, 'repeat');
+    pat.setTransform(new DOMMatrix().scale((0.3 * kx) / prints.width, (0.3 * ky) / prints.height));
+    pg.fillStyle = pat;
+    pg.fillRect(0, 0, S, S);
+    pg.globalCompositeOperation = 'destination-in';
+    const M2 = canvas(S, S);
+    const mg = M2.getContext('2d');
+    for (const [cx, cy, rx, ry] of [
+      [HANDLE.x + 0.06, 1.04, 0.2, 0.32],
+      [0, 1.62, 0.2, 0.14],
+      [-LW / 2 + 0.05, 1.2, 0.09, 0.5],
+      [0.05, 1.3, 0.28, 0.3],
+    ]) {
+      mg.save();
+      mg.translate((cx + LW / 2) * kx, S - cy * ky);
+      mg.scale(rx * kx, ry * ky);
+      const rg = mg.createRadialGradient(0, 0, 0.1, 0, 0, 1);
+      rg.addColorStop(0, 'rgba(0,0,0,0.9)');
+      rg.addColorStop(1, 'rgba(0,0,0,0)');
+      mg.fillStyle = rg;
+      mg.fillRect(-1, -1, 2, 2);
+      mg.restore();
+    }
+    pg.drawImage(M2, 0, 0);
+  }
+  g.globalAlpha = 1;
+  g.drawImage(P, 0, 0);
+  g.globalCompositeOperation = 'source-over';
+  return c;
 }

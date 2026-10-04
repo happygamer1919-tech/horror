@@ -13,7 +13,7 @@ const GRADE = {
   paper: 'grayscale(0.45) brightness(1.5) contrast(0.62)',
   boards: 'hue-rotate(9deg) saturate(0.44) brightness(1.0) contrast(0.96)', // brown, not crimson
   carpet: 'hue-rotate(-4deg) saturate(0.3) contrast(1.2) brightness(0.09)', // a dark, dusty brown-rose: by torchlight it must never be the brightest plane
-  door: 'hue-rotate(10deg) saturate(0.36) brightness(1.2) contrast(0.78)', // brown, the grain quiet
+  door: 'hue-rotate(8deg) saturate(0.62) brightness(1.15) contrast(0.8)', // a warm brown, the grain quiet
 };
 // Door skins: [material name, seed, { grime, kicked }]. scene.js hands them out.
 export const DOOR_SKINS = [
@@ -467,157 +467,121 @@ function decalAtlas(plaster, size) {
 
 // --- the clawed inside of door 305 -------------------------------------------------------------
 // Full leaf face, 0.86 x 2.03 m. Returns albedo and height canvases.
-function clawedDoor(wood, W, H) {
+// The gouges are not drawn. Their shapes come from a CC0 map of real-looking scratch lines
+// (ambientCG Scratches001): the map is laid down the door in patches at the height of a child's
+// hands, leaning, masked to where the hands worked and thresholded so only its strongest lines
+// are left, a few to a patch. They are grooves: depth for the normal map, no lacquer in them
+// (roughness), dirt in all of them and paler raw wood only in the deepest.
+function clawedDoor(wood, W, H, scratch, smear) {
   const c = canvas(W, H);
   const g = c.getContext('2d');
-  // the same varnished veneer as the corridor side of the leaves, at its true scale, so the raw
-  // wood in the cuts shows pale against it
+  const px = W / 0.86; // pixels per metre
+  const yOf = (metres) => H - metres * px; // canvas y runs down from the top of the door
   {
+    // the same varnished veneer as the corridor side of the leaves, at its true scale
     const pat = g.createPattern(wood, 'repeat');
-    const k = (DOOR_TILE * (W / 0.86)) / wood.width;
+    const k = (DOOR_TILE * px) / wood.width;
     pat.setTransform(new DOMMatrix().translate(W * 0.37, H * 0.21).scale(k, k));
     g.fillStyle = pat;
     g.fillRect(0, 0, W, H);
-    // the inside of a door nobody polished: duller, and darker towards the floor
-    // (the figure of the veneer held back: under a torch a foot away its pale streaks read as
-    // drawn lines, and the gouges must be the only pale marks)
-    g.fillStyle = 'rgba(84,66,50,0.38)';
-    g.fillRect(0, 0, W, H);
+    // the inside of a door nobody polished: darker towards the floor
     const shade = g.createLinearGradient(0, 0, 0, H);
     shade.addColorStop(0, 'rgba(0,0,0,0.12)');
     shade.addColorStop(0.6, 'rgba(0,0,0,0.05)');
     shade.addColorStop(1, 'rgba(0,0,0,0.4)');
     g.fillStyle = shade;
     g.fillRect(0, 0, W, H);
+    // the inside of a panelled leaf: two recessed panels, a soft dark line at their mouldings
+    for (const [y0, y1] of [[0.21, 0.88], [1.035, 1.914]]) {
+      g.strokeStyle = 'rgba(8,5,3,0.14)';
+      g.lineWidth = 0.012 * px;
+      g.strokeRect(0.108 * px, yOf(y1), (0.853 - 0.216) * px, (y1 - y0) * px);
+    }
   }
+  const r = mulberry(305);
+  // where the hands worked: at hand height, round the handle and along the lock edge
+  const D = canvas(W, H);
+  const dg = D.getContext('2d');
+  dg.fillStyle = '#000';
+  dg.fillRect(0, 0, W, H);
+  const cover = 0.95; // metres of door one tile of the scratch map is laid over: its lines come out 1 to 2 mm wide
+  for (let i = 0; i < 6; i++) {
+    const lockSide = i < 4;
+    const cx = (lockSide ? 0.46 + r() * 0.3 : 0.18 + r() * 0.26) * px;
+    const cy = yOf(0.74 + r() * 0.5);
+    const rw = (0.09 + r() * 0.08) * px;
+    const rh = (0.13 + r() * 0.12) * px;
+    const P = canvas(Math.ceil(rw * 2), Math.ceil(rh * 2));
+    const pg = P.getContext('2d');
+    pg.save();
+    pg.translate(rw, rh);
+    // the map's lines run across it: turned to run down the door, leaning one way or the other
+    pg.rotate(Math.PI / 2 + (r() < 0.5 ? -1 : 1) * (0.12 + 0.5 * r()));
+    const k = (cover * px) / scratch.width;
+    pg.scale(k, k * (0.8 + 0.5 * r()));
+    pg.translate(r() * scratch.width, r() * scratch.height);
+    pg.fillStyle = pg.createPattern(scratch, 'repeat');
+    pg.fillRect(-3 * scratch.width, -3 * scratch.height, 6 * scratch.width, 6 * scratch.height);
+    pg.restore();
+    // only where the hands were: a soft-edged patch
+    pg.globalCompositeOperation = 'destination-in';
+    pg.save();
+    pg.translate(rw, rh);
+    pg.scale(rw, rh);
+    const rg = pg.createRadialGradient(0, 0, 0.15, 0, 0, 1);
+    rg.addColorStop(0, 'rgba(0,0,0,1)');
+    rg.addColorStop(1, 'rgba(0,0,0,0)');
+    pg.fillStyle = rg;
+    pg.fillRect(-1, -1, 2, 2);
+    pg.restore();
+    dg.globalCompositeOperation = 'lighter';
+    dg.drawImage(P, cx - rw, cy - rh);
+  }
+  // the lacquer's own history for the sheen: wipe marks (ambientCG Smear002) over the whole face
+  const S2 = canvas(W, H);
+  const sg = S2.getContext('2d');
+  {
+    const pat = sg.createPattern(smear, 'repeat');
+    const k = (0.8 * px) / smear.width;
+    pat.setTransform(new DOMMatrix().scale(k, k));
+    sg.fillStyle = pat;
+    sg.fillRect(0, 0, W, H);
+  }
+  const dd = dg.getImageData(0, 0, W, H).data;
+  const sd = sg.getImageData(0, 0, W, H).data;
+  const img = g.getImageData(0, 0, W, H);
+  const ad = img.data;
   const hc = canvas(W, H);
   const hg = hc.getContext('2d');
-  hg.fillStyle = '#808080';
-  hg.fillRect(0, 0, W, H);
-  const r = mulberry(305);
-  const px = W / 0.86; // pixels per metre
-  // canvas y runs down from the top of the door
-  const yOf = (metres) => H - metres * px;
-  // One gouge: a groove cut through the varnish into raw, pale wood. The lip on the lit side is
-  // bright, the far wall of the groove is in shadow, fibres are torn up along the edges, and
-  // the height map gives it real depth for the normal map.
-  const track = (x, y, len, lean, w, depth) => {
-    // old cuts have gone grey-brown with dirt, the last ones are still pale
-    const tone = 0.62 + 0.5 * Math.pow(r(), 1.3); // some have gone dull with dirt, a few are fresh
-    // a nail skids: the line wavers, bites deeper in places and lifts off at the end
-    const N = 24;
-    const pts = [];
-    const wob = r() * 10;
-    for (let i = 0; i <= N; i++) {
-      const t = i / N;
-      pts.push([x + lean * len * t + Math.sin(t * 5 + wob) * w * 0.35 + (r() - 0.5) * w * 0.1, y + len * t]);
-    }
-    const bite = (t) => (0.35 + 0.65 * Math.sin(Math.min(1, t * 1.4) * Math.PI * 0.5)) * (1 - smooth(0.75, 1, t)) * (0.7 + 0.3 * Math.sin(t * 9 + wob));
-    const seg = (ctx, i, width, style, dx = 0) => {
-      ctx.strokeStyle = style;
-      ctx.lineWidth = width;
-      ctx.beginPath();
-      ctx.moveTo(pts[i][0] + dx, pts[i][1]);
-      ctx.lineTo(pts[i + 1][0] + dx, pts[i + 1][1]);
-      ctx.stroke();
-    };
-    // butt ends: round caps on translucent segments bead the line like a string of pearls
-    g.lineCap = 'butt';
-    hg.lineCap = 'butt';
-    for (let i = 0; i < N; i++) {
-      const b = bite(i / N) * depth;
-      // crushed, dirty varnish either side; the walls of the groove raw wood, pale and grey, not
-      // gold; the bottom of the cut in its own shadow; a thin torn lip catching the light
-      seg(g, i, w * 1.9, `rgba(14,9,6,${0.4 * b})`);
-      seg(g, i, w * (0.6 + 0.6 * b), `rgba(${Math.round(tone * (176 + 26 * b))},${Math.round(tone * (152 + 22 * b))},${Math.round(tone * (118 + 18 * b))},${0.4 + 0.45 * b})`);
-      seg(g, i, w * 0.32, `rgba(24,15,9,${0.7 * b})`);
-      seg(g, i, w * 0.18, `rgba(188,170,142,${0.1 * b * b * tone})`, -w * 0.42);
-      seg(hg, i, w * (0.8 + 0.6 * b), `rgba(0,0,0,${0.35 + 0.6 * b})`);
-    }
-    // a splinter or two torn up at the deepest point
-    for (let i = 0; i < 3; i++) {
-      const t = 0.2 + 0.5 * r();
-      const k = Math.floor(t * N);
-      g.strokeStyle = `rgba(150,132,106,${0.25 + 0.3 * r()})`;
-      g.lineWidth = Math.max(1, w * 0.3);
-      g.beginPath();
-      g.moveTo(pts[k][0], pts[k][1]);
-      g.lineTo(pts[k][0] + (r() - 0.5) * w * 3, pts[k][1] + w * (2 + 3 * r()));
-      g.stroke();
-    }
+  const himg = hg.createImageData(W, H);
+  const rc = canvas(W, H);
+  const rgx = rc.getContext('2d');
+  const rimg = rgx.createImageData(W, H);
+  const ss = (e0, e1, v) => {
+    const t = clamp((v - e0) / (e1 - e0), 0, 1);
+    return t * t * (3 - 2 * t);
   };
-  // the inside of a panelled leaf: two recessed panels, as a dark line and a step in the height
-  for (const [a, b] of [[0.21, 0.88], [1.035, 1.914]]) {
-    const x0 = 0.108 * px;
-    const w0 = (0.853 - 0.216) * px;
-    g.strokeStyle = 'rgba(8,5,3,0.14)';
-    g.lineWidth = 0.012 * px;
-    g.strokeRect(x0, yOf(b), w0, (b - a) * px);
-    hg.strokeStyle = 'rgba(0,0,0,0.75)';
-    hg.lineWidth = 0.024 * px;
-    hg.strokeRect(x0, yOf(b), w0, (b - a) * px);
-    hg.strokeStyle = 'rgba(255,255,255,0.35)';
-    hg.lineWidth = 0.006 * px;
-    hg.strokeRect(x0 + 0.03 * px, yOf(b) + 0.03 * px, w0 - 0.06 * px, (b - a) * px - 0.06 * px);
+  for (let i = 0; i < W * H; i++) {
+    const k = i * 4;
+    const d = dd[k] / 255;
+    const cut = ss(0.2, 0.62, d); // only the map's stronger lines
+    const deep = ss(0.72, 0.98, d);
+    // dirt in every groove, raw wood in the deepest
+    const dirt = 1 - 0.42 * cut * (1 - deep);
+    ad[k] = ad[k] * dirt * (1 - 0.75 * deep) + 172 * 0.75 * deep;
+    ad[k + 1] = ad[k + 1] * dirt * (1 - 0.75 * deep) + 148 * 0.75 * deep;
+    ad[k + 2] = ad[k + 2] * dirt * (1 - 0.75 * deep) + 116 * 0.75 * deep;
+    const h = 150 - 150 * cut;
+    himg.data[k] = himg.data[k + 1] = himg.data[k + 2] = h;
+    himg.data[k + 3] = 255;
+    const rough = clamp(0.3 + 0.5 * (sd[k] / 255) + 0.6 * cut, 0.2, 1);
+    rimg.data[k] = rimg.data[k + 1] = rimg.data[k + 2] = rough * 255;
+    rimg.data[k + 3] = 255;
   }
-  // Where the hands worked: most of it at the height a child reaches, on the side of the lock
-  // and the handle, where a door might give. Each place was gone over again and again, so the
-  // marks come in dense patches, the varnish between them flaked off to bare, dull wood.
-  const places = [];
-  for (let i = 0; i < 5; i++) {
-    const lockSide = i < 3;
-    // (at hand height, round the handle and along the lock edge: nothing up in the dark)
-    places.push({ x: lockSide ? 0.5 + r() * 0.27 : 0.2 + r() * 0.3, y: 0.72 + r() * 0.55, rx: 0.08 + r() * 0.07, ry: 0.13 + r() * 0.12, n: lockSide ? 3 + Math.floor(r() * 2) : 2 + Math.floor(r() * 2) });
-  }
-  for (const pl of places) {
-    // the flaked varnish: an uneven pale patch, broken up along the grain
-    g.save();
-    g.filter = `blur(${px * 0.006}px)`;
-    for (let i = 0; i < 46; i++) {
-      const a2 = r() * Math.PI * 2;
-      const d = Math.sqrt(r());
-      g.fillStyle = `rgba(${150 + 30 * r()},${124 + 26 * r()},${96 + 22 * r()},${0.008 + 0.02 * r()})`;
-      g.beginPath();
-      g.ellipse((pl.x + Math.cos(a2) * d * pl.rx) * px, yOf(pl.y + Math.sin(a2) * d * pl.ry), (0.004 + r() * 0.012) * px, (0.015 + r() * 0.05) * px, 0, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.restore();
-    // sets of three or four nails dragged down together: nearly parallel, never crossing like a net
-    const bias = (r() < 0.5 ? -1 : 1) * (0.35 + 0.5 * r()); // across the grain
-    for (let k = 0; k < pl.n; k++) {
-      const x = (pl.x + (r() - 0.5) * 1.6 * pl.rx) * px;
-      const top = pl.y + pl.ry * (0.2 + 0.9 * r());
-      const len = (0.05 + Math.pow(r(), 1.5) * 0.2) * px;
-      const lean = bias + (r() - 0.5) * 0.1; // a set of nails comes down together
-      const spread = (0.014 + r() * 0.008) * px;
-      const fingers = r() < 0.35 ? 3 : 4;
-      const w = (0.0022 + Math.pow(r(), 1.6) * 0.0032) * px; // one to three pixels at the distance of the glance
-      const depth = 0.55 + 0.45 * r();
-      for (let f = 0; f < fingers; f++) {
-        track(x + f * spread, yOf(top) + Math.abs(f - 1.5) * 0.012 * px + r() * 5, len * (0.6 + 0.4 * r()) * (f === 3 ? 0.75 : 1), lean + (r() - 0.5) * 0.05, w * (f === 3 ? 0.8 : 1), depth * (0.75 + 0.25 * r()));
-      }
-    }
-  }
-  // along the lock edge, where the fingers tried to get round the door, the varnish is gone in
-  // a ragged strip
-  g.filter = `blur(${px * 0.004}px)`;
-  for (let i = 0; i < 90; i++) {
-    g.fillStyle = `rgba(${140 + 34 * r()},${112 + 28 * r()},${82 + 20 * r()},${0.1 + 0.22 * r()})`;
-    g.beginPath();
-    g.ellipse((0.815 + r() * 0.04) * px, yOf(0.7 + r() * 0.62), (0.002 + r() * 0.006) * px, (0.008 + r() * 0.03) * px, 0, 0, Math.PI * 2);
-    g.fill();
-  }
-  g.filter = 'none';
-  // old, dry, brown: where the nails broke
-  g.filter = 'blur(1.5px)';
-  for (let i = 0; i < 26; i++) {
-    g.fillStyle = `rgba(52,16,9,${0.3 + 0.4 * r()})`;
-    const x = (0.1 + r() * 0.7) * px;
-    const y = yOf(0.45 + r() * 0.8);
-    g.fillRect(x, y, (0.003 + r() * 0.004) * px, (0.03 + r() * 0.16) * px);
-  }
-  g.filter = 'none';
-  return { albedo: c, height: hc };
+  g.putImageData(img, 0, 0);
+  hg.putImageData(himg, 0, 0);
+  rgx.putImageData(rimg, 0, 0);
+  return { albedo: c, height: hc, rough: rc };
 }
 
 // --- number plates: one atlas for every door ----------------------------------------------------
@@ -638,10 +602,10 @@ function plates(S) {
   const ag = a.getContext('2d');
   const mg = m.getContext('2d');
   const hg = hgt.getContext('2d');
-  ag.fillStyle = 'rgb(112,86,46)';
+  ag.fillStyle = 'rgb(186,148,84)'; // brass
   ag.fillRect(0, 0, S, S);
   // roughness in G, metalness in B
-  mg.fillStyle = 'rgb(0,196,255)'; // dull: a tarnished plate does not flash back at the lamp
+  mg.fillStyle = 'rgb(0,84,255)'; // metal, roughness about a third
   mg.fillRect(0, 0, S, S);
   hg.fillStyle = '#909090';
   hg.fillRect(0, 0, S, S);
@@ -655,11 +619,11 @@ function plates(S) {
     const y = Math.floor(i / n) * (S / n);
     // tarnish
     for (let k = 0; k < 40; k++) {
-      ag.fillStyle = `rgba(${70 + 40 * r()},${52 + 30 * r()},${24 + 20 * r()},${0.05 + 0.1 * r()})`;
+      ag.fillStyle = `rgba(${70 + 40 * r()},${52 + 30 * r()},${24 + 20 * r()},${0.08 + 0.16 * r()})`;
       ag.beginPath();
       ag.ellipse(x + r() * cw, y + r() * chh, cw * (0.02 + 0.1 * r()), chh * (0.05 + 0.2 * r()), r() * 3, 0, Math.PI * 2);
       ag.fill();
-      mg.fillStyle = `rgba(0,${140 + 80 * r()},255,0.25)`;
+      mg.fillStyle = `rgba(0,${120 + 90 * r()},255,0.3)`;
       mg.beginPath();
       mg.ellipse(x + r() * cw, y + r() * chh, cw * (0.02 + 0.1 * r()), chh * (0.05 + 0.2 * r()), r() * 3, 0, Math.PI * 2);
       mg.fill();
@@ -678,6 +642,17 @@ function plates(S) {
       ctx.strokeStyle = style;
       ctx.lineWidth = chh * 0.025;
       ctx.strokeRect(x + cw * 0.06, y + chh * 0.1, cw * 0.88, chh * 0.8);
+    }
+    // the black fill of the stamped numerals has chipped: specks of brass show through, and
+    // tarnish has gathered in the recess of the border
+    for (let k = 0; k < 90; k++) {
+      const cx2 = x + cw * (0.2 + 0.6 * r());
+      const cy2 = y + chh * (0.25 + 0.55 * r());
+      const rad = chh * (0.006 + 0.014 * r());
+      ag.fillStyle = 'rgb(176,140,80)';
+      ag.fillRect(cx2, cy2, rad, rad * (0.6 + r()));
+      mg.fillStyle = 'rgb(0,90,255)';
+      mg.fillRect(cx2, cy2, rad, rad);
     }
   });
   return { albedo: a, orm: m, height: hgt };
@@ -957,6 +932,11 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
   for (const id of ids) T[id] = set(id);
 
   // the scans, graded once: forty years of varnish, smoke and dirt take the colour out of them
+  // imperfection maps (ambientCG): sources for the bakes only, never layers of their own
+  const imp = {};
+  await Promise.all(['Smear002', 'Fingerprints002', 'Scratches001'].map(async (id) => {
+    imp[id] = await loadImage(`${BASE}/${id}/Color.jpg`);
+  }));
   const src = {
     paper: tinted(graded(img['decrepit_wallpaper/Diffuse'], GRADE.paper), 'rgb(232,234,196)'),
     print: printTile(),
@@ -978,22 +958,14 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
   // door leaves: the doors the walker stops at have a skin of their own, the rest share four
   T.doorSkins = {};
   for (const [name, seed, o] of DOOR_SKINS) T.doorSkins[name] = tex(doorSkin(seed, size, src, o), { srgb: true });
-  T.doorRough = tex(doorRough(512));
+  T.doorRough = tex(doorRough(1024, imp.Smear002, imp.Fingerprints002));
   T.floorWood = tex(graded(img['plank_flooring/Diffuse'], 'saturate(0.5) brightness(0.5) contrast(0.42)'), { srgb: true }); // the blocks nearly one tone: by torchlight their tone steps read as texels
   T.trimWood = tex(graded(img['dark_wood/Diffuse'], 'hue-rotate(9deg) saturate(0.34) brightness(0.9)'), { srgb: true });
   T.decals = tex(decalAtlas(img['worn_plaster_wall/Diffuse'], size), { srgb: true, repeat: false });
-  const claw = clawedDoor(src.door, Math.round(size * 0.75), Math.round((size * 0.75 * 2.03) / 0.86));
+  const claw = clawedDoor(src.door, Math.round(size * 0.75), Math.round((size * 0.75 * 2.03) / 0.86), imp.Scratches001, imp.Smear002);
   T.claw = tex(claw.albedo, { srgb: true, repeat: false });
-  T.clawNormal = tex(heightToNormal(claw.height, 26, false), { repeat: false });
-  {
-    // where a nail has cut through, the varnish is gone: raw wood, dull
-    const rc = canvas(claw.height.width, claw.height.height);
-    const rg = rc.getContext('2d');
-    rg.filter = 'invert(1) contrast(2.6) brightness(1.5)';
-    rg.drawImage(claw.height, 0, 0);
-    rg.filter = 'none';
-    T.clawRough = tex(rc, { repeat: false });
-  }
+  T.clawNormal = tex(heightToNormal(claw.height, 14, false), { repeat: false });
+  T.clawRough = tex(claw.rough, { repeat: false });
   const pl = plates(small);
   T.plates = tex(pl.albedo, { srgb: true, repeat: false });
   T.platesOrm = tex(pl.orm, { repeat: false });
