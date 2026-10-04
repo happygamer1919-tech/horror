@@ -11,6 +11,7 @@
     "shots": "node scripts/shots.mjs",
     "lighthouse": "node scripts/lighthouse.mjs",
     "og": "node scripts/og.mjs",
+    "logo": "node scripts/logo.mjs",
     "test:live": "playwright test tests/live.spec.ts --config=playwright.live.config.ts",
     "test:perf": "playwright test --config=playwright.perf.config.ts"
   },
