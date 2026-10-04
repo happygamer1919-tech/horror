@@ -163,13 +163,14 @@ export function makeMaterials(T) {
   // The figure behind the door.
   // (The torch is beside the lens, so anything smooth that faces the walker throws it straight back:
   // a wet cheek and wet knuckles shone at luma 110 to 150 whatever their colour. Dry, matt skin.)
-  m.skin = P({ color: new THREE.Color(0.042, 0.035, 0.03), roughness: 0.9, specularIntensity: 0.15, vertexColors: true });
+  m.skin = P({ color: new THREE.Color(0.03, 0.025, 0.021), roughness: 1, specularIntensity: 0.04, vertexColors: true });
   // (by torchlight a white, mirror-wet eyeball was a glowing blob: the white is dull and bloodshot,
   // the surface less of a mirror, and what is left is one small catchlight)
-  m.eye = P({ color: new THREE.Color(0.11, 0.085, 0.07), roughness: 0.34, specularIntensity: 0.6, vertexColors: true });
-  m.hair = P({ color: new THREE.Color(0.01, 0.009, 0.008), roughness: 0.62, specularIntensity: 0.3, side: THREE.DoubleSide, vertexColors: true });
-  m.nail = P({ color: new THREE.Color(0.2, 0.18, 0.16), roughness: 0.75, specularIntensity: 0.3, vertexColors: true });
-  m.gown = P({ color: new THREE.Color(0.05, 0.046, 0.04), roughness: 1, side: THREE.DoubleSide, vertexColors: true });
+  m.eye = P({ color: new THREE.Color(0.045, 0.036, 0.03), roughness: 0.7, specularIntensity: 0.1, vertexColors: true });
+  // (no highlight at all: with the torch beside the lens every strand threw it back, and the hair read as pale grey drawn lines)
+  m.hair = P({ color: new THREE.Color(0.004, 0.0036, 0.0032), roughness: 1, specularIntensity: 0, side: THREE.DoubleSide, vertexColors: true });
+  m.nail = P({ color: new THREE.Color(0.12, 0.11, 0.1), roughness: 0.9, specularIntensity: 0.08, vertexColors: true });
+  m.gown = P({ color: new THREE.Color(0.02, 0.018, 0.016), roughness: 1, specularIntensity: 0, side: THREE.DoubleSide, vertexColors: true });
 
   for (const [name, mat] of Object.entries(m)) {
     mat.name = name;
