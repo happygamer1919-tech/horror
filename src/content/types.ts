@@ -1,6 +1,6 @@
 import type { Lang } from '../config';
 
-export type Level = 'none' | 'weak' | 'hardcore';
+export type Level = 'none' | 'hardcore';
 export type DayRange = 'mon-thu' | 'fri' | 'sat-sun';
 
 export interface FaqItem {
@@ -11,7 +11,8 @@ export interface FaqItem {
 }
 
 export interface FaqValues {
-  minutes: number;
+  // The length of a game as a range, for example "60-90".
+  minutes: string;
   players: { min: number; max: number };
   priceFrom: string;
   // null = no age limit.
@@ -30,7 +31,8 @@ export interface Copy {
   langName: string;
   meta: {
     title: (brand: string, subtitle: string | null) => string;
-    description: string;
+    // `minutes` is the length of a game as a range, for example "60-90".
+    description: (minutes: string) => string;
     hiddenTitle: string;
     ogAlt: string;
   };
@@ -65,6 +67,7 @@ export interface Copy {
   };
   preloader: { label: string; floor: string };
   hero: {
+    // The hero adds the duration ("60-90 min") as the last part.
     kicker: string[];
     line: string;
     sub: string;
@@ -103,7 +106,7 @@ export interface Copy {
     title: string;
     intro: string;
     labels: { players: string; duration: string; age: string; price: string };
-    duration: (minutes: number) => string;
+    duration: (minutes: string) => string;
     priceFrom: (amount: number, currency: string) => string;
     // null = no age limit.
     age: (min: number | null) => string;
@@ -113,6 +116,8 @@ export interface Copy {
       legend: string;
       options: Record<Level, string>;
       note: string;
+      // The one rule that goes with the levels. Shown next to both level selectors.
+      minors: string;
     };
   };
   prices: {

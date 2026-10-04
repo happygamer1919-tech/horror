@@ -17,7 +17,7 @@ export type SummaryValues = Partial<Record<keyof SummaryLabels, string>>;
 
 const ORDER: (keyof SummaryLabels)[] = ['team', 'level', 'language', 'total'];
 
-// "Team: 4 - Level: Weak electroshock - Language: English - Total: 1200 MDL".
+// "Team: 4 - Level: No electroshock - Language: English - Total: 1200 MDL".
 // A part without a value is left out.
 export function summaryLine(labels: SummaryLabels, values: SummaryValues): string {
   return ORDER.filter((k) => values[k])

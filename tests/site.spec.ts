@@ -11,16 +11,34 @@ const TELEGRAM_URL = 'https://t.me/+37368232596';
 const SLOTS_URL = 'https://widget.easyweek.io/horror-quest-moldova/team/34544/62497';
 // Placeholders of the earlier versions. None of them may be left on the page.
 const PLACEHOLDERS = /Întrebați recepția|Уточните на стойке|Ask the desk|Confirmăm acest detaliu|Мы уточняем эту информацию|We are confirming this detail|TODO/;
+// Exactly two levels. The third one of the earlier versions is gone in every language.
 const LEVEL_NAMES = {
-  ro: ['Fără electroșoc', 'Electroșoc slab', 'Hardcore'],
-  ru: ['Без электрошока', 'Слабый электрошок', 'Хардкор'],
-  en: ['No electroshock', 'Weak electroshock', 'Hardcore'],
+  ro: ['Fără electroșoc', 'Hardcore'],
+  ru: ['Без электрошока', 'Хардкор'],
+  en: ['No electroshock', 'Hardcore'],
+};
+// The removed level, as a name in each language and as a key in code.
+const REMOVED_LEVEL = [/\bweak\b/i, /\bslab\b/i, /слаб/i];
+const INSTAGRAM_URL = 'https://instagram.com/last.quest.moldova';
+// The length of a game, as each page words it: on the key tag and the hero line, in the
+// "how long" answer, and inside the "what is this" answer and the page description.
+const DURATION = {
+  ro: { short: '60-90 min', answer: '60-90 de minute.', prose: '60-90 de minute' },
+  ru: { short: '60-90 мин', answer: '60-90 минут.', prose: '60-90 минут' },
+  en: { short: '60-90 min', answer: '60-90 minutes.', prose: '60-90 minutes' },
+};
+const DURATION_Q = { ro: 'Cât durează?', ru: 'Сколько длится игра?', en: 'How long does it last?' };
+// One rule, said in three places: the age key tag, the age answer, next to the level choice.
+const MINORS = {
+  ro: { rule: 'Echipele cu minori joacă fără electroșoc.', tag: 'fără electroșoc' },
+  ru: { rule: 'Команды с несовершеннолетними играют без электрошока.', tag: 'без электрошока' },
+  en: { rule: 'Teams with minors play without electroshock.', tag: 'no electroshock' },
 };
 // The confirmed facts, as each page words them.
 const FACTS = {
   ro: {
     age: 'Fără limită',
-    ageNote: 'Acord la sosire. Minori: semnează un părinte',
+    ageNote: 'Acord la sosire. Minori: semnează un părinte, fără electroșoc',
     ageQ: 'Există o vârstă minimă?',
     ageA: ['nu există limită de vârstă', 'semnează un acord la sosire', 'Minorii intră doar dacă acordul este semnat de un părinte'],
     payQ: 'Cum pot plăti?',
@@ -34,7 +52,7 @@ const FACTS = {
   },
   ru: {
     age: 'Без ограничений',
-    ageNote: 'Соглашение на месте. Несовершеннолетним: подпись родителя',
+    ageNote: 'Соглашение на месте. Несовершеннолетним: подпись родителя, без электрошока',
     ageQ: 'Есть ли минимальный возраст?',
     ageA: ['ограничений по возрасту нет', 'подписывают соглашение на месте', 'Несовершеннолетние допускаются, только если соглашение подпишет родитель'],
     payQ: 'Как можно оплатить?',
@@ -48,7 +66,7 @@ const FACTS = {
   },
   en: {
     age: 'No age limit',
-    ageNote: 'Agreement on arrival. Minors: a parent signs',
+    ageNote: 'Agreement on arrival. Minors: a parent signs, no electroshock',
     ageQ: 'Is there a minimum age?',
     ageA: ['there is no age limit', 'Everyone signs an agreement on arrival', 'Minors enter only if a parent signs it'],
     payQ: 'How can I pay?',
@@ -261,7 +279,7 @@ for (const lang of LANGS) {
       await open(page, lang);
       const fob = (no: string) => page.locator(`[data-fob="${no}"] .fob__value`);
       await expect(fob('01')).toHaveText('2-11');
-      await expect(fob('02')).toContainText('60');
+      await expect(fob('02')).toHaveText(DURATION[lang].short);
       await expect(fob('04')).toContainText('1000 MDL');
       // Age on the key tag: no limit, the agreement on arrival, and a parent signs for a minor.
       await expect(fob('03')).toHaveText(FACTS[lang].age);
@@ -296,8 +314,17 @@ for (const lang of LANGS) {
       expect(hours[2]).not.toContain(':');
       await expect(page.locator('a[href*="place_id:ChIJ8UbS8b3Xy0ARaOu6EZ-iXhU"]')).toHaveCount(1);
       await expect(page.locator('[data-review]')).toHaveAttribute('href', 'https://search.google.com/local/writereview?placeid=ChIJ8UbS8b3Xy0ARaOu6EZ-iXhU');
-      // Instagram is still unknown: no link.
-      await expect(page.locator('a[href*="instagram.com"]')).toHaveCount(0);
+      // Instagram: one link, in the footer, to the exact profile address, in a new tab.
+      const ig = page.locator('a[href*="instagram.com"]');
+      await expect(ig).toHaveCount(1);
+      await expect(page.locator('footer.foot a[href*="instagram.com"]')).toHaveCount(1);
+      expect(await ig.getAttribute('href')).toBe(INSTAGRAM_URL);
+      await expect(ig).toHaveAttribute('target', '_blank');
+      expect(await ig.getAttribute('rel')).toContain('noopener');
+      await expect(ig).toHaveText('Instagram: @last.quest.moldova');
+      await ig.scrollIntoViewIfNeeded();
+      await expect(ig).toBeVisible();
+      expect((await ig.boundingBox())!.height, 'target height').toBeGreaterThanOrEqual(44);
     });
 
     test('share image: og:image and twitter:card are wired to a 1200 x 630 picture', async ({ page, request }) => {
@@ -342,8 +369,8 @@ for (const lang of LANGS) {
           expect(h.startsWith(`${BASE}/`), `${h} is under ${BASE}`).toBe(true);
           pages.add(h);
         } else {
-          if (h === TELEGRAM_URL || h === SLOTS_URL) continue;
-          expect(h, 'only tel:, wa.me, Telegram, the booking widget and Google leave the site').toMatch(/^(tel:\+37368232596|https:\/\/wa\.me\/37368232596\?|https:\/\/www\.google\.com\/maps\/|https:\/\/search\.google\.com\/local\/writereview\?)/);
+          if (h === TELEGRAM_URL || h === SLOTS_URL || h === INSTAGRAM_URL) continue;
+          expect(h, 'only tel:, wa.me, Telegram, Instagram, the booking widget and Google leave the site').toMatch(/^(tel:\+37368232596|https:\/\/wa\.me\/37368232596\?|https:\/\/www\.google\.com\/maps\/|https:\/\/search\.google\.com\/local\/writereview\?)/);
         }
       }
       for (const p of pages) {
@@ -359,14 +386,25 @@ for (const lang of LANGS) {
       }
     });
 
-    test('levels are on: three names, nothing preselected, and no description of what a level contains', async ({ page }) => {
+    test('levels are on: exactly two names, nothing preselected, and no description of what a level contains', async ({ page }) => {
       await open(page, lang);
-      // One selector at the desk, one on the card.
-      await expect(page.locator('[data-level-input]')).toHaveCount(6);
+      // One selector at the desk, one on the card: two levels each.
+      await expect(page.locator('[data-level-input]')).toHaveCount(4);
+      await expect(page.locator('#keys [data-level-input]')).toHaveCount(2);
+      await expect(page.locator('#checkin [data-level-input]')).toHaveCount(2);
+      for (const sel of ['#keys', '#checkin']) expect(await page.locator(`${sel} [data-level-input]`).evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(['none', 'hardcore']);
+      // The two cells share the row evenly, at the desk and on the card.
+      for (const sel of ['#keys .lvl__opt', '#checkin .card__lvl label']) {
+        const boxes = await page.locator(sel).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()));
+        expect(boxes).toHaveLength(2);
+        expect(Math.abs(boxes[0].width - boxes[1].width), `${sel}: equal cells`).toBeLessThan(2);
+        expect(Math.abs(boxes[0].top - boxes[1].top), `${sel}: one row`).toBeLessThan(2);
+      }
       await expect(page.locator('[data-level-input]:checked')).toHaveCount(0);
       expect(await page.locator('#keys .lvl__opt').allTextContents().then((a) => a.map((x) => x.trim()))).toEqual(LEVEL_NAMES[lang]);
       expect(await page.locator('#checkin .card__lvl label').allTextContents().then((a) => a.map((x) => x.trim()))).toEqual(LEVEL_NAMES[lang]);
-      // The key section holds the three names and one neutral line, nothing per level.
+      // The key section holds the two names, the rule about minors and one neutral line,
+      // nothing per level.
       await expect(page.locator('#keys [data-level-note]')).toBeVisible();
       await expect(page.locator('[data-level-text], [data-limits], .lvl__note')).toHaveCount(0);
       const body = (await page.locator('body').textContent()) ?? '';
@@ -381,6 +419,107 @@ for (const lang of LANGS) {
       expect(rules).toEqual([]);
       // The old copy that described the levels is gone.
       expect(body).not.toMatch(/keeps its distance|stops being polite|păstrează distanța|nu mai este politicos|держит дистанцию|перестаёт быть вежливым/);
+    });
+
+    test('the third level is gone: no name of it in the page, no key of it in the built page or its scripts', async ({ page, request }) => {
+      await open(page, lang);
+      // What the visitor can read, the hidden parts included (FAQ answers, dialog, attributes).
+      const body = (await page.locator('body').textContent()) ?? '';
+      for (const gone of REMOVED_LEVEL) expect(body, `page text, ${gone}`).not.toMatch(gone);
+      // What was built: the page itself and every script it can load, the lazy ones too.
+      const pageUrl = new URL(page.url());
+      const html = await (await request.get(pageUrl.href)).text();
+      const seen = new Map<string, string>([[pageUrl.pathname, html]]);
+      const queue = [html];
+      while (queue.length) {
+        const text = queue.pop()!;
+        for (const m of text.matchAll(/[\w.-]+\.js\b/g)) {
+          const path = `${BASE}/_astro/${m[0]}`;
+          if (seen.has(path)) continue;
+          const res = await request.get(path);
+          if (res.status() !== 200) continue;
+          const js = await res.text();
+          seen.set(path, js);
+          queue.push(js);
+        }
+      }
+      // The page, its main script and the lazy ones (fog, cameras, clipboard, smooth scroll).
+      expect(seen.size, 'page plus its scripts').toBeGreaterThanOrEqual(4);
+      for (const [path, text] of seen) for (const gone of REMOVED_LEVEL) expect(text, `${path}, ${gone}`).not.toMatch(gone);
+      // The two that are left are there.
+      for (const name of LEVEL_NAMES[lang]) expect(html).toContain(name);
+      // The answer about the levels names two of them.
+      const levelsAnswer = (await page.locator('.faq__item p').allTextContents()).find((a) => a.includes(LEVEL_NAMES[lang][0]) && a.includes(LEVEL_NAMES[lang][1]));
+      expect(levelsAnswer, 'FAQ answer naming both levels').toBeTruthy();
+      expect(levelsAnswer).not.toMatch(/three|trei|три/i);
+    });
+
+    test('the duration reads 60-90 min: key tag, hero line, FAQ and the page description', async ({ page }) => {
+      await open(page, lang);
+      const d = DURATION[lang];
+      await expect(page.locator('[data-fob="02"] .fob__value')).toHaveText(d.short);
+      // The tag holds it on one line, inside the tag.
+      await page.locator('[data-fob="02"]').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      const value = await page.locator('[data-fob="02"] .fob__value').evaluate((v) => {
+        const range = document.createRange();
+        range.selectNodeContents(v);
+        const f = v.closest('.fob')!.getBoundingClientRect();
+        const r = range.getBoundingClientRect();
+        return { lines: new Set([...range.getClientRects()].map((c) => Math.round(c.top))).size, inside: r.left >= f.left + 8 && r.right <= f.right - 8, fits: v.scrollWidth <= v.clientWidth };
+      });
+      expect(value).toEqual({ lines: 1, inside: true, fits: true });
+      // The hero line: what, where, how long. The duration is its last part.
+      const kicker = await page.locator('.hero__kicker span').allTextContents();
+      expect(kicker).toHaveLength(3);
+      expect(kicker[2].replace('/', '').trim()).toBe(d.short);
+      // FAQ: the "how long" answer, and the "what is this" answer.
+      await expect(page.locator('.faq__item', { hasText: DURATION_Q[lang] }).locator('p')).toHaveText(d.answer);
+      await expect(page.locator('.faq__item').first().locator('p')).toContainText(d.prose);
+      // The page description, which is also the share text.
+      for (const sel of ['meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]']) {
+        expect(await page.locator(sel).getAttribute('content'), sel).toContain(d.prose);
+      }
+      // Nowhere does the page still say 60 minutes or one hour as the length of the game.
+      const all = `${(await page.locator('body').textContent()) ?? ''} ${await page.locator('meta[name="description"]').getAttribute('content')}`;
+      expect(all).not.toMatch(/(^|[^-\d])60 (min|мин|de min)|One hour|Один час|O oră ca/);
+      // A plain hyphen in the range, never a dash.
+      expect(all).not.toMatch(/60[\u2013\u2014]90/);
+    });
+
+    test('teams with minors play without electroshock: on the age key tag, in the age answer and next to both level choices', async ({ page }) => {
+      await open(page, lang);
+      const m = MINORS[lang];
+      // The age key tag.
+      await expect(page.locator('[data-fob="03"] .fob__note')).toContainText(m.tag, { ignoreCase: true });
+      // The age answer in the FAQ.
+      await expect(page.locator('.faq__item', { hasText: FACTS[lang].ageQ }).locator('p')).toContainText(m.rule);
+      // Next to the level choice: on the card, right under the two cells, and at the desk.
+      const onCard = page.locator('#checkin .card__lvl [data-minors]');
+      await expect(onCard).toHaveCount(1);
+      await expect(onCard).toHaveText(m.rule);
+      await page.locator('#checkin .card__lvl').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      await expect(onCard).toBeVisible();
+      const card = await page.locator('#checkin .card__lvl').evaluate((f) => {
+        const cells = f.querySelector('div')!.getBoundingClientRect();
+        const rule = f.querySelector('[data-minors]')!.getBoundingClientRect();
+        return { gap: rule.top - cells.bottom, left: rule.left - cells.left, inside: rule.right <= cells.right + 1 };
+      });
+      expect(card.gap).toBeGreaterThanOrEqual(0);
+      expect(card.gap).toBeLessThan(24);
+      expect(Math.abs(card.left)).toBeLessThan(2);
+      expect(card.inside).toBe(true);
+      const atDesk = page.locator('#keys [data-minors]');
+      await expect(atDesk).toHaveCount(1);
+      await expect(atDesk).toHaveText(m.rule);
+      await atDesk.scrollIntoViewIfNeeded();
+      await expect(atDesk).toBeVisible();
+      const desk = await page.locator('#keys .lvl__pick').evaluate((f) => {
+        const cells = f.querySelector('.lvl__opts')!.getBoundingClientRect();
+        const rule = f.querySelector('[data-minors]')!.getBoundingClientRect();
+        return rule.top - cells.bottom;
+      });
+      expect(desk).toBeGreaterThanOrEqual(0);
+      expect(desk).toBeLessThan(24);
     });
 
     test('review quotes stay hidden while the config array is empty', async ({ page }) => {

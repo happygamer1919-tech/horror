@@ -77,6 +77,9 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
                   </label>
                 ))}
               </div>
+              <p class="card__rule" data-minors>
+                {t.keys.level.minors}
+              </p>
             </fieldset>
           )
         }
@@ -306,10 +309,19 @@ const waUrl = `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(st
     outline: 2px solid var(--stamp);
     outline-offset: 2px;
   }
+  /* One cell per level, however many there are. */
   .card__lvl > div {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     border: 1px solid var(--paper-ink);
+  }
+  /* The rule that goes with the levels: teams with minors. */
+  .card__rule {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--paper-ash);
   }
   .card__lvl label {
     position: relative;

@@ -15,7 +15,7 @@ import Sticky from '../../components/Sticky.astro';
 import Prices from '../../components/Prices.astro';
 import Voucher from '../../components/Voucher.astro';
 import { LANGS, abs, type Lang } from '../../config';
-import { copy, site, priceFrom, CONTACT_LEVELS_ENABLED, VOUCHERS_ENABLED, CONFIRM_CALL_ENABLED } from '../../content';
+import { copy, site, priceFrom, durationRange, instagramUrl, CONTACT_LEVELS_ENABLED, VOUCHERS_ENABLED, CONFIRM_CALL_ENABLED } from '../../content';
 
 export function getStaticPaths() {
   return LANGS.map((lang) => ({ params: { lang } }));
@@ -25,7 +25,7 @@ const lang = Astro.params.lang as Lang;
 const t = copy[lang];
 const address = `${site.address.street}, ${site.address.postalCode}, ${site.city[lang]}`;
 const faq = t.faq.items({
-  minutes: site.durationMinutes,
+  minutes: durationRange,
   players: site.players,
   priceFrom: t.keys.priceFrom(priceFrom, site.currency),
   minAge: site.ageLimit,
@@ -44,7 +44,7 @@ const jsonLd = [
     '@id': `${abs(`/${lang}/`)}#business`,
     name: site.brand,
     alternateName: Object.values(site.brandSubtitle).filter(Boolean),
-    description: t.meta.description,
+    description: t.meta.description(durationRange),
     url: abs(`/${lang}/`),
     image: abs(`/og/${lang}.jpg`),
     telephone: site.phone.e164,
@@ -69,6 +69,7 @@ const jsonLd = [
       bestRating: 5,
     },
     hasMap: site.maps.profileUrl,
+    ...(instagramUrl ? { sameAs: [instagramUrl] } : {}),
   },
   {
     '@context': 'https://schema.org',

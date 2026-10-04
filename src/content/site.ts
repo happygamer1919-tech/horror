@@ -1,17 +1,17 @@
 // Single source of business facts. Copy lives in ro.ts / ru.ts / en.ts.
 //
-// Values marked TODO(owner) are NOT known yet. Keep them `null` (or empty) until the
-// owner confirms them: the site hides the matching block for every one of them.
-// Every TODO here is also listed in HANDOFF.md.
+// One value is still to come from the owner: the review quotes (`site.reviews`). The block
+// that shows them stays hidden while the list is empty. It is also listed in HANDOFF.md.
 
 import type { Lang } from '../config';
 
 // --- Feature flags -------------------------------------------------------------------
 
-// Level selector: no electroshock / weak electroshock / hardcore. The team chooses. The site
-// shows the three names only and never describes what a level contains.
+// Level selector: exactly two levels, no electroshock and hardcore. The team chooses. The
+// site shows the two names only and never describes what a level contains. One rule goes
+// with them: teams with minors play without electroshock (the wording is in the language files).
 export const CONTACT_LEVELS_ENABLED = true;
-export const LEVELS = ['none', 'weak', 'hardcore'] as const;
+export const LEVELS = ['none', 'hardcore'] as const;
 
 // Gift voucher block (bought at the venue, in cash). Also controls the voucher FAQ answer.
 export const VOUCHERS_ENABLED = true;
@@ -22,9 +22,9 @@ export const VOUCHERS_ENABLED = true;
 // Components read it as BOOKING_URL (see index.ts). Booking always goes through the check-in card.
 export const SLOTS_URL = 'https://widget.easyweek.io/horror-quest-moldova/team/34544/62497';
 
-// The desk phones the guest on the day of the game to confirm the booking. The line shows on
-// the check-in card, in the booking dialog and in the "How do I book?" answer. false hides
-// the line everywhere.
+// The desk phones the guest on the day of the game to confirm the booking. Confirmed by the
+// owner: it stays on. The line shows on the check-in card, in the booking dialog and in the
+// "How do I book?" answer. false hides the line everywhere.
 export const CONFIRM_CALL_ENABLED = true;
 
 // Telegram, the second "ask a question" channel next to WhatsApp. A phone link cannot be
@@ -58,7 +58,8 @@ export const site = {
     whatsapp: '37368232596',
   },
 
-  durationMinutes: 60,
+  // Length of a game in minutes: a range. Shown as "60-90 min" (see durationRange below).
+  duration: { min: 60, max: 90 },
 
   // Team size. Also the bounds of the "Guests" field and of the voucher block.
   players: { min: 2, max: 11 },
@@ -106,10 +107,12 @@ export const site = {
   // Cash only, at the venue. Gift vouchers too. The wording is in the language files.
   payment: 'cash' as const,
 
-  // TODO(owner): Instagram handle without the @. null = no link in the footer.
-  instagram: null as string | null,
+  // Instagram handle without the @. null = no link in the footer and no sameAs in JSON-LD.
+  instagram: 'last.quest.moldova' as string | null,
 
-  // TODO(owner): real review quotes, with permission. The block stays hidden while empty.
+  // Review quotes. The owner has given permission to publish them; the texts are still to
+  // come (the one remaining owner value). The "From the guest book" block stays hidden while
+  // this list is empty and shows as soon as quotes are added here.
   // Shape: { author: 'Name', text: { ru: '...', ro: '...', en: '...' } }
   reviews: [] as { author: string; text: Record<Lang, string> }[],
 };
@@ -123,3 +126,9 @@ export function priceFor(team: number): number | null {
 }
 
 export const priceFrom = Math.min(...site.prices.map((p) => p.total));
+
+// "60-90": the length of a game, with a plain hyphen. The language files add the unit.
+export const durationRange = site.duration.min === site.duration.max ? `${site.duration.min}` : `${site.duration.min}-${site.duration.max}`;
+
+// The Instagram profile, for the footer link and for sameAs in JSON-LD.
+export const instagramUrl = site.instagram ? `https://instagram.com/${site.instagram}` : null;

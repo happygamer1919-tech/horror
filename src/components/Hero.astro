@@ -1,6 +1,6 @@
 ---
 import type { Lang } from '../config';
-import { copy, site } from '../content';
+import { copy, site, durationRange } from '../content';
 
 interface Props {
   lang: Lang;
@@ -12,6 +12,8 @@ const subtitle = site.brandSubtitle[lang];
 const cut = brand.lastIndexOf(' ');
 const brandLines = cut > 0 ? [brand.slice(0, cut), brand.slice(cut + 1)] : [brand];
 const routeAddress = `${site.address.street}, ${site.city[lang]}`;
+// What, where, how long: the duration comes from the config ("60-90 min").
+const kicker = [...t.hero.kicker, t.keys.duration(durationRange)];
 
 // Facade geometry, viewBox 600 x 900. Everything is generated, there are no image files.
 const COLS = 5;
@@ -368,7 +370,7 @@ const watchers = [
 
   <div class="hero__body wrap">
     <p class="hero__kicker">
-      {t.hero.kicker.map((k, i) => <span>{i > 0 && <i aria-hidden="true">/</i>}{k}</span>)}
+      {kicker.map((k, i) => <span>{i > 0 && <i aria-hidden="true">/</i>}{k}</span>)}
     </p>
     <h1 class="hero__title" id="hero-title" lang={site.brandLang}>
       {brandLines.map((l) => <span>{l}</span>)}

@@ -1,6 +1,6 @@
 ---
 import { LANGS, href, SITE_INDEXABLE, type Lang } from '../config';
-import { copy, site } from '../content';
+import { copy, site, instagramUrl } from '../content';
 
 interface Props {
   lang: Lang;
@@ -32,8 +32,8 @@ const year = new Date().getFullYear();
         {site.address.street}, {site.address.postalCode}, {site.city[lang]}<br />
         <a href={`tel:${site.phone.e164}`}>{site.phone.display}</a>
         {
-          site.instagram && (
-            <a class="foot__ig" href={`https://www.instagram.com/${site.instagram}/`} target="_blank" rel="noopener noreferrer">
+          instagramUrl && (
+            <a class="foot__ig" href={instagramUrl} target="_blank" rel="noopener noreferrer" data-instagram>
               Instagram: @{site.instagram}
             </a>
           )
@@ -150,9 +150,6 @@ const year = new Date().getFullYear();
   .foot__addr {
     color: var(--ash);
   }
-  .foot__ig {
-    margin-left: 22px;
-  }
   .foot__addr a {
     display: inline-block;
     padding-block: 10px;
@@ -209,6 +206,10 @@ const year = new Date().getFullYear();
   @media (min-width: 900px) {
     .foot {
       padding-bottom: 56px;
+    }
+    /* Next to the phone number on a wide screen; on a phone it takes its own line. */
+    .foot__ig {
+      margin-left: 22px;
     }
     .foot__grid {
       grid-template-columns: repeat(12, minmax(0, 1fr));

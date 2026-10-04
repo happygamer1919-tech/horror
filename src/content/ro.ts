@@ -6,8 +6,8 @@ export const ro: Copy = {
   langName: 'Română',
   meta: {
     title: (brand, sub) => `${brand}${sub ? ` (${sub})` : ''} - quest horror cu actori, Chișinău`,
-    description:
-      'Quest horror cu actori în Chișinău. Un hotel vechi care nu s-a închis niciodată, o gazdă care nu a plecat și 60 de minute ca să găsiți cheia ascunsă.',
+    description: (m) =>
+      `Quest horror cu actori în Chișinău. Un hotel vechi care nu s-a închis niciodată, o gazdă care nu a plecat și ${m} de minute ca să găsiți cheia ascunsă.`,
     hiddenTitle: 'Cheia vă așteaptă',
     ogAlt: 'Fațada unui hotel vechi, noaptea, cu o firmă roșie de neon: HOTEL',
   },
@@ -42,9 +42,9 @@ export const ro: Copy = {
   },
   preloader: { label: 'Lift', floor: 'Etaj' },
   hero: {
-    kicker: ['Quest horror cu actori', 'Chișinău', '60 min'],
+    kicker: ['Quest horror cu actori', 'Chișinău'],
     line: 'Vă așteptam.',
-    sub: 'Un hotel vechi care nu s-a închis niciodată. O gazdă care nu a plecat. O oră ca să găsiți cheia și să aflați de ce.',
+    sub: 'Un hotel vechi care nu s-a închis niciodată. O gazdă care nu a plecat. O oră sau mai mult ca să găsiți cheia și să aflați de ce.',
     cta: 'Check-in',
     route: 'Traseu',
     routeNote: 'Traseu în Google Maps, se deschide într-o filă nouă',
@@ -101,11 +101,12 @@ export const ro: Copy = {
     duration: (m) => `${m} min`,
     priceFrom: (n, cur) => `de la ${n} ${cur}`,
     age: (min) => (min === null ? 'Fără limită' : `${min}+`),
-    ageNote: 'Acord la sosire. Minori: semnează un părinte',
+    ageNote: 'Acord la sosire. Minori: semnează un părinte, fără electroșoc',
     level: {
       legend: 'Nivelul jocului',
-      options: { none: 'Fără electroșoc', weak: 'Electroșoc slab', hardcore: 'Hardcore' },
+      options: { none: 'Fără electroșoc', hardcore: 'Hardcore' },
       note: 'Echipa alege nivelul la rezervare.',
+      minors: 'Echipele cu minori joacă fără electroșoc.',
     },
   },
   prices: {
@@ -181,13 +182,13 @@ export const ro: Copy = {
       {
         q: 'Cât de înfricoșător este?',
         a: v.levels
-          ? 'Este un quest horror cu actori. Există trei niveluri: Fără electroșoc, Electroșoc slab și Hardcore. Echipa alege nivelul la rezervare.'
+          ? 'Este un quest horror cu actori. Există două niveluri: Fără electroșoc și Hardcore. Echipa alege nivelul la rezervare.'
           : 'Este un quest horror cu actori.',
         known: true,
       },
       {
         q: 'Există o vârstă minimă?',
-        a: `${v.minAge === null ? 'Nu, nu există limită de vârstă.' : `Da: ${v.minAge}+.`} Toți participanții semnează un acord la sosire. Minorii intră doar dacă acordul este semnat de un părinte.`,
+        a: `${v.minAge === null ? 'Nu, nu există limită de vârstă.' : `Da: ${v.minAge}+.`} Toți participanții semnează un acord la sosire. Minorii intră doar dacă acordul este semnat de un părinte. Echipele cu minori joacă fără electroșoc.`,
         known: true,
       },
       { q: 'În ce limbi se joacă?', a: 'În română, rusă sau engleză. Alegeți limba în fișa de cazare.', known: true },

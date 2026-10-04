@@ -6,8 +6,8 @@ export const en: Copy = {
   langName: 'English',
   meta: {
     title: (brand, sub) => `${brand}${sub ? ` (${sub})` : ''} - horror quest with live actors in Chisinau`,
-    description:
-      'A horror quest with live actors in Chisinau. An old hotel that never closed, a host who never left, and 60 minutes to find the hidden key.',
+    description: (m) =>
+      `A horror quest with live actors in Chisinau. An old hotel that never closed, a host who never left, and ${m} minutes to find the hidden key.`,
     hiddenTitle: 'Your key is still here',
     ogAlt: 'Night facade of an old hotel with a red neon HOTEL sign',
   },
@@ -42,9 +42,9 @@ export const en: Copy = {
   },
   preloader: { label: 'Lift', floor: 'Floor' },
   hero: {
-    kicker: ['Horror quest with live actors', 'Chisinau', '60 min'],
+    kicker: ['Horror quest with live actors', 'Chisinau'],
     line: 'We have been expecting you.',
-    sub: 'An old hotel that never closed. A host who never left. One hour to find the key and learn why.',
+    sub: 'An old hotel that never closed. A host who never left. An hour or more to find the key and learn why.',
     cta: 'Check in',
     route: 'Directions',
     routeNote: 'Directions in Google Maps, opens in a new tab',
@@ -101,11 +101,12 @@ export const en: Copy = {
     duration: (m) => `${m} min`,
     priceFrom: (n, cur) => `from ${n} ${cur}`,
     age: (min) => (min === null ? 'No age limit' : `${min}+`),
-    ageNote: 'Agreement on arrival. Minors: a parent signs',
+    ageNote: 'Agreement on arrival. Minors: a parent signs, no electroshock',
     level: {
       legend: 'Game level',
-      options: { none: 'No electroshock', weak: 'Weak electroshock', hardcore: 'Hardcore' },
+      options: { none: 'No electroshock', hardcore: 'Hardcore' },
       note: 'The team chooses the level when booking.',
+      minors: 'Teams with minors play without electroshock.',
     },
   },
   prices: {
@@ -181,13 +182,13 @@ export const en: Copy = {
       {
         q: 'How frightening is it?',
         a: v.levels
-          ? 'It is a horror quest with live actors. There are three levels: No electroshock, Weak electroshock and Hardcore. The team chooses the level when booking.'
+          ? 'It is a horror quest with live actors. There are two levels: No electroshock and Hardcore. The team chooses the level when booking.'
           : 'It is a horror quest with live actors.',
         known: true,
       },
       {
         q: 'Is there a minimum age?',
-        a: `${v.minAge === null ? 'No, there is no age limit.' : `Yes: ${v.minAge}+.`} Everyone signs an agreement on arrival. Minors enter only if a parent signs it.`,
+        a: `${v.minAge === null ? 'No, there is no age limit.' : `Yes: ${v.minAge}+.`} Everyone signs an agreement on arrival. Minors enter only if a parent signs it. Teams with minors play without electroshock.`,
         known: true,
       },
       { q: 'What languages is the game played in?', a: 'Romanian, Russian or English. Choose the language on the registration card.', known: true },

@@ -17,10 +17,12 @@ const LABELS: Record<L, { team: string; level: string; language: string; total: 
   ru: { team: 'Команда', level: 'Уровень', language: 'Язык', total: 'Итого' },
   en: { team: 'Team', level: 'Level', language: 'Language', total: 'Total' },
 };
-const LEVELS: Record<L, Record<'none' | 'weak' | 'hardcore', string>> = {
-  ro: { none: 'Fără electroșoc', weak: 'Electroșoc slab', hardcore: 'Hardcore' },
-  ru: { none: 'Без электрошока', weak: 'Слабый электрошок', hardcore: 'Хардкор' },
-  en: { none: 'No electroshock', weak: 'Weak electroshock', hardcore: 'Hardcore' },
+// Exactly two levels.
+type Lvl = 'none' | 'hardcore';
+const LEVELS: Record<L, Record<Lvl, string>> = {
+  ro: { none: 'Fără electroșoc', hardcore: 'Hardcore' },
+  ru: { none: 'Без электрошока', hardcore: 'Хардкор' },
+  en: { none: 'No electroshock', hardcore: 'Hardcore' },
 };
 // Names of the three game languages, as each page spells them.
 const LANG_NAMES: Record<L, Record<L, string>> = {
@@ -47,14 +49,14 @@ const CONFIRM_CALL: Record<L, string> = {
 };
 const FAQ_BOOK: Record<L, string> = { ro: 'Cum rezerv?', ru: 'Как забронировать?', en: 'How do I book?' };
 // Each case: team size, level, game language.
-const CASES: { team: number; level: 'none' | 'weak' | 'hardcore'; game: L }[] = [
+const CASES: { team: number; level: Lvl; game: L }[] = [
   { team: 2, level: 'none', game: 'ro' },
-  { team: 4, level: 'weak', game: 'en' },
+  { team: 4, level: 'hardcore', game: 'en' },
   { team: 7, level: 'hardcore', game: 'ru' },
-  { team: 11, level: 'weak', game: 'ro' },
+  { team: 11, level: 'none', game: 'ro' },
 ];
 
-const line = (lang: L, c: { team: number; level: 'none' | 'weak' | 'hardcore'; game: L }) =>
+const line = (lang: L, c: { team: number; level: Lvl; game: L }) =>
   `${LABELS[lang].team}: ${c.team} - ${LABELS[lang].level}: ${LEVELS[lang][c.level]} - ${LABELS[lang].language}: ${LANG_NAMES[lang][c.game]} - ${LABELS[lang].total}: ${PRICES[c.team]} MDL`;
 
 // Nothing in this file reaches the network: the three outside hosts get a local answer.
@@ -100,8 +102,8 @@ for (const lang of LANGS) {
       await expect(form.locator('input[name="team"]')).toHaveAttribute('min', '2');
       await expect(form.locator('input[name="team"]')).toHaveAttribute('max', '11');
       const radios = form.locator('input[name="level"]');
-      await expect(radios).toHaveCount(3);
-      expect(await radios.evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(['none', 'weak', 'hardcore']);
+      await expect(radios).toHaveCount(2);
+      expect(await radios.evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(['none', 'hardcore']);
       expect(await radios.evaluateAll((els) => els.map((e) => (e as HTMLInputElement).dataset.name))).toEqual(Object.values(LEVELS[lang]));
       expect(await radios.evaluateAll((els) => els.filter((e) => (e as HTMLInputElement).checked).length), 'no default level').toBe(0);
       expect(await radios.evaluateAll((els) => els.every((e) => (e as HTMLInputElement).required))).toBe(true);
@@ -130,6 +132,48 @@ for (const lang of LANGS) {
         await page.keyboard.press('Escape');
         await expect(dialog).toHaveJSProperty('open', false);
       }
+    });
+
+    test('the summary line names the chosen level, for each of the two levels, on the card, in the dialog and in both question links', async ({ page, context }) => {
+      await seal(context);
+      await open(page, lang);
+      const dialog = page.locator('[data-booking]');
+      for (const level of ['none', 'hardcore'] as const) {
+        const c = { team: 3, level, game: lang };
+        const form = await fill(page, lang, c);
+        const expected = line(lang, c);
+        expect(expected).toContain(`${LABELS[lang].level}: ${LEVELS[lang][level]} - `);
+        // WhatsApp and Telegram carry it after the greeting.
+        expect((new URL((await form.locator('[data-ask-wa]').getAttribute('href'))!).searchParams.get('text') ?? '').split('\n')[1]).toBe(expected);
+        expect(((await form.locator('[data-ask-tg]').getAttribute('data-message')) ?? '').split('\n')[1]).toBe(expected);
+        // The booking button copies it and the dialog shows it.
+        await form.locator('[data-book]').click();
+        await expect(dialog).toHaveJSProperty('open', true);
+        await expect.poll(() => clipboard(page)).toBe(expected);
+        await expect(dialog.locator('[data-booking-line]')).toHaveText(expected);
+        await page.keyboard.press('Escape');
+        await expect(dialog).toHaveJSProperty('open', false);
+      }
+    });
+
+    test('a level that no longer exists is no choice: nothing is selected, the button stays off, the line has no level', async ({ page, context }) => {
+      await seal(context);
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await open(page, lang);
+      const form = page.locator('[data-checkin]');
+      await form.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await form.locator('input[name="team"]').fill('4');
+      // The removed level arrives the way a level choice travels through the page.
+      await page.evaluate(() => document.dispatchEvent(new CustomEvent('hotel:level', { detail: 'weak' })));
+      expect(await page.locator('[data-level-input]:checked').count()).toBe(0);
+      await expect(form.locator('[data-book]')).toBeDisabled();
+      const text = new URL((await form.locator('[data-ask-wa]').getAttribute('href'))!).searchParams.get('text') ?? '';
+      expect(text.split('\n')[1]).toBe(`${LABELS[lang].team}: 4 - ${LABELS[lang].language}: ${LANG_NAMES[lang][lang]} - ${LABELS[lang].total}: ${PRICES[4]} MDL`);
+      // A real choice still works afterwards.
+      await form.locator('input[name="level"][value="none"]').check({ force: true });
+      await expect(form.locator('[data-book]')).toBeEnabled();
+      expect(errors).toEqual([]);
     });
 
     test('the booking dialog opens the widget, closes with Esc and the button, and gives focus back', async ({ page, context }) => {
@@ -274,7 +318,7 @@ for (const lang of LANGS) {
       }
 
       // Choosing a level turns it on, at once, and nothing on the card moves.
-      await form.locator('input[name="level"][value="weak"]').check({ force: true });
+      await form.locator('input[name="level"][value="hardcore"]').check({ force: true });
       await on('level chosen');
       // Compared within half a pixel: the card is still easing in, and its sub-pixel offset
       // rounds differently from one sample to the next.

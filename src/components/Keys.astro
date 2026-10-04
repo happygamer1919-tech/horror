@@ -1,6 +1,6 @@
 ---
 import type { Lang } from '../config';
-import { copy, site, priceFrom, CONTACT_LEVELS_ENABLED, LEVELS } from '../content';
+import { copy, site, priceFrom, durationRange, CONTACT_LEVELS_ENABLED, LEVELS } from '../content';
 import SectionHead from './SectionHead.astro';
 
 interface Props {
@@ -12,8 +12,11 @@ const k = t.keys;
 
 const fobs = [
   { no: '01', label: k.labels.players, value: `${site.players.min}-${site.players.max}`, small: false, note: '' },
-  { no: '02', label: k.labels.duration, value: k.duration(site.durationMinutes), small: false, note: '' },
-  // No age limit: everyone signs an agreement on arrival, a parent signs for a minor.
+  // A range ("60-90 min") is set in the smaller size, like the price: at the large size the
+  // Russian tag is filled edge to edge on a phone and breaks in two on a wide screen.
+  { no: '02', label: k.labels.duration, value: k.duration(durationRange), small: site.duration.min !== site.duration.max, note: '' },
+  // No age limit: everyone signs an agreement on arrival; with minors in the team a parent
+  // signs and the team plays without electroshock.
   { no: '03', label: k.labels.age, value: k.age(site.ageLimit), small: site.ageLimit === null, note: k.ageNote },
   { no: '04', label: k.labels.price, value: k.priceFrom(priceFrom, site.currency), small: true, note: '' },
 ];
@@ -46,13 +49,18 @@ const fobs = [
       CONTACT_LEVELS_ENABLED && (
         <fieldset class="lvl" data-reveal>
           <legend class="lvl__legend">{k.level.legend}</legend>
-          <div class="lvl__opts">
-            {LEVELS.map((l) => (
-              <label class="lvl__opt">
-                <input type="radio" name="level-pick" value={l} data-level-input />
-                <span>{k.level.options[l]}</span>
-              </label>
-            ))}
+          <div class="lvl__pick">
+            <div class="lvl__opts">
+              {LEVELS.map((l) => (
+                <label class="lvl__opt">
+                  <input type="radio" name="level-pick" value={l} data-level-input />
+                  <span>{k.level.options[l]}</span>
+                </label>
+              ))}
+            </div>
+            <p class="lvl__minors" data-minors>
+              {k.level.minors}
+            </p>
           </div>
           <p class="lvl__text" data-level-note>
             {k.level.note}
@@ -193,7 +201,8 @@ const fobs = [
     text-transform: uppercase;
   }
 
-  /* Level: three names and one neutral line. Nothing here describes a level. */
+  /* Level: the names, the one rule that goes with them (teams with minors) and one neutral
+     line. Nothing here describes a level. */
   .lvl {
     margin-top: 80px;
     display: grid;
@@ -207,10 +216,22 @@ const fobs = [
     text-transform: uppercase;
     color: var(--brass);
   }
+  .lvl__pick {
+    display: grid;
+    gap: 12px;
+  }
+  /* One cell per level, however many there are. */
   .lvl__opts {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     border: 1px solid var(--line);
+  }
+  .lvl__minors {
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: 0.04em;
+    color: var(--ash);
   }
   .lvl__opt {
     position: relative;
@@ -288,7 +309,7 @@ const fobs = [
       width: 100%;
       grid-column: 1 / -1;
     }
-    .lvl__opts {
+    .lvl__pick {
       grid-column: 1 / span 6;
       align-self: start;
     }
