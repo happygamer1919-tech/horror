@@ -8,7 +8,8 @@ Live: https://happygamer1919-tech.github.io/horror/
 
 Status on 2026-10-03 (update 3): content, booking, hero, the owner's rulings and the mobile
 scroll fix are live. The new 3D corridor is NOT live: its stills did not reach the agreed
-review score, so the site still shows the earlier 2D corridor. The site is a preview and is
+review score in the first shoot (four rounds) or in the torch-lit re-shoot (two rounds), so
+the site still shows the earlier 2D corridor. The site is a preview and is
 hidden from search engines.
 
 ## What is live from update 3
@@ -27,8 +28,9 @@ Booking
 - "Book a time slot" opens the EasyWeek widget in a styled window. The check-in card keeps
   team size, level, language and the live total, and copies one summary line for the widget's
   comment field ("Team: 4 - Level: Weak electroshock - Language: English - Total: 1200 MDL").
-- The button is disabled until a level is chosen and the team size is a whole number from 2
-  to 11, with the prompt "Choose team size and level" next to it.
+- The team size starts empty (hint "2-11", the total shows three dots). The button is disabled
+  until the team size is a whole number from 2 to 11 and a level is chosen, with the prompt
+  "Choose team size and level" next to it.
 - "We call you on the day of the game to confirm the booking." is shown on the card, in the
   "How do I book?" answer and in the booking window.
 - "Ask a question": WhatsApp (prefilled) and Telegram (message copied, short notice).
@@ -37,6 +39,9 @@ Booking
 Hero
 - Darker base: the wall outside the light is near black. The headline keeps about 62 percent
   of its strength outside the light. Buttons are always fully lit.
+- Idle dimming (after 20 seconds without input) goes under the hero copy and buttons: the
+  headline stays at about 62 percent and the buttons stay fully lit. The header, the mobile
+  book bar and the floating button also stay lit; the rest of the page dims as before.
 - Touch: the light is on from the first paint and drifts slowly across the hero; the first
   touch takes it over and it follows the finger, also through a scroll drag.
 - The E of the sign hangs from one bolt, sways, and is electrically faulty all the time.
@@ -65,12 +70,34 @@ by two independent reviewers, in at most four rounds, before any full render. Re
 Round 4 per still (A / B): start 7.0 / 7.3, mid walk 7.3 / 7.0, scratched door 7.8 / 8.0,
 scare door closed 8.0 / 7.9, scare 7.8 / 7.7, last door 6.9 / 7.1.
 
-The close, shallow-focus frames pass as film stills. The wide frames and the last door still
-read as a high-end render, mainly because of the carpet runner (a flat plane), the lamp shades
-and door 313. Stills are in `docs/corridor-stills/` (one sheet per round, the six round 4
-stills, and the two best round 3 stills).
+The close, shallow-focus frames passed as film stills. The wide frames and the last door
+read as a high-end render, mainly because of the carpet runner, the lamp shades and door 313.
 
-No full render was run, so the frames on that branch are from the older, lower scoring scene.
+The owner then ruled a re-shoot of the whole walk as a handheld torch point of view (one
+narrow beam, everything else near black, lamps dead, camera low and close), same gate, at
+most two rounds. Result:
+
+| Torch round | Reviewer A | Reviewer B |
+|-------------|-----------|-----------|
+| 1 | 7.2 | 7.4 |
+| 2 | 7.1 | 7.1 |
+
+Torch round 2 per still (A / B): start 7.0 / 6.7, shoe 7.6 / 7.7, scratched door 6.3 / 6.8,
+scare door closed 8.0 / 8.0, scare 7.6 / 7.7, last door 6.7 / 6.4.
+
+Both reviewers judged the torch light, the exposure, the grain and the handheld camera as
+photographic in both rounds. What fails is what the beam lands on: brass that reads as cream
+plastic, a number plate that reads as a flat decal, scratches that look ruler-drawn, wood
+without lacquer response. The frames that show little pass; the frames that present an
+object do not.
+
+Stills are in `docs/corridor-stills/`: one sheet per round of the first shoot, the six
+round 4 stills and the two best round 3 stills; for the re-shoot `torch-round-1-sheet.jpg`,
+`torch-round-2-sheet.jpg`, the six torch round 2 stills and the two best torch round 1 stills.
+
+No full render was run in either shoot, so the frames on `wt/corridor` are from an older,
+lower scoring scene. The scene, the torch, the camera path and the stills command
+(`node corridor3d/render.mjs stills`) are on that branch.
 
 ## What you still need to send
 
@@ -87,10 +114,11 @@ language pages and a broken avatar image. Enable RO and EN there and upload a lo
 
 ## Decisions needed
 
-- Corridor: accept the current level for the close frames and rework the wide ones, give it
-  more rounds, or keep the 2D corridor.
-- After 20 seconds without input the whole page dims by about half, headline included. This
-  existed before; say if the 60 percent floor should apply there too.
+- Corridor: both shoots stopped under the bar of 8. Options: commission or buy real assets
+  for what the beam lands on (door hardware, number plate, a child's shoe, a scanned door),
+  shoot the corridor as real photographs or video in the venue, or keep the 2D corridor.
+- While idle the header, the mobile book bar and the floating button now stay lit. Say if
+  the header should dim with the page.
 
 ## Flags and config
 
@@ -115,8 +143,9 @@ After changing the wordmark, the hero or the subtitles, regenerate the share ima
 | Check | Result |
 |-------|--------|
 | `npm run build` | exit 0 |
-| `npm test` (Playwright, 390px and 1440px) | exit 0, 224 passed, 14 skipped (tests that apply to the other screen size only) |
-| Booking button disabled until a level is chosen | tested, all three languages |
+| `npm test` (Playwright, 390px and 1440px) | exit 0, 232 passed, 14 skipped (tests that apply to the other screen size only) |
+| Booking button disabled while the team size is empty, and until a level is chosen | tested, all three languages |
+| Idle dimming: headline at 62 percent, hero buttons unchanged | tested in pixels, both widths |
 | Light on the hero before any touch, moving over 3 seconds | tested (about 98 px in 3 s) |
 | Scare plays once | tested on `wt/corridor` only, not on main |
 | `npm run test:perf` (phone emulation, 4x CPU throttle) | 0.2 percent dropped frames (worst 0.3), no long task; a scroll that starts during an 800 ms script hang waits 24 ms (was about 650 ms) |
@@ -155,8 +184,8 @@ test runs outside the deploy gate; build-only render packages (`three`, `three-g
 
 Open:
 
-1. **The team size keeps its default of 4, which counts as chosen.** In practice the booking
-   button waits for the level. It turns off again when the team size is empty or outside 2 to 11.
+1. **While idle, the header, the mobile book bar and the floating button stay lit.** The idle
+   layer was moved under the hero copy; these three sit above it as well.
 2. **The confirmation line is hidden in the booking window on short phones** (under 700 px
    high), so the widget keeps its height. It stays on the card and in the FAQ.
 3. **True volumetric fog is not in the corridor.** The path tracer loses the direct light on
@@ -164,6 +193,11 @@ Open:
 4. **Corridor textures are 2K, not 4K.** The tracer's texture memory holds about 80 layers at
    2K; the scene needs about 75.
 5. **The legend text still mentions a child's silhouette** in the corridor. Left as ruled.
+6. **In torch round 2 one still was corrected before review.** The sharper focus had turned
+   the stand-in figure in the scare frame into a clearly drawn shape; it was put back into
+   deep shadow and that one frame re-rendered. The other five went to review as first rendered.
+7. **No CC0 scanned child's shoe exists** in the sources checked (521 Poly Haven models), so
+   in the re-shoot the shoe sits at the edge of the beam, dark and soft.
 
 ## Not verified
 
