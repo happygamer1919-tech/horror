@@ -74,7 +74,8 @@ const starTilt = [-6, 4, -2, 7, -4];
                     </p>
                     <blockquote class="entry__text" lang={lang}>
                       <span data-review-text>{q.text[lang]}</span>
-                      {q.excerpt && <span data-excerpt> ...</span>}
+                      {/* A non-breaking space: the dots never drop to a line of their own. */}
+                      {q.excerpt && <span data-excerpt>&nbsp;...</span>}
                     </blockquote>
                     <p class="entry__sign">
                       <cite data-review-author>{q.author}</cite>
