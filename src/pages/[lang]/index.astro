@@ -93,8 +93,9 @@ const jsonLd = [
     <Keys lang={lang} />
     <Prices lang={lang} />
     <Cctv lang={lang} />
-    <Proof lang={lang} />
     {VOUCHERS_ENABLED && <Voucher lang={lang} />}
+    {/* The guest book comes right before the registration card: proof, then the booking. */}
+    <Proof lang={lang} />
     <CheckIn lang={lang} />
     <Faq lang={lang} items={faq} />
   </main>

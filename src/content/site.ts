@@ -1,7 +1,7 @@
 // Single source of business facts. Copy lives in ro.ts / ru.ts / en.ts.
 //
-// One value is still to come from the owner: the review quotes (`site.reviews`). The block
-// that shows them stays hidden while the list is empty. It is also listed in HANDOFF.md.
+// Every value here is confirmed by the owner. A block whose list is empty (for example
+// `site.reviews`) is not rendered.
 
 import type { Lang } from '../config';
 
@@ -51,6 +51,7 @@ export const site = {
     postalCode: 'MD-2071',
   },
 
+  // Confirmed by the owner: this number is on WhatsApp and on Telegram.
   phone: {
     display: '+373 682 32 596',
     e164: '+37368232596',
@@ -110,11 +111,58 @@ export const site = {
   // Instagram handle without the @. null = no link in the footer and no sameAs in JSON-LD.
   instagram: 'last.quest.moldova' as string | null,
 
-  // Review quotes. The owner has given permission to publish them; the texts are still to
-  // come (the one remaining owner value). The "From the guest book" block stays hidden while
-  // this list is empty and shows as soon as quotes are added here.
-  // Shape: { author: 'Name', text: { ru: '...', ro: '...', en: '...' } }
-  reviews: [] as { author: string; text: Record<Lang, string> }[],
+  // Review quotes for the guest book, published with the owner's permission. Google reviews,
+  // five stars each, written in Romanian: `text.ro` is the original, character for character;
+  // `text.ru` and `text.en` are faithful translations (nothing added, nothing dropped), shown
+  // with a "translated from Romanian" label. `author` is the first name and the initial of
+  // the last name. `excerpt: true` means the review goes on: the page adds "..." after it.
+  // An empty list hides the guest book.
+  reviews: [
+    {
+      author: 'Catalina G.',
+      stars: 5,
+      lang: 'ro',
+      excerpt: false,
+      text: {
+        ro: 'Cel mai tare quest horror! Foarte înfricoșător, plin de adrenalină și extrem de captivant. Ne-am speriat serios și ne-a plăcut enorm. Recomand 100%!',
+        ru: 'Самый крутой хоррор-квест! Очень страшный, полный адреналина и крайне захватывающий. Мы серьёзно испугались, и нам невероятно понравилось. Рекомендую на 100%!',
+        en: 'The coolest horror quest! Very scary, full of adrenaline and extremely captivating. We got seriously scared and we enjoyed it enormously. I recommend it 100%!',
+      },
+    },
+    {
+      author: 'Diana R.',
+      stars: 5,
+      lang: 'ro',
+      excerpt: true,
+      text: {
+        ro: 'O experiență de neuitat! Am fost la acest horror quest cu prietenii și pot spune că a fost absolut genial! Atmosfera este incredibil de bine realizată, decorurile sunt detaliate și te fac să simți că ești într-un film de groază.',
+        ru: 'Незабываемые впечатления! Я была на этом хоррор-квесте с друзьями и могу сказать, что это было абсолютно гениально! Атмосфера создана невероятно хорошо, декорации детальные и заставляют почувствовать, что ты в фильме ужасов.',
+        en: 'An unforgettable experience! I went to this horror quest with friends and I can say it was absolutely brilliant! The atmosphere is incredibly well done, the sets are detailed and make you feel like you are in a horror film.',
+      },
+    },
+    {
+      author: 'Ruslana P.',
+      stars: 5,
+      lang: 'ro',
+      excerpt: false,
+      text: {
+        ro: 'Quest, pușca, racheta, bomba, țunami!!! Emoții de neuitat, încăperea e amenajată perfect, actorii fenomenali 10/10. Nu e ultima dată când voi mai vizita acest Quest!!!',
+        ru: 'Квест, пушка, ракета, бомба, цунами!!! Незабываемые эмоции, помещение оформлено идеально, актёры феноменальные 10/10. Это не последний раз, когда я посещу этот Квест!!!',
+        en: 'Quest, gun, rocket, bomb, tsunami!!! Unforgettable emotions, the room is set up perfectly, the actors phenomenal 10/10. This is not the last time I will visit this Quest!!!',
+      },
+    },
+  ] as { author: string; stars: number; lang: Lang; excerpt: boolean; text: Record<Lang, string> }[],
+
+  // One short line from the reviews, set large above the guest book. `review` is the index
+  // of the review it is taken from (for the name under it); the text is its first sentence.
+  reviewPull: {
+    review: 0,
+    text: {
+      ro: 'Cel mai tare quest horror!',
+      ru: 'Самый крутой хоррор-квест!',
+      en: 'The coolest horror quest!',
+    } as Record<Lang, string>,
+  },
 };
 
 export type Site = typeof site;

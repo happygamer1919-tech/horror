@@ -5,7 +5,7 @@ const LANGS = ['ro', 'ru', 'en'] as const;
 // The wordmark is the same on every language page. RO and EN add a subtitle under it.
 const BRAND = 'Проклятие Отеля';
 const SUBTITLE: Record<string, string | null> = { ro: 'Blestemul Hotelului', ru: null, en: "The Hotel's Curse" };
-const SECTIONS = ['#lobby', '#corridor', '#file', '#keys', '#prices', '#cctv', '#proof', '#voucher', '#checkin', '#info', 'footer.foot'];
+const SECTIONS = ['#lobby', '#corridor', '#file', '#keys', '#prices', '#cctv', '#voucher', '#proof', '#checkin', '#info', 'footer.foot'];
 const WA = '37368232596';
 const TELEGRAM_URL = 'https://t.me/+37368232596';
 const SLOTS_URL = 'https://widget.easyweek.io/horror-quest-moldova/team/34544/62497';
@@ -522,9 +522,12 @@ for (const lang of LANGS) {
       expect(desk).toBeLessThan(24);
     });
 
-    test('review quotes stay hidden while the config array is empty', async ({ page }) => {
+    // The guest book itself (the three reviews, the pull quote, its place before the card) is
+    // pinned in tests/reviews.spec.ts.
+    test('review quotes are shown in the guest book section, under the rating', async ({ page }) => {
       await open(page, lang);
-      await expect(page.locator('#quotes')).toHaveCount(0);
+      await expect(page.locator('#quotes')).toHaveCount(1);
+      await expect(page.locator('#proof #quotes [data-entry]')).toHaveCount(3);
       await expect(page.locator('#proof')).toContainText('39');
     });
 

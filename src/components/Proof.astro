@@ -11,11 +11,16 @@ const t = copy[lang];
 const value = site.rating.value.toLocaleString(t.locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const fill = `${(site.rating.value / 5) * 100}%`;
 const quotes = site.reviews;
+// One short line, set large above the book, with the name of the guest who wrote it.
+const pull = quotes[site.reviewPull.review] ? { text: site.reviewPull.text[lang], author: quotes[site.reviewPull.review].author } : null;
+// Five-point star in one stroke, the way a guest draws it with a pen. One per star given.
+const STAR = 'M10 2.5L14.7 17L2.4 8H17.6L5.3 17Z';
+const starTilt = [-6, 4, -2, 7, -4];
 ---
 
 <section class="sec proof" id="proof" data-dark="0.42" aria-labelledby="proof-title">
   <div class="wrap">
-    <SectionHead no="07" place={t.places.guestbook} title={t.proof.title} id="proof-title" />
+    <SectionHead no="08" place={t.places.guestbook} title={t.proof.title} id="proof-title" />
     <div class="grid">
       <div class="score" data-reveal>
         <p class="score__num">
@@ -36,16 +41,54 @@ const quotes = site.reviews;
 
     {
       quotes.length > 0 && (
-        <div class="quotes" id="quotes">
-          <h3 class="quotes__title">{t.proof.quotesTitle}</h3>
-          <ul>
-            {quotes.map((q) => (
-              <li>
-                <blockquote>{q.text[lang]}</blockquote>
-                <cite>{q.author}</cite>
-              </li>
-            ))}
-          </ul>
+        <div class="book" id="quotes" data-quotes>
+          {pull && (
+            <figure class="pull" data-reveal data-pull>
+              <blockquote lang={lang}>
+                <p>{pull.text}</p>
+              </blockquote>
+              <figcaption>{pull.author}</figcaption>
+            </figure>
+          )}
+
+          {/* The guest book: the same paper, ink and red margin as the registry in the archive.
+              The reveal is on the wrapper, the tilt of the sheet on the figure inside it. */}
+          <div data-reveal>
+            <figure class="gb" data-guestbook>
+              <div class="gb__head">
+                <span class="gb__brand" lang={site.brandLang}>
+                  {site.brand}
+                </span>
+                <span class="gb__page">p. 48</span>
+              </div>
+              <h3 class="gb__title">{t.proof.quotesTitle}</h3>
+              <ol class="gb__list">
+                {quotes.map((q, i) => (
+                  <li class="entry" data-entry data-reveal style={`--d:${0.1 + i * 0.12}s`}>
+                    <p class="entry__stars" role="img" aria-label={`${q.stars} ${t.proof.outOf}`} data-stars={q.stars}>
+                      <svg viewBox={`0 0 ${q.stars * 21} 20`} style={`width:${q.stars * 19}px`} aria-hidden="true">
+                        {Array.from({ length: q.stars }, (_, n) => (
+                          <path d={STAR} transform={`translate(${n * 21}) rotate(${starTilt[n % starTilt.length]} 10 10)`} />
+                        ))}
+                      </svg>
+                    </p>
+                    <blockquote class="entry__text" lang={lang}>
+                      <span data-review-text>{q.text[lang]}</span>
+                      {q.excerpt && <span data-excerpt> ...</span>}
+                    </blockquote>
+                    <p class="entry__sign">
+                      <cite data-review-author>{q.author}</cite>
+                    </p>
+                    {q.lang !== lang && t.proof.translatedFrom[q.lang] && (
+                      <p class="entry__tr" data-translated>
+                        {t.proof.translatedFrom[q.lang]}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </figure>
+          </div>
         </div>
       )
     }
@@ -114,34 +157,178 @@ const quotes = site.reviews;
     min-height: 44px;
     font-size: 13px;
   }
-  .quotes {
-    margin-top: 80px;
-    padding-top: 32px;
-    border-top: 1px solid var(--line);
-  }
-  .quotes__title {
-    font-size: 11px;
-    font-weight: 400;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--brass);
-    margin-bottom: 28px;
-  }
-  .quotes ul {
+  /* The pull quote and the guest book. */
+  .book {
     display: grid;
-    gap: 36px;
+    gap: 52px;
+    margin-top: 76px;
   }
-  .quotes blockquote {
-    margin: 0 0 10px;
+  .pull {
+    margin: 0;
+  }
+  .pull blockquote {
+    margin: 0;
+    quotes: '\201C' '\201D';
+  }
+  .pull blockquote:lang(ro) {
+    quotes: '\201E' '\201D';
+  }
+  .pull blockquote:lang(ru) {
+    quotes: '\AB' '\BB';
+  }
+  .pull p {
     font-family: var(--serif);
     font-style: italic;
-    font-size: 1.3rem;
-    line-height: 1.4;
+    font-weight: 500;
+    font-size: clamp(2.6rem, 11.5vw, 6rem);
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    color: var(--bone);
   }
-  .quotes cite {
-    font-style: normal;
-    font-size: 12px;
-    color: var(--ash);
+  .pull p::before {
+    content: open-quote;
+    color: var(--brass);
+  }
+  .pull p::after {
+    content: close-quote;
+    color: var(--brass);
+  }
+  .pull figcaption {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 20px;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass-hi);
+  }
+  .pull figcaption::before {
+    content: '';
+    width: 34px;
+    height: 1px;
+    background: var(--brass);
+  }
+
+  /* Guest book sheet: the registry's paper and red margin line, ruled for handwriting.
+     --rule is the distance between two lines; every row of an entry is one rule high, so
+     the writing sits on the lines. --pen is the guests' ink. */
+  .gb {
+    --rule: 30px;
+    --pen: #1f2a44;
+    position: relative;
+    margin: 0;
+    padding: 20px 16px 8px 30px;
+    background:
+      linear-gradient(90deg, transparent 17px, rgba(143, 29, 24, 0.5) 17px, rgba(143, 29, 24, 0.5) 18px, transparent 18px),
+      var(--paper);
+    color: var(--paper-ink);
+    box-shadow:
+      inset 0 0 60px rgba(84, 62, 30, 0.35),
+      0 24px 60px rgba(0, 0, 0, 0.6);
+  }
+  .gb__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--paper-ink);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .gb__brand {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+  }
+  .gb__title {
+    padding: 12px 0 10px;
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.25rem;
+  }
+  .gb__list {
+    padding-top: var(--rule);
+    background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--rule) - 1px), rgba(28, 22, 17, 0.24) calc(var(--rule) - 1px), rgba(28, 22, 17, 0.24) var(--rule)) 0 -5px;
+  }
+  .entry {
+    padding-bottom: var(--rule);
+    break-inside: avoid;
+  }
+  /* Each guest writes at a slightly different slant. */
+  .entry:nth-child(3n + 1) {
+    --tilt: -0.5deg;
+  }
+  .entry:nth-child(3n + 2) {
+    --tilt: 0.4deg;
+  }
+  .entry:nth-child(3n) {
+    --tilt: -0.25deg;
+  }
+  .entry__stars {
+    display: flex;
+    align-items: center;
+    height: var(--rule);
+  }
+  .entry__stars svg {
+    height: 18px;
+    overflow: visible;
+  }
+  .entry__stars path {
+    fill: none;
+    stroke: var(--pen);
+    stroke-width: 1.3;
+    stroke-linejoin: round;
+  }
+  .entry__text {
+    margin: 0;
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 19px;
+    line-height: var(--rule);
+    color: var(--pen);
+    overflow-wrap: break-word;
+    transform: rotate(var(--tilt, 0deg));
+    transform-origin: 0 50%;
+  }
+  .entry__sign {
+    line-height: var(--rule);
+    text-align: right;
+  }
+  /* The signature, underlined with one stroke of the pen. Like the strikes in the
+     registry, the stroke is drawn when the entry scrolls into view. */
+  .entry__sign cite {
+    display: inline-block;
+    padding: 0 4px 0 16px;
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 800;
+    font-size: 20px;
+    line-height: 1.2;
+    color: var(--pen);
+    background: linear-gradient(var(--pen), var(--pen)) no-repeat 0 100% / 100% 1.5px;
+    transform: rotate(-2.5deg);
+  }
+  :global(html.motion) .entry__sign cite {
+    background-size: 0 1.5px;
+    transition: background-size 0.7s ease 0.6s;
+  }
+  :global(html.motion) .entry.is-in .entry__sign cite {
+    background-size: 100% 1.5px;
+  }
+  .entry__tr {
+    line-height: var(--rule);
+    text-align: right;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--paper-ash);
   }
   @media (min-width: 900px) {
     .score {
@@ -152,8 +339,29 @@ const quotes = site.reviews;
       align-self: end;
       margin-top: 0;
     }
-    .quotes ul {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+    .book {
+      gap: 72px;
+      margin-top: 110px;
+    }
+    /* An open book: two ruled pages and the fold between them. */
+    .gb {
+      --rule: 34px;
+      padding: 30px 44px 14px 60px;
+      background:
+        linear-gradient(90deg, transparent calc(50% - 16px), rgba(60, 42, 12, 0.1) calc(50% - 6px), rgba(60, 42, 12, 0.3) 50%, rgba(255, 240, 200, 0.14) calc(50% + 2px), transparent calc(50% + 16px)),
+        linear-gradient(90deg, transparent 30px, rgba(143, 29, 24, 0.5) 30px, rgba(143, 29, 24, 0.5) 31px, transparent 31px),
+        var(--paper);
+      transform: rotate(-0.4deg);
+    }
+    .gb__list {
+      columns: 2;
+      column-gap: 88px;
+    }
+    .entry__text {
+      font-size: 21px;
+    }
+    .entry__sign cite {
+      font-size: 22px;
     }
   }
 </style>

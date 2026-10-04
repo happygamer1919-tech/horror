@@ -142,6 +142,8 @@ export interface Copy {
     link: string;
     review: string;
     quotesTitle: string;
+    // Label under a review that is shown in translation, by the language it was written in.
+    translatedFrom: Partial<Record<Lang, string>>;
   };
   voucher: {
     title: string;

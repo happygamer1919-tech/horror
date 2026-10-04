@@ -128,9 +128,10 @@ export const en: Copy = {
     outOf: 'out of 5',
     reviews: (n) => `${n} reviews`,
     source: 'Google rating',
-    link: 'Read the reviews on Google Maps',
+    link: 'Read all reviews on Google',
     review: 'Leave a review',
     quotesTitle: 'From the guest book',
+    translatedFrom: { ro: 'translated from Romanian', ru: 'translated from Russian' },
   },
   voucher: {
     title: 'Gift voucher',

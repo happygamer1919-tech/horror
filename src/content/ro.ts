@@ -128,9 +128,10 @@ export const ro: Copy = {
     outOf: 'din 5',
     reviews: (n) => `${n} de recenzii`,
     source: 'Rating Google',
-    link: 'Citiți recenziile pe Google Maps',
+    link: 'Citiți toate recenziile pe Google',
     review: 'Lăsați o recenzie',
     quotesTitle: 'Din cartea de oaspeți',
+    translatedFrom: { ru: 'tradus din rusă', en: 'tradus din engleză' },
   },
   voucher: {
     title: 'Voucher cadou',
