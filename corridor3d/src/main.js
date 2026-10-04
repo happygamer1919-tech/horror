@@ -135,7 +135,7 @@ window.corridor = {
     }
     await pipe.compiled();
     const tScene = performance.now() - t0;
-    const shutterLen = (opts.shutter ?? 0.12) * ds; // a short exposure: a scrubbed frame is looked at standing still
+    const shutterLen = (opts.shutter ?? 0.03) * ds; // short: the head turns as it walks, and a longer exposure smeared the focal plane by 6 to 13 px // a short exposure: a scrubbed frame is looked at standing still
     const seed = opts.seed ?? (set === 'desktop' ? 1000 : 5000) + (opts.index ?? Math.round(at * 100));
     const res = pipe.render({
       camera,

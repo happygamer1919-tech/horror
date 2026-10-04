@@ -760,13 +760,8 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5, worn = 0 } =
     pat.setTransform(across ? m.rotate(90).scale(k, -k) : m.scale(k, -k));
     g.fillStyle = pat;
     g.fillRect(a, b, cc - a, d - b);
-    const t = (0.78 + 0.26 * r()) * (1 + 0.3 * worn); // where the varnish has worn thin the wood is paler
-    g.globalCompositeOperation = worn > 0 ? 'source-over' : 'multiply';
-    if (worn > 0) {
-      g.fillStyle = `rgba(150,128,100,${0.16 * worn})`;
-      g.fillRect(a, b, cc - a, d - b);
-      g.globalCompositeOperation = 'multiply';
-    }
+    const t = 0.78 + 0.26 * r();
+    g.globalCompositeOperation = 'multiply';
     g.fillStyle = `rgb(${255 * t},${255 * t * (0.95 + 0.05 * r())},${255 * t * (0.9 + 0.1 * r())})`;
     g.fillRect(a, b, cc - a, d - b);
     g.restore();
@@ -879,23 +874,8 @@ export function doorSkin(seed, S, src, { grime = 0.5, kicked = 0.5, worn = 0 } =
     // number, a greasy dark halo round both.
     const gauss = () => (r() + r() + r() - 1.5) / 1.5;
     g.save();
-    for (const [cx, cy, rx, ry, n, across] of [
-      [HANDLE.x + 0.12, 1.14, 0.13, 0.26, 150, 0],
-      [0.06, 1.34, 0.2, 0.26, 70, 0],
-      [0, 0.12, 0.36, 0.09, 150, 1],
-      [0.02, 0.96, 0.3, 0.05, 60, 1],
-      [x0 + 0.035, 1.02, 0.025, 0.5, 70, 0],
-      [x1 - 0.05, 0.6, 0.04, 0.5, 40, 0],
-    ]) {
-      for (let i = 0; i < n; i++) {
-        g.fillStyle = `rgba(${148 + 30 * r()},${120 + 26 * r()},${90 + 22 * r()},${(0.1 + 0.22 * r()) * worn})`;
-        const a = 0.003 + r() * 0.009;
-        const b = 0.012 + r() * 0.045;
-        g.beginPath();
-        g.ellipse(cx + gauss() * rx, cy + gauss() * ry, across ? b : a, across ? a : b, 0, 0, Math.PI * 2);
-        g.fill();
-      }
-    }
+    // (No flaked patches: drawn ovals read as drawn ovals. The veneer is the scan's own; the door's
+    // history is in its lacquer: the halo of hands, the runs of dirt, the kicked rail, the gloss.)
     for (const [cx, cy, rx, ry] of [[HANDLE.x + 0.01, 0.98, 0.07, 0.16], [0, 1.655, 0.12, 0.07]]) {
       g.save();
       g.translate(cx, cy);
@@ -986,7 +966,7 @@ export function doorRough(S = 512) {
     // (Tried and dropped: mouldings matt all the way round. Against a glossy leaf under the lamp
     // they showed as dark concentric rectangles. The whole leaf is a little duller instead, so a
     // moulding gives a broad soft highlight, never a white bar.)
-    k += 0.14;
+    k += 0.3;
     return [k, k, k];
   });
 }

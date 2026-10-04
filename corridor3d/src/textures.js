@@ -12,7 +12,7 @@ const BASE = '/corridor3d/textures';
 const GRADE = {
   paper: 'grayscale(0.45) brightness(1.5) contrast(0.62)',
   boards: 'hue-rotate(9deg) saturate(0.44) brightness(1.0) contrast(0.96)', // brown, not crimson
-  carpet: 'hue-rotate(-4deg) saturate(0.45) contrast(1.2) brightness(0.14)', // a dark, dusty brown-rose: by torchlight it must never be the brightest plane
+  carpet: 'hue-rotate(-4deg) saturate(0.3) contrast(1.2) brightness(0.09)', // a dark, dusty brown-rose: by torchlight it must never be the brightest plane
   door: 'hue-rotate(10deg) saturate(0.36) brightness(1.2) contrast(0.78)', // brown, the grain quiet
 };
 // Door skins: [material name, seed, { grime, kicked }]. scene.js hands them out.
@@ -510,7 +510,7 @@ function clawedDoor(wood, W, H) {
     const wob = r() * 10;
     for (let i = 0; i <= N; i++) {
       const t = i / N;
-      pts.push([x + lean * len * t + Math.sin(t * 5 + wob) * w * 1.2 + (r() - 0.5) * w * 0.12, y + len * t]);
+      pts.push([x + lean * len * t + Math.sin(t * 5 + wob) * w * 0.35 + (r() - 0.5) * w * 0.1, y + len * t]);
     }
     const bite = (t) => (0.35 + 0.65 * Math.sin(Math.min(1, t * 1.4) * Math.PI * 0.5)) * (1 - smooth(0.75, 1, t)) * (0.7 + 0.3 * Math.sin(t * 9 + wob));
     const seg = (ctx, i, width, style, dx = 0) => {
@@ -583,11 +583,11 @@ function clawedDoor(wood, W, H) {
     }
     g.restore();
     // sets of three or four nails dragged down together: nearly parallel, never crossing like a net
-    const bias = (r() - 0.5) * 0.22;
+    const bias = (r() < 0.5 ? -1 : 1) * (0.35 + 0.5 * r()); // across the grain
     for (let k = 0; k < pl.n; k++) {
       const x = (pl.x + (r() - 0.5) * 1.6 * pl.rx) * px;
       const top = pl.y + pl.ry * (0.2 + 0.9 * r());
-      const len = (0.05 + Math.pow(r(), 1.5) * 0.34) * px;
+      const len = (0.05 + Math.pow(r(), 1.5) * 0.2) * px;
       const lean = bias + (r() - 0.5) * 0.1; // a set of nails comes down together
       const spread = (0.014 + r() * 0.008) * px;
       const fingers = r() < 0.35 ? 3 : 4;
@@ -979,7 +979,7 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
   T.doorSkins = {};
   for (const [name, seed, o] of DOOR_SKINS) T.doorSkins[name] = tex(doorSkin(seed, size, src, o), { srgb: true });
   T.doorRough = tex(doorRough(512));
-  T.floorWood = tex(graded(img['plank_flooring/Diffuse'], 'saturate(0.6) brightness(0.62) contrast(0.82)'), { srgb: true });
+  T.floorWood = tex(graded(img['plank_flooring/Diffuse'], 'saturate(0.5) brightness(0.5) contrast(0.42)'), { srgb: true }); // the blocks nearly one tone: by torchlight their tone steps read as texels
   T.trimWood = tex(graded(img['dark_wood/Diffuse'], 'hue-rotate(9deg) saturate(0.34) brightness(0.9)'), { srgb: true });
   T.decals = tex(decalAtlas(img['worn_plaster_wall/Diffuse'], size), { srgb: true, repeat: false });
   const claw = clawedDoor(src.door, Math.round(size * 0.75), Math.round((size * 0.75 * 2.03) / 0.86));
@@ -997,7 +997,7 @@ export async function loadTextures({ size = 2048, small = 1024 } = {}) {
   const pl = plates(small);
   T.plates = tex(pl.albedo, { srgb: true, repeat: false });
   T.platesOrm = tex(pl.orm, { repeat: false });
-  T.platesNormal = tex(heightToNormal(pl.height, 3, false), { repeat: false });
+  T.platesNormal = tex(heightToNormal(pl.height, 9, false), { repeat: false });
   T.signs = tex(signs(small), { srgb: true, repeat: false });
   T.paperBack = tex(paperBack(512), { srgb: true });
   {

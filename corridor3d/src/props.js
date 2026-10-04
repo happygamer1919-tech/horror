@@ -507,7 +507,12 @@ export async function buildProps(bag, materials, T, doorMeta) {
   {
     const m = doorMeta[305];
     const lw = DOOR.w - 0.007;
-    bag.add('brassDull', box(0.0015, 0.16, 0.022, 0, 0, 0), M(move(m.handleSide * (lw / 2 + 0.0008), 1.0, -DOOR.t / 2), leafPlace(305)), [0.9, 0.85, 0.75]);
+    const at = (dy, w, h, mat, tint) => bag.add(mat, box(0.0016, h, w, 0, 0, 0), M(move(m.handleSide * (lw / 2 + 0.0008 + (mat === 'void' ? 0.0006 : 0)), 1.0 + dy, -DOOR.t / 2), leafPlace(305)), tint);
+    at(0, 0.022, 0.16, 'brassDull', [0.32, 0.29, 0.24]); // the forend: tarnished, not a mirror for the torch
+    at(0.02, 0.012, 0.03, 'void'); // latch
+    at(-0.035, 0.012, 0.022, 'void'); // deadbolt
+    at(0.068, 0.005, 0.005, 'void');
+    at(-0.068, 0.005, 0.005, 'void');
   }
 
   // ---- trolley, parked against the left wall in the dark part ----

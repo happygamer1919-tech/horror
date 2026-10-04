@@ -60,8 +60,14 @@ scene, change the cinematography. The whole walk is a handheld flashlight point 
   a faint ring from the reflector, and a very wide, very faint leak past the reflector's rim
   that the walker's own surroundings are just seen by. The hot spot sits a little off the
   centre of the spill. Tungsten colour; the dust pass draws the beam faintly in the air.
-- **Where it points** is a list of things worth finding (`AIMS`): the number on 301, the foot of
-  the right wall where the child's shoe lies, paper come away at a seam, the clawed inside of
+- **What the hot spot lands on must hold up** (the rule of the last review round): where a thing
+  does not, the hot spot goes to something that does and the weak thing sits in the spill, soft
+  and half dark. So the beam is on the lower panel of door 302 and the child's shoe lies beyond
+  it at the edge of the spill (the only CC0 scanned footwear found was a pair of adult rubber
+  boots); the runner and the floor are never in the hot spot; at the last door the frame stops
+  below the top mouldings and the number sits high in it.
+- **Where it points** is a list of things worth finding (`AIMS`): the number on 301, the lower
+  panel of door 302 with the child's shoe beyond it, paper come away at a seam, the clawed inside of
   305, the dried hand on 306, door 308 just under its number, the line of light under 311, the
   boards across 312. Between them the beam is on one wall or the other a few steps ahead. At
   the end it comes to the threshold of 313 and climbs the leaf to the number, the last thing
@@ -79,9 +85,17 @@ scene, change the cinematography. The whole walk is a handheld flashlight point 
   out one after another from the far end between s 13 and 15.8, inside the third caption
   ("The lights were fine a minute ago."); then the torch falters; then door 308. The exit sign
   stays as the one cool accent, and the line of light under 311.
-- **The runner** is dark and only ever in the edge of the beam or out of focus. **Door 313** has
-  the wear of the most handled door on the floor: varnish flaked pale along the grain where it
-  is pushed and kicked, a greasy halo round handle and number, dirt run down from both.
+- **The runner** is dark and only ever in the edge of the beam or out of focus. **Door 313** keeps
+  the scan's own veneer; its history is in the lacquer (a greasy halo round handle and number,
+  dirt run down from both, the kicked bottom rail, a duller sheen). Its plate has engraved
+  numerals in the normal map and slotted screws.
+- **Panel mouldings** on every leaf are pieces of their own (the trim wood, grain along each
+  piece). Cut out of the leaf's skin, with its grain running straight through them, they read as
+  transparent bands laid over the door: that was the cause of the hard-edged bands in the last
+  door's hot spot.
+- **The exposure is short** (3 percent of the step between frames): the head turns as it walks,
+  and at 12 percent the turn smeared the focal plane by 6 to 13 px. The lens is focused on the
+  thing the beam is on.
 
 ## Stills first
 

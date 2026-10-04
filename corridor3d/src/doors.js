@@ -22,6 +22,7 @@ const ARCH = [
   [0.07, 0],
 ];
 const ARCH_W = 0.07;
+const MOULD = [1.5, 1.4, 1.3]; // the tone of the panel mouldings against the trim wood
 const mirror = (p) => p.map(([a, b]) => [ARCH_W - a, b]).reverse();
 
 function quad(p, uv) {
@@ -179,26 +180,28 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
     [ys[1], ys[2]],
     [ys[3], ys[4]],
   ]) {
+    const mo = r() * 2;
     const ring = [
       [px0, a, px1, a, px1 - bev, a + bev, px0 + bev, a + bev],
       [px1, a, px1, c, px1 - bev, c - bev, px1 - bev, a + bev],
       [px1, c, px0, c, px0 + bev, c - bev, px1 - bev, c - bev],
       [px0, c, px0, a, px0 + bev, a + bev, px0 + bev, c - bev],
     ];
-    for (const q of ring) {
-      b.add(
-        skin,
-        quad(
-          [
-            [q[0], q[1], 0],
-            [q[2], q[3], 0],
-            [q[4], q[5], dz],
-            [q[6], q[7], dz],
-          ],
-          [uv(q[0], q[1]), uv(q[2], q[3]), uv(q[4], q[5]), uv(q[6], q[7])],
-        ),
-      );
-    }
+    // The mouldings are pieces of their own (applied beading, as on a real panelled door), with
+    // the grain running along each piece. Cut out of the leaf's own skin, with its grain running
+    // straight through them, they read as transparent bands laid over the door.
+    ring.forEach((q, i) => {
+      const along = i % 2 === 0 ? (x, y) => [y + mo, x] : (x, y) => [x + mo, y];
+      b.add('trim', quad(
+        [
+          [q[0], q[1], 0],
+          [q[2], q[3], 0],
+          [q[4], q[5], dz],
+          [q[6], q[7], dz],
+        ],
+        [along(q[0], q[1]), along(q[2], q[3]), along(q[4], q[5]), along(q[6], q[7])],
+      ), null, MOULD);
+    });
     // field
     const fx0 = px0 + bev;
     const fx1 = px1 - bev;
@@ -217,20 +220,18 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
       [fx1 - inset, fy1 - inset, fx0 + inset, fy1 - inset, fx0 + inset + e, fy1 - inset - e, fx1 - inset - e, fy1 - inset - e],
       [fx0 + inset, fy1 - inset, fx0 + inset, fy0 + inset, fx0 + inset + e, fy0 + inset + e, fx0 + inset + e, fy1 - inset - e],
     ];
-    for (const q of rr) {
-      b.add(
-        skin,
-        quad(
-          [
-            [q[0], q[1], dz],
-            [q[2], q[3], dz],
-            [q[4], q[5], rz],
-            [q[6], q[7], rz],
-          ],
-          [uv(q[0], q[1]), uv(q[2], q[3]), uv(q[4], q[5]), uv(q[6], q[7])],
-        ),
-      );
-    }
+    rr.forEach((q, i) => {
+      const along = i % 2 === 0 ? (x, y) => [y + mo + 0.4, x] : (x, y) => [x + mo + 0.4, y];
+      b.add('trim', quad(
+        [
+          [q[0], q[1], dz],
+          [q[2], q[3], dz],
+          [q[4], q[5], rz],
+          [q[6], q[7], rz],
+        ],
+        [along(q[0], q[1]), along(q[2], q[3]), along(q[4], q[5]), along(q[6], q[7])],
+      ), null, MOULD);
+    });
     b.add(skin, face(fx0 + inset + e, fy0 + inset + e, fx1 - inset - e, fy1 - inset - e, rz, uv));
   }
   // edges
@@ -259,7 +260,7 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
     b.add('claw', g, move(0, 0, -0.0006));
   }
   // furniture
-  const hx = handleSide * (lw / 2 - 0.058);
+  const hx = handleSide * (lw / 2 - 0.078); // the backplate clear of the door edge and the stop
   const hb = new Bag();
   handle(hb, -handleSide, 0.07 + r() * 0.12); // old springs: every lever sags a little, some a lot
   b.addBag(hb, move(hx, 1.0, 0));
@@ -291,7 +292,11 @@ export function buildLeaf({ no, handleSide = -1, inside = 'plain', seed = 1, pla
     const pb = new Bag();
     pb.add('plate', pg);
     pb.add('brassDull', box(pw, ph, 0.003, 0, 0, 0.0015));
-    for (const sx of [-1, 1]) pb.add('iron', new THREE.SphereGeometry(0.003, 8, 6), move(sx * (pw / 2 - 0.009), 0, 0.003));
+    // two slotted screws, proud of the plate
+    for (const sx of [-1, 1]) {
+      pb.add('brassDull', new THREE.CylinderGeometry(0.0042, 0.0046, 0.0022, 14), M(rotX(Math.PI / 2), move(sx * (pw / 2 - 0.01), 0, 0.004)), [0.6, 0.55, 0.45]);
+      pb.add('void', box(0.0066, 0.0011, 0.001), M(rotZ(0.4 + sx), move(sx * (pw / 2 - 0.01), 0, 0.0052)));
+    }
     b.addBag(pb, M(rotZ(plateTilt), move(0, 1.66, dz + 0.005)));
   }
   return b;

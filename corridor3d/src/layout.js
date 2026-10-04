@@ -53,7 +53,7 @@ export const LAMP_Y = CH - LAMP_DROP;
 // drop: extra flex in metres; dust: how much of the glass is dulled; bare: the shade is gone.
 // The embers are what the depth of the corridor is felt by: orange points receding in the dark.
 export const LAMP_KIND = [
-  { ember: 0, drop: 0.13, dust: 0.9 }, // dead
+  { ember: 0, drop: 0.13, dust: 0.9, bare: true }, // dead, its shade long gone: a bulb on a flex
   { ember: 0.7, drop: 0.035, dust: 0.7, tilt: 0.09, lean: -0.14 },
   { ember: 0, drop: 0.16, dust: 0.3 }, // the swinging one: a dead shade that still sways
   { ember: 0, drop: -0.02, dust: 1, bare: true },
@@ -113,7 +113,7 @@ const slow = (s, a, b, c) => Math.sin(s * a + b) * 0.6 + Math.sin(s * a * 2.3 + 
 // What the beam goes to, in order: [centre s, metres before, metres after, point (x, y, s) on a surface].
 const AIMS = [
   [0.35, 1.0, 2.2, [-0.95, 1.62, 2.72]], // the number on door 301
-  [4.3, 1.8, 1.2, [0.92, 0.24, 6.0]], // the foot of the right wall: the child's shoe lies in the spill
+  [4.3, 1.8, 1.2, [0.95, 0.6, 5.16]], // (round 2: the lower panel of door 302; the shoe lies beyond it at the edge of the spill) // the foot of the right wall: the child's shoe lies in the spill
   [7.7, 1.2, 1.3, [-0.95, 1.78, 9.2]], // paper come away at a seam, under the dead swinging shade
   [10.5, 1.5, 0.75, [-0.52, 1.02, 11.4]], // the clawed inside of door 305, at the height of a child's hands
   [12.5, 1.0, 1.3, [0.95, 1.0, 13.35]], // the dried hand on door 306
@@ -165,7 +165,7 @@ function walkerX(s) {
   x += 0.3 * bump2(16.6, 2.6, 1.4, s); // close along door 308
   x -= 0.2 * bump(22.0, 1.6, s);
   x += 0.22 * bump(24.6, 1.2, s);
-  x += -0.06 * smooth(25.6, 27.2, s);
+  x += -0.3 * smooth(25.6, 27.2, s); // stops left of the last door: its frame and the wall beside it are in the spill
   return x;
 }
 const camAt = (s) => [walkerX(s), EYE + 0.011 * Math.sin((s * 2 * Math.PI) / 2.6) - 0.05 * bump(10.6, 1.2, s), s];
@@ -183,8 +183,18 @@ function beamDistance(s) {
 export const exposureStops = (s) => 1.2 * Math.log2(beamDistance(s) / 2);
 
 // The lens: wide open, focused on what the beam is on.
-export const FSTOP = { desktop: 1.8, mobile: 2.0 };
-export const focusDistance = (s) => clamp(dist3(torchAim(s - 0.1), camAt(s)), 0.6, 6);
+export const FSTOP = { desktop: 2.5, mobile: 2.5 };
+export function focusDistance(s) {
+  let f = clamp(dist3(torchAim(s - 0.1), camAt(s)), 0.6, 6);
+  // two places where the thing looked at is not the point the beam is centred on (measured on
+  // the frames: the distance at which it is sharpest): the handle of the open door 305, and the
+  // edge of door 308 that will open
+  f += (1.0 - f) * bump(10.44, 0.7, s);
+  // (1.15 m: the casing the door closes against is as sharp as it gets, and whoever stands behind
+  // the door is half a metre further back, soft. In focus, the stand-in read as a drawing.)
+  f += (1.15 - f) * bump2(16.7, 0.9, 0.6, s);
+  return f;
+}
 
 // Camera pose. The head follows the beam, a little late and not all the way: the hot spot is
 // never dead centre. More of the way on the narrow phone frame, so the beam stays in it.
@@ -194,8 +204,10 @@ export function cameraPose(s, set) {
   const a = torchAim(s - 0.14);
   const yawT = Math.atan2(-(a[0] - x), a[2] - s);
   const pitchT = Math.atan2(a[1] - y, Math.hypot(a[0] - x, a[2] - s));
-  const yaw = (mobile ? 0.95 : 0.74) * yawT + 0.012 * Math.sin(s * 0.71 + 0.3);
-  const pitch = (mobile ? 0.92 : 0.88) * pitchT + 0.006 * Math.sin(s * 0.9 + 1.1);
+  // (at door 302 the head turns nearly all the way: the door and the wall foot fill the frame)
+  const yaw = (mobile ? 0.95 : 0.74 + 0.18 * bump(4.3, 1.6, s)) * yawT + 0.012 * Math.sin(s * 0.71 + 0.3);
+  // (at the last door the head stays lower than the beam: the number sits high in the frame)
+  const pitch = (mobile ? 0.92 : 0.88) * (1 - 0.5 * smooth(26.2, 27.6, s)) * pitchT + 0.006 * Math.sin(s * 0.9 + 1.1);
   // hand held: the horizon is never level
   const roll = 0.03 + 0.012 * Math.sin((s * 2 * Math.PI) / 5.2 + 1.2) + 0.008 * Math.sin(s * 1.13 + 0.4);
   return { x, y, s, yaw, pitch, roll };

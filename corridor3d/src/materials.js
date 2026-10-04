@@ -157,7 +157,7 @@ export function makeMaterials(T) {
 
   // The shoe.
   // a child's best shoe: pale leather gone cream, scuffed (black patent on a dark runner was a dark capsule)
-  m.leather = P({ color: new THREE.Color(0.1, 0.075, 0.055), roughness: 0.55, side: THREE.DoubleSide, vertexColors: true }); // oxblood, scuffed
+  m.leather = P({ color: new THREE.Color(0.045, 0.03, 0.024), roughness: 0.6, side: THREE.DoubleSide, vertexColors: true }); // oxblood, scuffed
   m.sole = P({ color: new THREE.Color(0.2, 0.13, 0.08), roughness: 0.8, vertexColors: true });
 
   // The figure behind the door.
@@ -166,7 +166,7 @@ export function makeMaterials(T) {
   m.skin = P({ color: new THREE.Color(0.042, 0.035, 0.03), roughness: 0.9, specularIntensity: 0.15, vertexColors: true });
   // (by torchlight a white, mirror-wet eyeball was a glowing blob: the white is dull and bloodshot,
   // the surface less of a mirror, and what is left is one small catchlight)
-  m.eye = P({ color: new THREE.Color(0.22, 0.17, 0.14), roughness: 0.34, specularIntensity: 0.6, vertexColors: true });
+  m.eye = P({ color: new THREE.Color(0.11, 0.085, 0.07), roughness: 0.34, specularIntensity: 0.6, vertexColors: true });
   m.hair = P({ color: new THREE.Color(0.01, 0.009, 0.008), roughness: 0.62, specularIntensity: 0.3, side: THREE.DoubleSide, vertexColors: true });
   m.nail = P({ color: new THREE.Color(0.2, 0.18, 0.16), roughness: 0.75, specularIntensity: 0.3, vertexColors: true });
   m.gown = P({ color: new THREE.Color(0.05, 0.046, 0.04), roughness: 1, side: THREE.DoubleSide, vertexColors: true });

@@ -140,9 +140,9 @@ export function buildLamps(materials) {
 export function setLamp(f, level) {
   const on = level > 0.004;
   f.light.visible = false;
-  f.shadeMat.emissiveIntensity = on ? 0.12 * level : 0;
+  f.shadeMat.emissiveIntensity = on ? 0.5 * level : 0; // a faint pool on the ceiling over it
   f.shadeMat.emissive.setRGB(1.0, 0.42, 0.12);
-  const b = 2.6 * level;
+  const b = 10 * level; // the filament itself: a small hot core
   f.bulb.material.color.setRGB(b, b * 0.42, b * 0.1);
   f.bulb.visible = on;
   f.bulb.scale.set(0.5, 0.9, 0.5); // the filament and its support, not the whole bulb
