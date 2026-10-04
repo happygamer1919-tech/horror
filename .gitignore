@@ -9,7 +9,5 @@ playwright-report/
 .env
 .env.*
 
-# corridor authoring: downloaded CC0 sources and intermediate renders (see corridor3d/README.md)
-corridor3d/textures/
-corridor3d/out/
-corridor3d/out-dummy/
+# corridor frame build: frames extracted from corridor-src/*.mp4 (see corridor-src/SOURCES.md)
+corridor-src/.cache/

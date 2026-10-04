@@ -14,9 +14,7 @@
     "logo": "node scripts/logo.mjs",
     "test:live": "playwright test tests/live.spec.ts --config=playwright.live.config.ts",
     "test:perf": "playwright test --config=playwright.perf.config.ts",
-    "corridor:fetch": "node corridor3d/fetch-textures.mjs",
-    "corridor:render": "node corridor3d/render.mjs",
-    "corridor:encode": "node corridor3d/encode.mjs"
+    "corridor:frames": "node scripts/corridor-frames.mjs"
   },
   "dependencies": {
     "@fontsource-variable/playfair-display": "^5.3.0",
@@ -29,9 +27,6 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "lighthouse": "^13.5.0",
-    "three": "^0.186.1",
-    "three-gpu-pathtracer": "^0.0.26",
-    "three-mesh-bvh": "^0.9.15",
     "typescript": "^7.0.2"
   }
 }
