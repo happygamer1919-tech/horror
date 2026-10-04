@@ -12,7 +12,7 @@ mkdirSync('public/og', { recursive: true });
 
 // Hide everything that is interface rather than picture, and light the whole scene.
 const css = `
-  .torch, .grain, .tint, .dim, .bar, .sticky, .wa, .lift, .skip-link, .hero__hint, .hero__cta, .hero__sub { display: none !important; }
+  .torch, .grain, .tint, .dim, .bar, .sticky, .wa, .ask, .toast, .lift, .skip-link, .hero__hint, .hero__cta, .hero__sub { display: none !important; }
   .hero { min-height: 630px !important; height: 630px !important; padding: 0 0 64px !important; }
   .hero__body { padding-left: 8px; gap: 16px !important; }
   .hero__title { font-size: 104px !important; }

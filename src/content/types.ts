@@ -1,46 +1,28 @@
 import type { Lang } from '../config';
 
-export type Level = 'light' | 'standard' | 'hardcore';
+export type Level = 'none' | 'hardcore';
 export type DayRange = 'mon-thu' | 'fri' | 'sat-sun';
-
-// Tokens are filled in by the browser, see scripts/checkin.ts.
-export interface BookingData {
-  brand: string;
-  date: string;
-  time: string;
-  team: string;
-  total: string;
-  language: string;
-  // Only present when CONTACT_LEVELS_ENABLED is true.
-  level: string | null;
-  name: string;
-  phone: string;
-  comment: string;
-}
-
-export interface VoucherData {
-  brand: string;
-  team: string;
-  recipient: string;
-}
 
 export interface FaqItem {
   q: string;
   a: string;
-  // false = the answer is a placeholder for a TODO value, so it is kept out of JSON-LD.
+  // false = the answer is a placeholder for an unknown value, so it is kept out of JSON-LD.
   known: boolean;
 }
 
 export interface FaqValues {
-  minutes: number;
+  // The length of a game as a range, for example "60-90".
+  minutes: string;
   players: { min: number; max: number };
   priceFrom: string;
-  age: string | null;
-  payment: string | null;
+  // null = no age limit.
+  minAge: number | null;
   phone: string;
   address: string;
   levels: boolean;
   vouchers: boolean;
+  // The "we call you on the day of the game" sentence, or null when CONFIRM_CALL_ENABLED is off.
+  confirmCall: string | null;
 }
 
 export interface Copy {
@@ -49,7 +31,8 @@ export interface Copy {
   langName: string;
   meta: {
     title: (brand: string, subtitle: string | null) => string;
-    description: string;
+    // `minutes` is the length of a game as a range, for example "60-90".
+    description: (minutes: string) => string;
     hiddenTitle: string;
     ogAlt: string;
   };
@@ -61,12 +44,14 @@ export interface Copy {
     soundOff: string;
     book: string;
     call: string;
-    askDesk: string;
     languageNav: string;
     preview: string;
     whatsapp: string;
     waHello: (brand: string) => string;
-    slots: string;
+    ask: string;
+    telegram: string;
+    toastTelegram: string;
+    toastCopyFailed: string;
   };
   places: {
     lobby: string;
@@ -82,10 +67,14 @@ export interface Copy {
   };
   preloader: { label: string; floor: string };
   hero: {
+    // The hero adds the duration ("60-90 min") as the last part.
     kicker: string[];
     line: string;
     sub: string;
     cta: string;
+    // Second hero button: route in Google Maps. `routeNote` is read by screen readers only.
+    route: string;
+    routeNote: string;
     tel: string;
     hint: string;
     facadeAlt: string;
@@ -117,14 +106,18 @@ export interface Copy {
     title: string;
     intro: string;
     labels: { players: string; duration: string; age: string; price: string };
-    duration: (minutes: number) => string;
+    duration: (minutes: string) => string;
     priceFrom: (amount: number, currency: string) => string;
-    // Shown instead of the level selector while CONTACT_LEVELS_ENABLED is false.
-    limits: string;
+    // null = no age limit.
+    age: (min: number | null) => string;
+    ageNote: string;
+    // Names only. The site never describes what a level contains.
     level: {
       legend: string;
-      options: Record<Level, { name: string; text: string }>;
+      options: Record<Level, string>;
       note: string;
+      // The one rule that goes with the levels. Shown next to both level selectors.
+      minors: string;
     };
   };
   prices: {
@@ -149,37 +142,51 @@ export interface Copy {
     link: string;
     review: string;
     quotesTitle: string;
+    // Label under a review that is shown in translation, by the language it was written in.
+    translatedFrom: Partial<Record<Lang, string>>;
   };
   voucher: {
     title: string;
     text: string;
-    team: string;
-    recipient: string;
+    where: string;
+    whereValue: string;
+    pay: string;
+    payValue: string;
     submit: string;
-    message: (d: VoucherData) => string;
+    message: (brand: string) => string;
   };
   checkin: {
     title: string;
     intro: string;
     cardNo: string;
-    fields: {
-      date: string;
-      time: string;
-      team: string;
-      language: string;
-      level: string;
-      name: string;
-      phone: string;
-      comment: string;
-    };
+    fields: { team: string; language: string; level: string };
     languages: { ro: string; ru: string; en: string };
     total: string;
     submit: string;
+    // Next to the booking button while it is disabled. `levels` is CONTACT_LEVELS_ENABLED.
+    choose: (levels: boolean) => string;
+    // Shown only while CONFIRM_CALL_ENABLED is true (card, booking dialog, FAQ).
+    confirmCall: string;
     request: string;
     tel: string;
     note: string;
     signature: string;
-    message: (d: BookingData) => string;
+    // Labels of the one-line summary: "Team: 4 - Level: ... - Language: ... - Total: ...".
+    summary: { team: string; level: string; language: string; total: string };
+    // Greeting in front of the summary in the WhatsApp and Telegram messages.
+    hello: (brand: string) => string;
+  };
+  // The dialog around the booking widget.
+  booking: {
+    title: string;
+    copied: string;
+    notCopied: string;
+    instruction: string;
+    copyAgain: string;
+    newTab: string;
+    close: string;
+    frameTitle: string;
+    slow: string;
   };
   faq: {
     title: string;

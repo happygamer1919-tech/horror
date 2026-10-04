@@ -1,7 +1,6 @@
 ---
 import type { Lang } from '../config';
-import type { Level } from '../content/types';
-import { copy, site, priceFrom, CONTACT_LEVELS_ENABLED } from '../content';
+import { copy, site, priceFrom, durationRange, CONTACT_LEVELS_ENABLED, LEVELS } from '../content';
 import SectionHead from './SectionHead.astro';
 
 interface Props {
@@ -10,16 +9,17 @@ interface Props {
 const { lang } = Astro.props;
 const t = copy[lang];
 const k = t.keys;
-const ask = t.ui.askDesk;
 
-// null in site.ts means "not confirmed yet": the fob shows a neutral placeholder.
 const fobs = [
-  { no: '01', label: k.labels.players, value: `${site.players.min}-${site.players.max}`, known: true, small: false },
-  { no: '02', label: k.labels.duration, value: k.duration(site.durationMinutes), known: true, small: false },
-  { no: '03', label: k.labels.age, value: site.ageLimit, known: Boolean(site.ageLimit), small: false },
-  { no: '04', label: k.labels.price, value: k.priceFrom(priceFrom, site.currency), known: true, small: true },
+  { no: '01', label: k.labels.players, value: `${site.players.min}-${site.players.max}`, small: false, note: '' },
+  // A range ("60-90 min") is set in the smaller size, like the price: at the large size the
+  // Russian tag is filled edge to edge on a phone and breaks in two on a wide screen.
+  { no: '02', label: k.labels.duration, value: k.duration(durationRange), small: site.duration.min !== site.duration.max, note: '' },
+  // No age limit: everyone signs an agreement on arrival; with minors in the team a parent
+  // signs and the team plays without electroshock.
+  { no: '03', label: k.labels.age, value: k.age(site.ageLimit), small: site.ageLimit === null, note: k.ageNote },
+  { no: '04', label: k.labels.price, value: k.priceFrom(priceFrom, site.currency), small: true, note: '' },
 ];
-const levels: Level[] = ['light', 'standard', 'hardcore'];
 ---
 
 <section class="sec keys" id="keys" data-dark="0.4" aria-labelledby="keys-title">
@@ -37,7 +37,8 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
                 {f.no}
               </span>
               <span class="fob__label">{f.label}</span>
-              <span class:list={['fob__value', { 'is-todo': !f.known, 'is-small': f.small }]}>{f.known ? f.value : ask}</span>
+              <span class:list={['fob__value', { 'is-small': f.small }]}>{f.value}</span>
+              {f.note && <span class="fob__note">{f.note}</span>}
             </div>
           </li>
         ))
@@ -45,30 +46,26 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
     </ul>
 
     {
-      CONTACT_LEVELS_ENABLED ? (
+      CONTACT_LEVELS_ENABLED && (
         <fieldset class="lvl" data-reveal>
           <legend class="lvl__legend">{k.level.legend}</legend>
-          <div class="lvl__opts">
-            {levels.map((l) => (
-              <label class="lvl__opt">
-                <input type="radio" name="level-pick" value={l} checked={l === 'standard'} data-level-input />
-                <span>{k.level.options[l].name}</span>
-              </label>
-            ))}
+          <div class="lvl__pick">
+            <div class="lvl__opts">
+              {LEVELS.map((l) => (
+                <label class="lvl__opt">
+                  <input type="radio" name="level-pick" value={l} data-level-input />
+                  <span>{k.level.options[l]}</span>
+                </label>
+              ))}
+            </div>
+            <p class="lvl__minors" data-minors>
+              {k.level.minors}
+            </p>
           </div>
-          <div class="lvl__copy" aria-live="polite">
-            {levels.map((l) => (
-              <p class="lvl__text" data-level-text={l}>
-                {k.level.options[l].text}
-              </p>
-            ))}
-          </div>
-          {!site.contactRulesConfirmed && <p class="lvl__note">{k.level.note}</p>}
+          <p class="lvl__text" data-level-note>
+            {k.level.note}
+          </p>
         </fieldset>
-      ) : (
-        <p class="limits" data-limits data-reveal>
-          {k.limits}
-        </p>
       )
     }
   </div>
@@ -190,28 +187,22 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
     text-shadow: 0 1px 0 rgba(255, 236, 180, 0.45);
     overflow-wrap: anywhere;
   }
-  .fob__value.is-todo {
-    font-style: italic;
-    font-weight: 600;
-    font-size: 1.02rem;
-    line-height: 1.2;
-  }
-
   .fob__value.is-small {
     font-size: 1.22rem;
     line-height: 1.12;
   }
-  .limits {
-    margin-top: 72px;
+  .fob__note {
     max-width: 22ch;
-    font-family: var(--serif);
-    font-style: italic;
-    font-size: clamp(1.5rem, 6.4vw, 2.6rem);
-    line-height: 1.14;
+    font-size: 10px;
+    font-weight: 500;
     text-wrap: balance;
+    line-height: 1.35;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
-  /* Contact level */
+  /* Level: the names, the one rule that goes with them (teams with minors) and one neutral
+     line. Nothing here describes a level. */
   .lvl {
     margin-top: 80px;
     display: grid;
@@ -225,10 +216,22 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
     text-transform: uppercase;
     color: var(--brass);
   }
+  .lvl__pick {
+    display: grid;
+    gap: 12px;
+  }
+  /* One cell per level, however many there are. */
   .lvl__opts {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     border: 1px solid var(--line);
+  }
+  .lvl__minors {
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: 0.04em;
+    color: var(--ash);
   }
   .lvl__opt {
     position: relative;
@@ -251,10 +254,12 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
     display: grid;
     place-items: center;
     min-height: 56px;
-    padding: 8px 4px;
-    font-size: 12px;
+    padding: 8px 6px;
+    font-size: 11px;
     font-weight: 500;
-    letter-spacing: 0.14em;
+    line-height: 1.3;
+    letter-spacing: 0.1em;
+    text-align: center;
     text-transform: uppercase;
     color: var(--ash);
     transition:
@@ -270,26 +275,12 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
     outline-offset: 3px;
   }
   .lvl__text {
-    display: none;
     max-width: 24ch;
     font-family: var(--serif);
     font-style: italic;
     font-size: clamp(1.5rem, 6.4vw, 2.6rem);
     line-height: 1.14;
     text-wrap: balance;
-  }
-  :global(html[data-level='light']) .lvl__text[data-level-text='light'],
-  :global(html[data-level='standard']) .lvl__text[data-level-text='standard'],
-  :global(html[data-level='hardcore']) .lvl__text[data-level-text='hardcore'] {
-    display: block;
-  }
-  .lvl__copy {
-    min-height: 5.2em;
-  }
-  .lvl__note {
-    max-width: 52ch;
-    font-size: 13px;
-    color: var(--ash);
   }
 
   @media (min-width: 900px) {
@@ -305,14 +296,8 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
     .fob__value {
       font-size: 2.3rem;
     }
-    .fob__value.is-todo {
-      font-size: 1.25rem;
-    }
     .fob__value.is-small {
       font-size: 1.6rem;
-    }
-    .limits {
-      margin-top: 110px;
     }
     .lvl {
       margin-top: 120px;
@@ -324,17 +309,16 @@ const levels: Level[] = ['light', 'standard', 'hardcore'];
       width: 100%;
       grid-column: 1 / -1;
     }
-    .lvl__opts {
-      grid-column: 1 / span 5;
+    .lvl__pick {
+      grid-column: 1 / span 6;
       align-self: start;
     }
-    .lvl__copy {
-      grid-column: 7 / -1;
-      grid-row: span 2;
-      min-height: 0;
+    .lvl__opt span {
+      font-size: 12px;
+      letter-spacing: 0.14em;
     }
-    .lvl__note {
-      grid-column: 1 / span 5;
+    .lvl__text {
+      grid-column: 8 / -1;
     }
   }
 </style>

@@ -19,8 +19,7 @@ preloader is the lift, and every section is a place in the building
 - GSAP + ScrollTrigger for scroll-driven work, Lenis for smooth scroll.
 - OGL for the single WebGL scene (hero fog around the neon sign), rendered at
   low internal resolution, lazy loaded, with a CSS glow fallback.
-- Corridor is a pre-rendered walk (authored in 3D, path traced offline, see `corridor3d/`),
-  shipped as an image sequence and scrubbed on a 2D canvas by scroll progress. No WebGL at run time.
+- Corridor is drawn on a 2D canvas (not WebGL), driven by scroll progress.
 - Fonts self-hosted through Fontsource: Playfair Display (display serif) and
   IBM Plex Mono (monospace). Both cover Latin Extended and Cyrillic.
 - No trackers, no cookies, no external CDNs.
@@ -60,10 +59,8 @@ screenshots at 390px and 1440px, a critique against the concept, and fixes.
 2. Arrival hero: night facade (SVG), neon HOTEL sign with one dying letter,
    headline, "Check in" CTA, flashlight overlay (pointer on desktop, slow
    drift plus scroll on touch), WebGL fog with CSS fallback.
-3. Corridor: sticky pinned canvas, a walk down a rendered hotel corridor, numbered
-   doors, lamps failing in sequence. Once per session, on the first pass, one door
-   opens a hand's width for about 600ms (a face in the dark, fingers on the door edge),
-   then it is a closed door.
+3. Corridor: sticky pinned canvas, forward movement, numbered doors, lamps
+   failing in sequence, child silhouette once per session for about 400ms.
 4. The file: guest registry with crossed-out names, 1989 clipping, legend
    revealed on scroll.
 5. Key tags: brass fobs (players, duration, age, price) and the contact-level
@@ -106,3 +103,16 @@ screenshots at 390px and 1440px, a critique against the concept, and fixes.
 - Flags in `src/content/site.ts`: `CONTACT_LEVELS_ENABLED` (false), `VOUCHERS_ENABLED` (true), `SLOTS_URL` (empty).
 - Share images 1200 x 630 per language (`scripts/og.mjs`), `og:image` and `twitter:card`.
 - Live checks (`tests/live.spec.ts`) run as a `verify` job after each deploy.
+
+## Update 3: quality pass
+
+- Live: content (age, languages, cash, levels), EasyWeek booking window with a copied summary
+  line, Telegram, two-channel floating button, darker hero with a drifting touch light, the
+  loose E, route button, four facade effects, native scroll on touch devices.
+- Owner rulings applied: booking button disabled until a level is chosen, confirmation call
+  line behind `CONFIRM_CALL_ENABLED`, headline at about 60 percent outside the light.
+- Corridor: a path traced 3D corridor exists on `wt/corridor` but is not merged. Six stills
+  were reviewed in four rounds (6.9, 7.2 to 7.3, 7.3 to 7.4, 7.4 to 7.5 of 10) and did not
+  reach 8, so no full render was run and the 2D canvas corridor stays live. Stills are in
+  `docs/corridor-stills/`.
+- `npm run test:perf` measures phone scroll at 4x CPU throttle, outside the deploy gate.

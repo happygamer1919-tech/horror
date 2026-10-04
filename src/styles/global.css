@@ -28,25 +28,11 @@
   --max: 1320px;
   --header-h: 56px;
 
-  /* Contact-level tint, see html[data-level] below. */
+  /* Edge tint of the whole page (.tint). Off: nothing on the page follows the chosen level. */
   --tint-rgb: 0, 0, 0;
   --tint-a: 0;
 
   color-scheme: dark;
-}
-
-/* Contact level changes the accent temperature and the edge tint of the whole page. */
-html[data-level='light'] {
-  --neon: #f2705a;
-  --neon-rgb: 242, 112, 90;
-  --tint-rgb: 185, 151, 91;
-  --tint-a: 0.1;
-}
-html[data-level='hardcore'] {
-  --neon: #ff1a1a;
-  --neon-rgb: 255, 26, 26;
-  --tint-rgb: 200, 0, 0;
-  --tint-a: 0.22;
 }
 
 *,
@@ -355,7 +341,15 @@ html.motion .grain {
   transition: opacity 0.6s;
 }
 
-/* Flashlight. A huge element with a transparent centre, moved by transform only. */
+/* Flashlight. Darkness with a hole in it, moved by transform only (torch.ts).
+   On touch screens the light is on from the first paint and wanders over the hero until
+   the first touch: two wrappers around the beam (.torch__drift) each walk a slow loop, as
+   CSS keyframes on transform (printed by Base.astro from scripts/drift.ts), so the
+   compositor moves it and no script runs. From the first touch the script has the light
+   (html.torch-js): the drift is off and the beam itself is moved, as on a pointer device.
+   The beam is a zero-size anchor. Its ::before is the hole: one square texture holding the
+   soft edge. The four <i> panels around it are flat colour, which the compositor draws
+   without a texture. Nothing here is repainted while the light moves or the page scrolls. */
 
 .torch {
   position: fixed;
@@ -369,27 +363,76 @@ html.motion .grain {
 html.motion .torch {
   display: block;
 }
+/* The size of the viewport, so the keyframes can be written in percent of it. */
+.torch__drift {
+  position: absolute;
+  inset: 0;
+}
+html.torch-js .torch__drift {
+  animation: none;
+}
 .torch__beam {
+  /* --torch-r: where the light has faded to about a third. --torch-h: where it is gone. */
+  --torch-r: 16.5vmax;
+  --torch-h: calc(var(--torch-r) * 2.6);
+  --torch-far: 130vmax;
   position: absolute;
   left: 0;
   top: 0;
-  width: 300vmax;
-  height: 300vmax;
-  margin: -150vmax 0 0 -150vmax;
+  width: 0;
+  height: 0;
   transform: translate3d(50vw, 38vh, 0);
+  will-change: transform;
+}
+.torch__beam::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--torch-h) * -1);
+  top: calc(var(--torch-h) * -1);
+  width: calc(var(--torch-h) * 2);
+  height: calc(var(--torch-h) * 2);
   background: radial-gradient(
     circle closest-side,
     rgba(4, 3, 3, 0) 0,
-    rgba(4, 3, 3, 0.1) calc(var(--torch-r, 11%) * 0.45),
-    rgba(4, 3, 3, 0.62) var(--torch-r, 11%),
-    rgba(4, 3, 3, 0.9) calc(var(--torch-r, 11%) * 1.7),
-    rgb(4, 3, 3) calc(var(--torch-r, 11%) * 2.6)
+    rgba(4, 3, 3, 0.1) 17.3%,
+    rgba(4, 3, 3, 0.62) 38.5%,
+    rgba(4, 3, 3, 0.9) 65.4%,
+    rgb(4, 3, 3) 100%
   );
-  will-change: transform;
+}
+.torch__beam > i {
+  position: absolute;
+  background: rgb(4, 3, 3);
+}
+.torch__beam > i:nth-child(1),
+.torch__beam > i:nth-child(2) {
+  left: calc(var(--torch-far) * -1);
+  width: calc(var(--torch-far) * 2);
+  height: var(--torch-far);
+}
+.torch__beam > i:nth-child(1) {
+  bottom: calc(var(--torch-h) - 1px);
+}
+.torch__beam > i:nth-child(2) {
+  top: calc(var(--torch-h) - 1px);
+}
+.torch__beam > i:nth-child(3),
+.torch__beam > i:nth-child(4) {
+  top: calc(var(--torch-h) * -1);
+  height: calc(var(--torch-h) * 2);
+  width: var(--torch-far);
+}
+.torch__beam > i:nth-child(3) {
+  right: calc(var(--torch-h) - 1px);
+}
+.torch__beam > i:nth-child(4) {
+  left: calc(var(--torch-h) - 1px);
 }
 @media (hover: none) {
+  /* Touch: a wider light. Until the script takes it, the wrappers carry the position. */
   .torch__beam {
-    --torch-r: 14%;
+    --torch-r: 21vmax;
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -424,11 +467,17 @@ html.lenis body {
   overflow: hidden;
 }
 
-/* Idle: after 20 seconds without input the lights go down (see torch.ts). */
+/* Idle: after 20 seconds without input the lights go down (see torch.ts).
+   The layer sits under the hero copy (47) and the hero buttons (49), over everything the
+   scene is made of: the facade, the sign and the lit room (45), the rain, the sections, the
+   cards. So the building and the page go dark, the headline keeps the strength its veil
+   gives it (60 percent outside the light) and the buttons stay fully lit. The header, the
+   sticky bar and the floating "ask" control (60, 61) are whole above it: controls do not
+   dim. It comes after the hero in the document, so at 46 it is over the rain and the scrim. */
 .dim {
   position: fixed;
   inset: 0;
-  z-index: 88;
+  z-index: 46;
   background: #030202;
   opacity: 0;
   pointer-events: none;

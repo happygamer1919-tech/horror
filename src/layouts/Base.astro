@@ -11,8 +11,9 @@ import monoLatin from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-n
 import monoCyrillic from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-cyrillic-400-normal.woff2?url';
 
 import { SITE_INDEXABLE, LANGS, DEFAULT_LANG, abs, href, type Lang } from '../config';
-import { copy, site } from '../content';
+import { copy, site, durationRange } from '../content';
 import WaFloat from '../components/WaFloat.astro';
+import { driftCss } from '../scripts/drift';
 
 interface Props {
   lang: Lang;
@@ -29,7 +30,7 @@ const brand = site.brand;
 const title = Astro.props.title ?? t.meta.title(brand, site.brandSubtitle[lang]);
 // Social share image: rendered from the hero by scripts/og.mjs into public/og/.
 const ogImage = abs(`/og/${lang}.jpg`);
-const description = Astro.props.description ?? t.meta.description;
+const description = Astro.props.description ?? t.meta.description(durationRange);
 
 // Preload only the files the first screen needs for this language.
 // The wordmark is Cyrillic on every page, so the Cyrillic serif is always needed first.
@@ -37,7 +38,7 @@ const preloads = lang === 'ru' ? [serifCyrillic, monoCyrillic] : lang === 'ro' ?
 ---
 
 <!doctype html>
-<html lang={lang} data-level="standard">
+<html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -71,6 +72,8 @@ const preloads = lang === 'ru' ? [serifCyrillic, monoCyrillic] : lang === 'ro' ?
     <meta name="twitter:image" content={ogImage} />
     <meta name="twitter:image:alt" content={t.meta.ogAlt} />
     {SITE_INDEXABLE && jsonLd.map((data) => <script type="application/ld+json" set:html={JSON.stringify(data)} />)}
+    <!-- Touch screens: the path of the light before the first touch (scripts/drift.ts). -->
+    <style is:inline set:html={driftCss}></style>
     <script is:inline>
       (function () {
         var d = document.documentElement;
@@ -89,7 +92,9 @@ const preloads = lang === 'ru' ? [serifCyrillic, monoCyrillic] : lang === 'ro' ?
     <a class="skip-link" href="#main">{t.ui.skipToContent}</a>
     <slot />
     <WaFloat lang={lang} />
-    <div class="torch" aria-hidden="true"><div class="torch__beam"></div></div>
+    <div class="torch" aria-hidden="true">
+      <div class="torch__drift"><div class="torch__drift"><div class="torch__beam"><i></i><i></i><i></i><i></i></div></div></div>
+    </div>
     <div class="tint" aria-hidden="true"></div>
     <div class="dim" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>

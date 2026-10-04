@@ -1,24 +1,35 @@
 // Single source of business facts. Copy lives in ro.ts / ru.ts / en.ts.
 //
-// Values marked TODO(owner) are NOT known yet. Keep them `null` (or empty) until the
-// owner confirms them: the site renders a neutral placeholder for every null.
-// Every TODO here is also listed in HANDOFF.md.
+// Every value here is confirmed by the owner. A block whose list is empty (for example
+// `site.reviews`) is not rendered.
 
 import type { Lang } from '../config';
 
 // --- Feature flags -------------------------------------------------------------------
 
-// Light / Standard / Hardcore selector. The levels are NOT confirmed by the owner, so the
-// selector, its copy and the form field stay off. While false the site shows one line
-// instead: live actors, tell us your limits when you book.
-export const CONTACT_LEVELS_ENABLED = false;
+// Level selector: exactly two levels, no electroshock and hardcore. The team chooses. The
+// site shows the two names only and never describes what a level contains. One rule goes
+// with them: teams with minors play without electroshock (the wording is in the language files).
+export const CONTACT_LEVELS_ENABLED = true;
+export const LEVELS = ['none', 'hardcore'] as const;
 
-// Gift voucher block (WhatsApp request). Also controls the voucher FAQ answer.
+// Gift voucher block (bought at the venue, in cash). Also controls the voucher FAQ answer.
 export const VOUCHERS_ENABLED = true;
 
-// Optional link to a live schedule. When set, a secondary "See free slots" link appears
-// next to the booking buttons. Leave empty to hide it.
-export const SLOTS_URL = '';
+// The EasyWeek booking widget: the primary booking action. It collects the slot, name,
+// phone and a comment. The check-in card opens it in a dialog and copies the team size,
+// level, language and total for the comment field. Leave empty to hide the booking button.
+// Components read it as BOOKING_URL (see index.ts). Booking always goes through the check-in card.
+export const SLOTS_URL = 'https://widget.easyweek.io/horror-quest-moldova/team/34544/62497';
+
+// The desk phones the guest on the day of the game to confirm the booking. Confirmed by the
+// owner: it stays on. The line shows on the check-in card, in the booking dialog and in the
+// "How do I book?" answer. false hides the line everywhere.
+export const CONFIRM_CALL_ENABLED = true;
+
+// Telegram, the second "ask a question" channel next to WhatsApp. A phone link cannot be
+// prefilled reliably, so the site copies the message to the clipboard and says so.
+export const TELEGRAM_URL = 'https://t.me/+37368232596';
 
 // --- Facts ---------------------------------------------------------------------------
 
@@ -40,6 +51,7 @@ export const site = {
     postalCode: 'MD-2071',
   },
 
+  // Confirmed by the owner: this number is on WhatsApp and on Telegram.
   phone: {
     display: '+373 682 32 596',
     e164: '+37368232596',
@@ -47,7 +59,8 @@ export const site = {
     whatsapp: '37368232596',
   },
 
-  durationMinutes: 60,
+  // Length of a game in minutes: a range. Shown as "60-90 min" (see durationRange below).
+  duration: { min: 60, max: 90 },
 
   // Team size. Also the bounds of the "Guests" field and of the voucher block.
   players: { min: 2, max: 11 },
@@ -66,8 +79,8 @@ export const site = {
     { from: 11, to: 11, total: 3300 },
   ],
 
-  // Opening hours. The owner may correct these. `days` keys are labelled in the language
-  // files; `schema` is the same range for search engines (JSON-LD).
+  // Opening hours, confirmed by the owner. `days` keys are labelled in the language files;
+  // `schema` is the same range for search engines (JSON-LD).
   hours: [
     { days: 'mon-thu', open: '16:00', close: '03:00', allDay: false, schema: ['Monday', 'Tuesday', 'Wednesday', 'Thursday'] },
     { days: 'fri', open: '16:00', close: '00:00', allDay: false, schema: ['Friday'] },
@@ -85,26 +98,71 @@ export const site = {
     directionsUrl: `https://www.google.com/maps/dir/?api=1&destination=Strada+Onisifor+Ghibu+10%2C+Chi%C8%99in%C4%83u+MD-2071&destination_place_id=${PLACE_ID}`,
   },
 
-  // TODO(owner): age limit, for example "16+". null = placeholder.
-  ageLimit: null as string | null,
+  // Minimum age in years. null = no age limit (confirmed). Everyone signs an agreement on
+  // arrival; a minor enters only if a parent signs it. The wording is in the language files.
+  ageLimit: null as number | null,
 
-  // TODO(owner): languages the game is actually played in, for example ['ro', 'ru'].
-  // null = the form offers all three as a preference and promises nothing.
-  gameLanguages: null as Lang[] | null,
+  // Languages the game is played in. The "Language" field on the card offers exactly these.
+  gameLanguages: ['ro', 'ru', 'en'] as Lang[],
 
-  // TODO(owner): payment methods, one short line per language. null = placeholder in the FAQ.
-  paymentMethods: null as Record<Lang, string> | null,
+  // Cash only, at the venue. Gift vouchers too. The wording is in the language files.
+  payment: 'cash' as const,
 
-  // TODO(owner): Instagram handle without the @. null = no link in the footer.
-  instagram: null as string | null,
+  // Instagram handle without the @. null = no link in the footer and no sameAs in JSON-LD.
+  instagram: 'last.quest.moldova' as string | null,
 
-  // TODO(owner): real review quotes, with permission. The block stays hidden while empty.
-  // Shape: { author: 'Name', text: { ru: '...', ro: '...', en: '...' } }
-  reviews: [] as { author: string; text: Record<Lang, string> }[],
+  // Review quotes for the guest book, published with the owner's permission. Google reviews,
+  // five stars each, written in Romanian: `text.ro` is the original, character for character;
+  // `text.ru` and `text.en` are faithful translations (nothing added, nothing dropped), shown
+  // with a "translated from Romanian" label. `author` is the first name and the initial of
+  // the last name. `excerpt: true` means the review goes on: the page adds "..." after it.
+  // An empty list hides the guest book.
+  reviews: [
+    {
+      author: 'Catalina G.',
+      stars: 5,
+      lang: 'ro',
+      excerpt: false,
+      text: {
+        ro: 'Cel mai tare quest horror! Foarte înfricoșător, plin de adrenalină și extrem de captivant. Ne-am speriat serios și ne-a plăcut enorm. Recomand 100%!',
+        ru: 'Самый крутой хоррор-квест! Очень страшный, полный адреналина и крайне захватывающий. Мы серьёзно испугались, и нам невероятно понравилось. Рекомендую на 100%!',
+        en: 'The coolest horror quest! Very scary, full of adrenaline and extremely captivating. We got seriously scared and we enjoyed it enormously. I recommend it 100%!',
+      },
+    },
+    {
+      author: 'Diana R.',
+      stars: 5,
+      lang: 'ro',
+      excerpt: true,
+      text: {
+        ro: 'O experiență de neuitat! Am fost la acest horror quest cu prietenii și pot spune că a fost absolut genial! Atmosfera este incredibil de bine realizată, decorurile sunt detaliate și te fac să simți că ești într-un film de groază.',
+        ru: 'Незабываемые впечатления! Я была на этом хоррор-квесте с друзьями и могу сказать, что это было абсолютно гениально! Атмосфера создана невероятно хорошо, декорации детальные и заставляют почувствовать, что ты в фильме ужасов.',
+        en: 'An unforgettable experience! I went to this horror quest with friends and I can say it was absolutely brilliant! The atmosphere is incredibly well done, the sets are detailed and make you feel like you are in a horror film.',
+      },
+    },
+    {
+      author: 'Ruslana P.',
+      stars: 5,
+      lang: 'ro',
+      excerpt: false,
+      text: {
+        ro: 'Quest, pușca, racheta, bomba, țunami!!! Emoții de neuitat, încăperea e amenajată perfect, actorii fenomenali 10/10. Nu e ultima dată când voi mai vizita acest Quest!!!',
+        ru: 'Квест, пушка, ракета, бомба, цунами!!! Незабываемые эмоции, помещение оформлено идеально, актёры феноменальные 10/10. Это не последний раз, когда я посещу этот Квест!!!',
+        en: 'Quest, gun, rocket, bomb, tsunami!!! Unforgettable emotions, the room is set up perfectly, the actors phenomenal 10/10. This is not the last time I will visit this Quest!!!',
+      },
+    },
+  ] as { author: string; stars: number; lang: Lang; excerpt: boolean; text: Record<Lang, string> }[],
 
-  // TODO(owner): the real rules for each contact level. Only used when
-  // CONTACT_LEVELS_ENABLED is true.
-  contactRulesConfirmed: false,
+  // One short line from the reviews, set large above the guest book. `review` is the index
+  // of the review it is taken from (for the name under it); the text is its first sentence.
+  reviewPull: {
+    review: 0,
+    text: {
+      ro: 'Cel mai tare quest horror!',
+      ru: 'Самый крутой хоррор-квест!',
+      en: 'The coolest horror quest!',
+    } as Record<Lang, string>,
+  },
 };
 
 export type Site = typeof site;
@@ -116,3 +174,9 @@ export function priceFor(team: number): number | null {
 }
 
 export const priceFrom = Math.min(...site.prices.map((p) => p.total));
+
+// "60-90": the length of a game, with a plain hyphen. The language files add the unit.
+export const durationRange = site.duration.min === site.duration.max ? `${site.duration.min}` : `${site.duration.min}-${site.duration.max}`;
+
+// The Instagram profile, for the footer link and for sameAs in JSON-LD.
+export const instagramUrl = site.instagram ? `https://instagram.com/${site.instagram}` : null;

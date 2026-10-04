@@ -15,6 +15,7 @@ npm run dev          # local development
 npm run build        # static build into dist/
 npm test             # Playwright suite (builds and serves the site itself)
 npm run test:live    # checks against the deployed site (share images return 200)
+npm run test:perf    # phone scroll performance at 4x CPU throttle (run on an idle machine, not in CI)
 npm run og           # regenerate the share images in public/og/ (build first)
 npm run lighthouse   # Lighthouse mobile against the live URL
 ```

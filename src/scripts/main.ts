@@ -3,10 +3,12 @@ import { initReveal } from './reveal';
 import { initLift } from './lift';
 import { initTorch } from './torch';
 import { initNeon } from './neon';
-import { initScroll } from './scroll';
+import { initFacade } from './facade';
+import { initScroll, nativeScroll } from './scroll';
 import { initCorridor } from './corridor';
 import { initLevel } from './level';
-import { initCheckin, initVoucher } from './checkin';
+import { initCheckin } from './checkin';
+import { initBooking } from './booking';
 import { initToday, initTitle, initSticky, initHanger } from './misc';
 import { initAudio } from './audio';
 
@@ -15,12 +17,13 @@ initScroll();
 initReveal();
 initTorch();
 initNeon();
+initFacade();
 initCorridor();
 initToday();
 initTitle();
 initLevel();
+initBooking();
 initCheckin();
-initVoucher();
 initSticky();
 initHanger();
 initAudio();
@@ -35,13 +38,26 @@ idle(() => {
 
 // The WebGL fog rolls in on the first sign of life (or after 6 seconds). Until then the
 // CSS halo stands in, so the first paint never waits for a GPU context.
+//
+// Starting it costs one stall (WebGL context plus shader compile, 60 to 140 ms measured, see
+// docs/perf-notes.md). On a touch device the first sign of life is nearly always the start of
+// a scroll, and a stall under a moving finger is a visible hitch. So there it waits until the
+// page has been at rest for a moment. Pointer devices keep the immediate start.
+const FOG_REST_MS = 400;
 let fogStarted = false;
+let fogTimer = 0;
 const startFog = () => {
   if (fogStarted) return;
   fogStarted = true;
-  fogEvents.forEach((ev) => window.removeEventListener(ev, startFog));
+  window.clearTimeout(fogTimer);
+  fogEvents.forEach((ev) => window.removeEventListener(ev, wakeFog));
   import('./fog').then((m) => m.initFog()).catch(() => {});
 };
-const fogEvents = ['pointermove', 'pointerdown', 'touchstart', 'keydown', 'scroll'];
-fogEvents.forEach((ev) => window.addEventListener(ev, startFog, { passive: true, once: true }));
-window.setTimeout(startFog, 6000);
+const wakeFog = () => {
+  if (!nativeScroll) return startFog();
+  window.clearTimeout(fogTimer);
+  fogTimer = window.setTimeout(startFog, FOG_REST_MS);
+};
+const fogEvents = ['pointermove', 'pointerdown', 'touchstart', 'touchmove', 'keydown', 'scroll'];
+fogEvents.forEach((ev) => window.addEventListener(ev, wakeFog, { passive: true }));
+window.setTimeout(wakeFog, 6000);
