@@ -1,4 +1,5 @@
-// The corridor: a pre-rendered walk scrubbed by scroll, and the door that opens once.
+// The corridor: a walk made offline from generated video, scrubbed by scroll, and the door
+// that opens once.
 // Everything is asserted on state the scrubber exposes (data attributes on the canvas) and on
 // the network, never on timing luck.
 import { test, expect, type Page } from '@playwright/test';
@@ -121,14 +122,14 @@ test('the door opens once: not on a second pass, and not after a reload in the s
   await approach(page, set);
   await toFrame(page, set.scare.frame + 5, set.frames);
   await expect(canvas).toHaveAttribute('data-scare', 'playing');
-  // while it plays the walk holds on the frame it was rendered from
+  // while it plays the walk holds on the frame the scare clip starts on
   expect(await num(page, 'frame')).toBe(set.scare.frame);
   await expect(canvas).toHaveAttribute('data-scare', 'done', { timeout: 4000 });
   await expect(canvas).toHaveAttribute('data-scare-plays', '1');
   expect(await page.evaluate((k) => sessionStorage.getItem(k), SCARE_KEY)).toBe('1');
   // then walks on to where the scroll is, no cut
   expect(await walkTo(page, set.scare.frame + 5, set.frames)).toBeGreaterThan(set.scare.frame);
-  // the frames with the rendered stand-in were used, and no "empty gap" ones
+  // the frames with the generated face were used, and no "empty gap" ones
   expect(patches.length).toBe(set.scare.has.filter(Boolean).length);
   expect(new Set(patches)).toEqual(new Set(['f']));
 
@@ -159,10 +160,22 @@ test('the scare is quiet: the door moves for 500 to 700 ms, then shuts, and noth
   // the door is shut on the first and the last frame of the run
   expect(sc.has[0]).toBe(0);
   expect(sc.has[sc.count - 1]).toBe(0);
-  // the patch is the door and what is behind it, not the whole picture (the walker stands
-  // close to the door, so the leaf fills about half of the frame)
+  // The patch is the door, which swings as a whole, and what is behind it. On the wide frame
+  // that is a part of the picture. On the phone frame the window at door 308 IS the door, so
+  // there the patch is nearly the whole frame, and what is checked instead is that it holds
+  // the gap of every frame of the beat.
   const share = (sc.rect[2] * sc.rect[3]) / (set.w * set.h);
-  expect(share).toBeLessThan(0.6);
+  if (set.w > set.h) expect(share).toBeLessThan(0.6);
+  const ajar = sc.quads.filter((q): q is NonNullable<typeof q> => Boolean(q));
+  expect(ajar.length, 'frames of the beat with the door open').toBeGreaterThanOrEqual(8);
+  for (const q of ajar) {
+    for (const [x, y] of [...q.clip, ...q.quad.slice(0, 1), ...q.quad.slice(3)]) {
+      expect(x * set.w, 'the gap is inside the patch, left to right').toBeGreaterThan(sc.rect[0]);
+      expect(x * set.w).toBeLessThan(sc.rect[0] + sc.rect[2]);
+      expect(y * set.h, 'the gap is inside the patch, top to bottom').toBeGreaterThan(sc.rect[1]);
+      expect(y * set.h).toBeLessThan(sc.rect[1] + sc.rect[3]);
+    }
+  }
 
   await approach(page, set);
   // Watch every animation frame from here on: the scare state, the patch on the canvas, and a
@@ -512,8 +525,9 @@ test('every frame of both sets is lit: none of them is a black screen', async ({
       return out;
     }, s);
     expect(means.length).toBe(s.frames);
-    // The darkest beat (the lamps dying behind the walker after the scare) is designed: a dark
-    // corridor with its far end lit, a mean of about 6/255. A black screen is a mean of 1 or 2.
+    // The walk is by torchlight: the darkest frames are the ones where the beam is on a far
+    // wall and most of the picture is unlit corridor. A black screen is a mean of 1 or 2 (the
+    // finishing pass lifts black to about 3).
     const darkest = Math.min(...means.map((m) => m.mean));
     const at = means.findIndex((m) => m.mean === darkest);
     expect(darkest, `${name}: frame ${at} is the darkest (mean ${darkest.toFixed(1)}/255)`).toBeGreaterThan(5);
@@ -521,6 +535,71 @@ test('every frame of both sets is lit: none of them is a black screen', async ({
     const dimmest = Math.min(...means.map((m) => m.p99));
     const at2 = means.findIndex((m) => m.p99 === dimmest);
     expect(dimmest, `${name}: frame ${at2} has the dimmest highlights (${dimmest.toFixed(0)}/255)`).toBeGreaterThan(48);
+  }
+});
+
+// The floating "ask" button sits bottom right, level with the caption. On a phone the caption
+// used to run into it. Checked on the text itself (each line as laid out), not only on its box.
+test('the caption clears the floating button on phones, in every language', async ({ browser }, info) => {
+  test.skip(info.project.name !== 'phone-390', 'phone layouts, checked once');
+  test.slow();
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 390, height: 667 },
+    { width: 360, height: 640 },
+  ]) {
+    for (const lang of ['ro', 'ru', 'en']) {
+      const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+      const page = await ctx.newPage();
+      await open(page, lang);
+      const { set } = await setInfo(page);
+      const count = await page.locator('[data-cap]').count();
+      expect(count).toBe(4);
+      for (let i = 0; i < count; i++) {
+        const where = `${viewport.width}x${viewport.height} ${lang} caption ${i + 1}`;
+        // the middle of this caption's time on screen
+        const p = 0.03 + (i * 0.96) / count + (0.96 / count - 0.05) / 2;
+        await toFrame(page, p * (set.frames - 1), set.frames);
+        const cap = page.locator('[data-cap]').nth(i);
+        await expect.poll(async () => Number(await cap.evaluate((el) => getComputedStyle(el).opacity)), { message: `${where} is shown` }).toBeGreaterThan(0.99);
+        const button = page.locator('[data-float] .ask__btn');
+        await expect(button, `${where}: the button is on screen`).toBeVisible();
+        // the button slides to its place above the book bar: wait until it has stopped
+        let last = '';
+        await expect
+          .poll(async () => {
+            const now = JSON.stringify(await button.boundingBox());
+            const still = now === last;
+            last = now;
+            return still;
+          })
+          .toBe(true);
+        const m = await cap.evaluate((el) => {
+          const b = document.querySelector('[data-float] .ask__btn')!.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const lines = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
+          // how far a rectangle is from the button: the larger of the horizontal and the vertical gap
+          const gap = (r: DOMRect) => Math.max(b.left - r.right, r.left - b.right, b.top - r.bottom, r.top - b.bottom);
+          return {
+            lines: lines.length,
+            text: Math.min(...lines.map(gap)),
+            box: gap(el.getBoundingClientRect()),
+            level: lines.some((r) => r.bottom > b.top && r.top < b.bottom),
+            vw: document.documentElement.clientWidth,
+            right: Math.max(...lines.map((r) => r.right)),
+          };
+        });
+        expect(m.lines, `${where} has text`).toBeGreaterThan(0);
+        // the case the rule is for: the caption is level with the button, so only the space
+        // between them keeps them apart
+        expect(m.level, `${where} is level with the button`).toBe(true);
+        expect(m.text, `${where}: space between the text and the button`).toBeGreaterThanOrEqual(8);
+        expect(m.box, `${where}: space between the caption box and the button`).toBeGreaterThanOrEqual(8);
+        expect(m.right, `${where} stays on the screen`).toBeLessThanOrEqual(m.vw);
+      }
+      await ctx.close();
+    }
   }
 });
 

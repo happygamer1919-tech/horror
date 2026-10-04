@@ -10,7 +10,7 @@ const t = copy[Astro.props.lang];
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 // Optional photograph for the face behind door 308: src/assets/scare/face.(avif|webp|png).
-// While there is no file the frames rendered with the stand-in are used. See the README there.
+// While there is no file the generated scare frames are used as they are. See the README there.
 const faces = import.meta.glob<string>('../assets/scare/face.{avif,webp,png}', { eager: true, query: '?url', import: 'default' });
 const face = Object.values(faces)[0] ?? '';
 ---
@@ -37,7 +37,7 @@ const face = Object.values(faces)[0] ?? '';
 
 <style>
   /* Pinned with position: sticky, which survives mobile address-bar resizes.
-     The height sets the walking pace: about 25 m of corridor over 4.6 screens of scroll. */
+     The height sets the walking pace: the whole corridor over 4.6 screens of scroll. */
   .corr {
     position: relative;
     height: 560vh;
@@ -105,6 +105,13 @@ const face = Object.values(faces)[0] ?? '';
   :global(html.motion) .corr__caps li {
     opacity: 0;
     will-change: opacity, transform;
+  }
+  /* Phones: the floating "ask" button (WaFloat.astro: 52 px wide, in the right gutter) sits
+     level with the caption. The caption keeps out of its column, with 16 px between them. */
+  @media (max-width: 899px) {
+    :global(html.motion) .corr__caps li {
+      max-width: min(18ch, calc(100% - 68px));
+    }
   }
 
   /* Static version: no pin, one still frame, every caption readable. */

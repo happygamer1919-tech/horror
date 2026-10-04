@@ -1,6 +1,7 @@
-// The corridor. A walk down the third floor, rendered offline (see corridor3d/) and shipped as
-// an image sequence: scroll progress picks the frame, a 2D canvas shows it. Two sets, landscape
-// and portrait, chosen by the viewport and never by the user agent.
+// The corridor. A walk down the third floor by torchlight, made offline from generated video
+// (see corridor-src/SOURCES.md and scripts/corridor-frames.mjs) and shipped as an image
+// sequence: scroll progress picks the frame, a 2D canvas shows it. Two sets, landscape and
+// portrait, chosen by the viewport and never by the user agent.
 //
 // What keeps it off the main thread:
 //   - frames are fetched as blobs and decoded with createImageBitmap, off the main thread
@@ -13,7 +14,7 @@
 // Once per browser session, on the first pass, door 308 opens a hand's width for 625 ms. The
 // walk frame holds while the patches play, and the picture pushes in slowly towards the door (a
 // CSS transform, done by the compositor), so the walk never looks frozen. Afterwards it is a
-// closed door like the others.
+// closed door like the others, and the patches are let go.
 import { ScrollTrigger } from './scroll';
 import { still, once } from './env';
 import { doorCreak } from './audio';
@@ -447,10 +448,10 @@ export function initCorridor() {
         g.globalCompositeOperation = 'multiply';
         g.fillStyle = 'rgb(214, 170, 120)';
         g.fillRect(0, 0, W, H);
-        // She leans out past the door edge, which hides the right of the picture: the lamp
+        // She looks out through the gap, and the jamb hides the right of the picture: the torch
         // reaches one eye and the cheek under it, the contour beyond them falls into the dark,
-        // and so does everything towards the edge. No more than a third of the face is lit, and
-        // that no brighter than the skin of the hand on the door.
+        // and so does everything towards the door edge. No more than a third of the face is lit,
+        // and that no brighter than the skin of the hand on the door.
         const fall = g.createLinearGradient(0, 0, W, 0);
         fall.addColorStop(0, 'rgb(14, 13, 12)');
         fall.addColorStop(0.16, 'rgb(128, 124, 120)');
@@ -645,6 +646,10 @@ export function initCorridor() {
         pushOut();
         catchUp = true;
         shownTarget = sc.frame;
+        // it never plays again on this page: the decoded patches (on a phone each is nearly a
+        // whole frame) are freed
+        patches.forEach((b) => b?.close());
+        patches = [];
       } else {
         show = sc.frame;
         patch = sc.has[j] ? j : -1;
