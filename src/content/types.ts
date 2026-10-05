@@ -83,6 +83,10 @@ export interface Copy {
     title: string;
     captions: string[];
     alt: string;
+    // The small link inside the corridor that leaves it. `skipLabel` is its full name for
+    // screen readers and starts with the visible word.
+    skip: string;
+    skipLabel: string;
   };
   file: {
     title: string;

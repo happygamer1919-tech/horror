@@ -61,6 +61,8 @@ export const en: Copy = {
       'Your room is the last one.',
     ],
     alt: 'A walk by torchlight down a dark hotel corridor with numbered doors, to room 313.',
+    skip: 'Skip',
+    skipLabel: 'Skip the corridor',
   },
   file: {
     title: 'The file',

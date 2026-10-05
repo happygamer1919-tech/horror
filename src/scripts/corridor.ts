@@ -1,784 +1,761 @@
 // The corridor. A walk down the third floor by torchlight, made offline from generated video
-// (see corridor-src/SOURCES.md and scripts/corridor-frames.mjs) and shipped as an image
-// sequence: scroll progress picks the frame, a 2D canvas shows it. Two sets, landscape and
-// portrait, chosen by the viewport and never by the user agent.
+// (corridor-src/SOURCES.md, scripts/corridor-video.mjs) and shown as video, in three chapters:
+//   1  door 301 to door 304        2  on to the scratched door 305
+//   3  to door 308 and on to the last door, 313
+// One gesture (a swipe, a turn of the wheel, a key) starts one chapter. It plays by itself, at
+// the speed it was shot, and stops on its caption.
 //
-// What keeps it off the main thread:
-//   - frames are fetched as blobs and decoded with createImageBitmap, off the main thread
-//   - only a small window of decoded frames around the walker is kept; the rest stay compressed
-//   - the canvas is drawn only when the frame to show changes, inside requestAnimationFrame
-//   - the backing store is never larger than the part of the frame it shows
-//   - nothing of the sequence is requested until the first input, or until the page has been
-//     idle well after load (and then only every 8th frame). One small poster loads with the page.
+// How it works
+//   - The stage is CSS sticky inside a tall section, so the page scrolls natively and the
+//     picture stands still while it does. Scroll snap, in CSS alone (Corridor.astro), gives the
+//     section four places to rest: the start, and the end of each chapter. Nothing here calls
+//     preventDefault, and the only touch and wheel listeners are passive ones that note that
+//     the visitor did something (the first input, and when the last one was).
+//   - This script reads only the scroll position. Leaving a stop by more than a few pixels is
+//     the gesture: forwards it starts the next chapter, backwards it brings back the pose of
+//     the stop before (a crossfade; nothing plays in reverse). Passing a second stop while a
+//     chapter plays cuts that chapter to its end pose and starts the next. When the page comes
+//     to rest somewhere other than the stop of the chapter it started, the page is put there
+//     (a mouse wheel moves the page 100 px and the browser then snaps back: the chapter has
+//     begun all the same, and the page follows it). The stage is pinned, so this is not seen.
+//   - A fast pass (a hard fling, a link that glides across the section) starts nothing: the
+//     stage shows the end poses it passes and the page keeps going.
+//   - The picture is a stack: four poses (stills of the start and of the end of each chapter)
+//     and, over them, the video of the chapter that is playing. A chapter begins on the pose
+//     the one before it ends on, and as it comes to a stop its end pose fades in over its last
+//     frames: at rest the stage always shows a still, which is sharper than any video frame and
+//     holds no decoder.
+//   - Nothing but one small poster loads with the page. The first input fetches the poses and
+//     chapter 1; each chapter fetches the next one while it plays. A video is fetched whole
+//     before it is played, so it never stalls half way.
+//   - Without video (no codec, autoplay refused, a file that will not load) the chapters are
+//     crossfades between the poses, with the same captions. The section works either way.
+//   - Reduced motion: no pin, no video, three stills.
 //
-// Once per browser session, on the first pass, door 308 opens a hand's width for 625 ms. The
-// walk frame holds while the patches play, and the picture pushes in slowly towards the door (a
-// CSS transform, done by the compositor), so the walk never looks frozen. Afterwards it is a
-// closed door like the others, and the patches are let go.
-import { ScrollTrigger } from './scroll';
+// Once per browser session, on the first forward pass through chapter 3, door 308 opens a
+// hand's width for 625 ms: that pass plays the variant of chapter 3 that has the beat in it.
+// It counts once its frames were on screen; a visitor who skipped past keeps it for later.
 import { still, once } from './env';
 import { doorCreak } from './audio';
 
-interface Quad {
-  quad: number[][];
-  clip: number[][];
+interface Cue {
+  cap: number;
+  in: number;
+  out?: number;
 }
-interface ScareInfo {
-  frame: number;
-  fps: number;
-  count: number;
-  rect: [number, number, number, number];
-  has: number[];
-  quads: (Quad | null)[];
+interface Source {
+  codec: string;
+  src: string;
+  type: string;
 }
+interface FileInfo {
+  duration: number;
+  frames: number;
+  cues: Cue[];
+  sources: Source[];
+  scare?: { at: number; end: number; rect: [number, number, number, number] };
+}
+type FileId = 'c1' | 'c2' | 'c3' | 'c3s';
 interface SetInfo {
-  dir: string;
-  ext: string;
   w: number;
   h: number;
-  frames: number;
   poster: string;
-  scare: ScareInfo | null;
+  poses: string[];
+  files: Record<FileId, FileInfo>;
 }
 type SetName = 'desktop' | 'mobile';
 interface Manifest {
-  sets: Partial<Record<SetName, SetInfo>>;
+  sets: Record<SetName, SetInfo>;
 }
-type Drawable = ImageBitmap | HTMLImageElement;
-interface Pick {
-  bmp: Drawable;
-  idx: number;
-  q: 'full' | 'near' | 'coarse' | 'poster';
+interface Clip {
+  id: FileId;
+  info: FileInfo;
+  state: 'idle' | 'loading' | 'ready' | 'failed';
+  url: string;
+  direct: string;
+  ready: Promise<boolean>;
 }
+type FrameCallback = (now: number, meta: { mediaTime: number }) => void;
+type FrameVideo = HTMLVideoElement & { requestVideoFrameCallback?: (cb: FrameCallback) => number };
 
 const SCARE_KEY = 'hotel:scare';
-const KEY = 8; // every 8th frame is fetched first and kept as a small stand-in
-const STILL_AT = 0.1; // the frame shown to visitors who asked for reduced motion
+// The section's shape, in screens (Corridor.astro: --corr-lead, --corr-step, one screen to leave with).
+const LEAD = 0.2;
+const STEP = 1.25;
+const SCREENS = LEAD + 3 * STEP + 1;
+const LAST = 3;
+const INTENT_PX = 16; // leaving a stop by more than this is a gesture
+const FAST_PX_MS = 3.2; // faster than this is a pass, not a visit: nothing starts
+const FADE_MS = 280; // to a pose
+const VIDEO_FADE_MS = 160; // a pose to the first frame of its video (the same picture)
+const SETTLE_S = 0.4; // a chapter's end pose comes up over its last frames, this long before the end
+const INPUT_QUIET_MS = 300; // the page is taken to its stop only this long after the last wheel, touch or key
+const READY_WAIT_MS = 1500; // how long a chapter waits for its file before it goes on without it
+const FRAME_WAIT_MS = 4000; // and for its first frame, once it plays
+// A chapter without video: a slow crossfade to its end pose, the captions in the same order.
+const WALK_MS = [0, 1700, 1700, 3400];
+const WALK_FADE_MS = 900;
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
-const smooth = (a: number, b: number, v: number) => {
-  const t = clamp((v - a) / (b - a), 0, 1);
-  return t * t * (3 - 2 * t);
-};
-const pad = (n: number, w = 3) => String(n).padStart(w, '0');
 
-// Frame order for progressive loading: every 8th, then every 4th, every 2nd, the rest.
-function coarseOrder(n: number): number[] {
-  const seen = new Set<number>();
-  const out: number[] = [];
-  const add = (i: number) => {
-    if (i >= 0 && i < n && !seen.has(i)) {
-      seen.add(i);
-      out.push(i);
-    }
+export function initCorridor() {
+  const found = document.querySelector<HTMLElement>('[data-corridor]');
+  const section = document.getElementById('corridor');
+  const viewEl = found?.querySelector<HTMLElement>('[data-view]');
+  if (!found || !section || !viewEl) return;
+  const pin: HTMLElement = found;
+  const view: HTMLElement = viewEl;
+  let manifest: Manifest;
+  try {
+    manifest = JSON.parse(pin.dataset.manifest ?? '');
+  } catch {
+    return;
+  }
+  const base = pin.dataset.base ?? '';
+  const caps = Array.from(section.querySelectorAll<HTMLElement>('[data-cap]'));
+  const poses = [0, 1, 2, 3].map((k) => view.querySelector<HTMLImageElement>(`[data-pose="${k}"]`)).filter((el): el is HTMLImageElement => Boolean(el));
+  if (poses.length !== 4) return;
+
+  const narrow = window.matchMedia('(orientation: portrait), (max-width: 760px)');
+  let setName: SetName = narrow.matches ? 'mobile' : 'desktop';
+  let info = manifest.sets[setName];
+  if (!info) return;
+  pin.dataset.set = setName;
+
+  // Two hooks for the tests: which codec to use (or 'none'), and how fast to play.
+  const hook = window as unknown as { __corridorCodec?: string; __corridorRate?: number };
+  const rate = () => (hook.__corridorRate && hook.__corridorRate > 0 ? hook.__corridorRate : 1);
+  const set = (key: string, value: string | number) => {
+    const v = String(value);
+    if (pin.dataset[key] !== v) pin.dataset[key] = v;
   };
-  for (const step of [KEY, KEY / 2, KEY / 4, 1]) {
-    for (let i = 0; i < n; i += step) add(i);
-    add(n - 1);
-  }
-  return out;
-}
 
-// One image sequence: what has been fetched, what is decoded, what to show for a frame.
-class Sequence {
-  private blobs: (Blob | undefined)[];
-  private state: Uint8Array; // 0 not asked, 1 on its way, 2 here, 3 failed
-  private full = new Map<number, ImageBitmap>();
-  private small = new Map<number, ImageBitmap>();
-  private decoding = new Set<number>();
-  private order: number[];
-  private cursor = 0;
-  private active = 0;
-  private running = false;
-  private everything = false;
-  private only: number[] | null = null;
-  private centre = 0;
-  private dir = 1;
-  private dead = false;
-  loaded = 0;
+  // --- the poses ---
+  // The small poster that came with the page stays where it is, under everything, for good: it
+  // is the floor of the stack. The four poses are layers over it and get their source here.
+  let posesAsked = false;
+  const loadPoses = () => {
+    if (posesAsked) return;
+    posesAsked = true;
+    info.poses.forEach((src, k) => {
+      poses[k].src = base + src;
+    });
+  };
 
-  constructor(
-    readonly info: SetInfo,
-    private base: string,
-    private mobile: boolean,
-    private onChange: () => void,
-    private onBroken: () => void,
-  ) {
-    this.blobs = new Array(info.frames);
-    this.state = new Uint8Array(info.frames);
-    this.order = coarseOrder(info.frames);
-  }
-
-  url(i: number) {
-    return `${this.base}${this.info.dir}/${pad(i)}.${this.info.ext}`;
-  }
-  // The decoded window. A phone frame is 900 x 1800 (6.5 MB decoded): at most 6 ahead, 2 behind
-  // and 1 of slack either side are kept, 11 bitmaps, about 70 MB. Everything else stays compressed.
-  private get ahead() {
-    return this.mobile ? 6 : 10;
-  }
-  private get behind() {
-    return this.mobile ? 2 : 5;
-  }
-  private get slack() {
-    return this.mobile ? 1 : 3;
-  }
-
-  // Start fetching. `only`: just these frames (the still, or the idle head start).
-  start(everything: boolean, only: number[] | null = null) {
-    if (this.dead) return;
-    this.only = only;
-    if (everything) this.everything = true;
-    this.running = true;
-    this.pump();
-  }
-
-  private next(): number {
-    if (this.only) {
-      for (const i of this.only) if (this.state[i] === 0) return i;
-      if (!this.everything) return -1;
-    }
-    // 1. the coarse pass: every 8th frame, so there is always something near to show
-    while (this.cursor < this.order.length) {
-      const i = this.order[this.cursor];
-      if (this.state[i] !== 0) {
-        this.cursor++;
-        continue;
+  if (still) {
+    // three stills, no pin, no walk, no scare, and no video is ever asked for
+    set('mode', 'still');
+    set('state', 'off');
+    poses.forEach((el, k) => {
+      if (k > 0) {
+        el.loading = 'lazy';
+        el.src = base + info.poses[k];
       }
-      if (i % KEY !== 0 && i !== this.info.frames - 1) break;
-      return i;
-    }
-    if (!this.everything) return -1;
-    // 2. what the walker is about to need
-    for (let d = 0; d <= this.ahead; d++) {
-      for (const i of d === 0 ? [this.centre] : [this.centre + d * this.dir, this.centre - d * this.dir]) {
-        if (this.wanted(i) && this.state[i] === 0) return i;
+    });
+    return;
+  }
+
+  // --- the picture: a stack, the newest layer on top ---
+  let top = 10;
+  let fadeToken = 0;
+  const videos = new Set<HTMLVideoElement>();
+  const release = (v: HTMLVideoElement) => {
+    videos.delete(v);
+    v.pause();
+    v.removeAttribute('src');
+    v.load();
+    v.remove();
+  };
+  // Bring one layer up over whatever is showing, fading in; when it is fully there, everything
+  // under it goes (and a video under it gives its decoder back; a video that has not come up
+  // yet is not under anything and is left alone).
+  // A pose that has not arrived yet waits for its picture, and what is showing stays until then:
+  // the stage is never empty.
+  const show = (el: HTMLElement, ms: number) => {
+    const token = ++fadeToken;
+    const done = () => {
+      if (token !== fadeToken) return;
+      for (const p of poses) if (p !== el) p.classList.remove('is-on');
+      for (const v of [...videos]) if (v !== el && v.classList.contains('is-on')) release(v);
+    };
+    const up = () => {
+      if (token !== fadeToken) return;
+      el.style.zIndex = String(++top);
+      el.classList.add('is-on');
+      if (ms <= 0 || typeof el.animate !== 'function') return done();
+      el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: 'linear' }).finished.then(done, () => {});
+    };
+    if (!(el instanceof HTMLImageElement)) return up();
+    // loaded, and decoded too: a picture that is still being decoded paints as nothing
+    const decoded = () => (typeof el.decode === 'function' ? el.decode().then(up, up) : up());
+    if (el.complete && el.naturalWidth > 0) decoded();
+    else el.addEventListener('load', decoded, { once: true });
+  };
+
+  // --- captions ---
+  const capOn = caps.map(() => false);
+  const setCaps = (on: (i: number) => boolean) => {
+    caps.forEach((el, i) => {
+      const want = on(i);
+      if (want !== capOn[i]) {
+        capOn[i] = want;
+        el.classList.toggle('is-on', want);
       }
-    }
-    // 3. the rest: every 4th, every 2nd, every frame
-    while (this.cursor < this.order.length) {
-      const i = this.order[this.cursor];
-      if (this.state[i] === 0) return i;
-      this.cursor++;
-    }
-    return -1;
-  }
+    });
+  };
+  const fileOf = (chapter: number, scare: boolean): FileId => (chapter === 1 ? 'c1' : chapter === 2 ? 'c2' : scare ? 'c3s' : 'c3');
+  // the caption a stop rests on: the one its chapter never takes away
+  const restCap = (stop: number) => (stop < 1 ? -1 : (info.files[fileOf(stop, false)].cues.find((c) => c.out === undefined)?.cap ?? -1));
+  const cuesAt = (cues: Cue[], t: number) => (i: number) => cues.some((c) => c.cap === i && t >= c.in && (c.out === undefined || t < c.out));
 
-  private pump() {
-    const limit = this.mobile ? 4 : 6;
-    while (this.running && !this.dead && this.active < limit) {
-      const i = this.next();
-      if (i < 0) return;
-      this.load(i);
-    }
-  }
-
-  private load(i: number) {
-    this.state[i] = 1;
-    this.active++;
-    fetch(this.url(i))
+  // --- the files ---
+  let codec: string | null = null; // decided at the first input
+  let codecAsked: Promise<void> | null = null;
+  const clips = new Map<FileId, Clip>();
+  const loaded: string[] = [];
+  const chooseCodec = () => {
+    if (codecAsked) return codecAsked;
+    codecAsked = (async () => {
+      const probe = document.createElement('video');
+      const sources = info.files.c1.sources;
+      const can = sources.filter((s) => probe.canPlayType(s.type) !== '');
+      if (hook.__corridorCodec !== undefined) {
+        codec = can.find((s) => s.codec === hook.__corridorCodec)?.codec ?? null;
+        return;
+      }
+      // The sources are listed best first (AV1, then H.264), and the first that can be played
+      // is taken, as a <source> list would. One exception: where the better codec would be
+      // decoded in software and the next one in hardware, a phone takes the hardware one.
+      let pick = can[0] ?? null;
+      const mc = navigator.mediaCapabilities;
+      if (pick && can.length > 1 && mc?.decodingInfo) {
+        try {
+          const r = await mc.decodingInfo({ type: 'file', video: { contentType: pick.type, width: info.w, height: info.h, bitrate: 1_500_000, framerate: 36 } });
+          if (!r.supported || !r.smooth || (setName === 'mobile' && !r.powerEfficient)) pick = can[1];
+        } catch {
+          // an old browser that knows the API but not the codec string: keep the list order
+        }
+      }
+      codec = pick?.codec ?? null;
+    })().then(() => set('codec', codec ?? 'none'));
+    return codecAsked;
+  };
+  const clipOf = (id: FileId): Clip | null => {
+    const have = clips.get(id);
+    if (have) return have;
+    const source = info.files[id].sources.find((s) => s.codec === codec);
+    if (!source) return null;
+    const clip: Clip = { id, info: info.files[id], state: 'loading', url: '', direct: base + source.src, ready: Promise.resolve(false) };
+    clip.ready = fetch(clip.direct)
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
         return r.blob();
       })
       .then((blob) => {
-        if (this.dead) return;
-        this.blobs[i] = blob;
-        this.state[i] = 2;
-        this.loaded++;
-        if (i % KEY === 0 || i === this.info.frames - 1) this.decodeSmall(i);
-        this.fill();
-        this.onChange();
+        clip.url = URL.createObjectURL(new Blob([blob], { type: 'video/mp4' }));
+        clip.state = 'ready';
+        loaded.push(id);
+        set('loaded', loaded.join(' '));
+        return true;
       })
       .catch(() => {
-        this.state[i] = 3;
-      })
-      .finally(() => {
-        this.active--;
-        this.pump();
+        clip.state = 'failed';
+        return false;
       });
-  }
-
-  private decodeSmall(i: number) {
-    const blob = this.blobs[i];
-    if (!blob || this.small.has(i)) return;
-    createImageBitmap(blob, { resizeWidth: Math.round(this.info.w / 4), resizeHeight: Math.round(this.info.h / 4), resizeQuality: 'low' })
-      .then((bmp) => {
-        if (this.dead) return bmp.close();
-        this.small.set(i, bmp);
-        this.onChange();
-      })
-      .catch(() => {
-        // no resize option, or the format cannot be decoded here: the full-size window still works
-      });
-  }
-
-  // Tell the sequence where the walker is. Decodes around that frame, drops what fell behind.
-  focus(i: number, dir: number) {
-    this.centre = i;
-    if (dir) this.dir = dir;
-    this.fill();
-    for (const [k, bmp] of this.full) {
-      const d = (k - i) * this.dir;
-      if (d > this.ahead + this.slack || d < -this.behind - this.slack) {
-        bmp.close();
-        this.full.delete(k);
-      }
-    }
-    this.pump();
-  }
-
-  private wanted(k: number) {
-    const d = (k - this.centre) * this.dir;
-    return k >= 0 && k < this.info.frames && d <= this.ahead && d >= -this.behind;
-  }
-
-  private fill() {
-    const limit = this.mobile ? 2 : 3;
-    for (let d = 0; d <= this.ahead && this.decoding.size < limit; d++) {
-      for (const k of d === 0 ? [this.centre] : [this.centre + d * this.dir, this.centre - d * this.dir]) {
-        if (this.decoding.size >= limit) break;
-        if (!this.wanted(k) || this.full.has(k) || this.decoding.has(k) || !this.blobs[k]) continue;
-        this.decode(k);
-      }
-    }
-  }
-
-  private decode(k: number) {
-    this.decoding.add(k);
-    createImageBitmap(this.blobs[k] as Blob)
-      .then((bmp) => {
-        this.decoding.delete(k);
-        if (this.dead || !this.wanted(k)) return bmp.close();
-        this.full.set(k, bmp);
-        this.fill();
-        this.onChange();
-      })
-      .catch(() => {
-        this.decoding.delete(k);
-        this.state[k] = 3;
-        this.onBroken();
-      });
-  }
-
-  has(i: number) {
-    return this.full.has(i);
-  }
-
-  // The best thing to show for frame i right now.
-  pick(i: number): Pick | null {
-    const exact = this.full.get(i);
-    if (exact) return { bmp: exact, idx: i, q: 'full' };
-    for (let d = 1; d <= 3; d++) {
-      for (const k of [i - d * this.dir, i + d * this.dir]) {
-        const b = this.full.get(k);
-        if (b) return { bmp: b, idx: k, q: 'near' };
-      }
-    }
-    let best: Pick | null = null;
-    for (const [k, b] of this.small) {
-      if (!best || Math.abs(k - i) < Math.abs(best.idx - i)) best = { bmp: b, idx: k, q: 'coarse' };
-    }
-    return best;
-  }
-
-  // Free the decoded window (the compressed frames stay).
-  release() {
-    for (const bmp of this.full.values()) bmp.close();
-    this.full.clear();
-  }
-
-  destroy() {
-    this.dead = true;
-    this.release();
-    for (const bmp of this.small.values()) bmp.close();
-    this.small.clear();
-  }
-}
-
-export function initCorridor() {
-  const found = document.querySelector<HTMLCanvasElement>('[data-corridor]');
-  const section = document.getElementById('corridor');
-  if (!found || !section) return;
-  const canvas: HTMLCanvasElement = found;
-  const context = canvas.getContext('2d', { alpha: false });
-  if (!context) return;
-  const ctx: CanvasRenderingContext2D = context;
-  let manifest: Manifest;
-  try {
-    manifest = JSON.parse(canvas.dataset.manifest ?? '');
-  } catch {
-    return;
-  }
-  const base = canvas.dataset.base ?? '';
-  // A supplied photograph of the face (build time), or the test hook that stands in for it.
-  const faceUrl = (window as unknown as { __corridorFace?: string }).__corridorFace ?? canvas.dataset.face ?? '';
-  const caps = Array.from(section.querySelectorAll<HTMLElement>('[data-cap]'));
-
-  const narrow = window.matchMedia('(orientation: portrait), (max-width: 760px)');
-  let avifBroken = false;
-  const choose = (): SetName => {
-    const want: SetName = narrow.matches ? 'mobile' : 'desktop';
-    if (want === 'desktop' && (avifBroken || !manifest.sets.desktop)) return 'mobile';
-    if (want === 'mobile' && !manifest.sets.mobile) return 'desktop';
-    return want;
+    clips.set(id, clip);
+    return clip;
   };
-
-  let setName: SetName = choose();
-  let info = manifest.sets[setName] as SetInfo;
-  if (!info) return;
-
-  // --- canvas geometry: set on resize, never read while drawing ---
-  let cw = 0;
-  let ch = 0;
-  let cssW = 0;
-  let cssH = 0;
-  let crop = { x: 0, y: 0, w: 1, h: 1 }; // the part of the frame the canvas shows, in frame pixels
-  const layout = () => {
-    if (!cssW || !cssH) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    // device pixels the canvas would need, capped at the frame's own resolution
-    const s = Math.max((cssW * dpr) / info.w, (cssH * dpr) / info.h);
-    const k = Math.min(1, 1 / s);
-    cw = Math.max(1, Math.round(cssW * dpr * k));
-    ch = Math.max(1, Math.round(cssH * dpr * k));
-    if (canvas.width !== cw) canvas.width = cw;
-    if (canvas.height !== ch) canvas.height = ch;
-    const sc = Math.max(cw / info.w, ch / info.h);
-    crop = { w: cw / sc, h: ch / sc, x: (info.w - cw / sc) / 2, y: (info.h - ch / sc) / 2 };
-    drawn.idx = -2;
+  const scareDone = () => {
+    try {
+      return Boolean(sessionStorage.getItem(SCARE_KEY));
+    } catch {
+      return false;
+    }
+  };
+  // Fetch what the chapter after `stop` will need. Of chapter 3 only the variant this session
+  // still needs.
+  const preload = (stop: number) => {
+    if (!started || stop >= LAST) return;
+    void chooseCodec().then(() => {
+      if (codec) clipOf(fileOf(stop + 1, !scareDone()));
+    });
   };
 
   // --- state ---
-  let progress = 0;
-  let prevTarget = -1;
-  let shownTarget = -1; // the frame the walk is at (differs from the scroll target while catching up)
-  let dir = 1;
-  let inView = false;
-  let raf = 0;
+  let chapter = 0; // the stop the visitor is at, or is on the way to: 0 to 3
+  let anchor = 0; // the stop last passed or rested on
+  let state: 'rest' | 'play' = 'rest';
+  let run = 0; // every change of plan gets a new number; whatever was under way checks it and stops
+  let pending = 0; // a chapter that was reached but has not started: the page was moving too fast
+  let notBefore = 0; // and the earliest it may start (after a cut to the pose it starts on)
+  let playing: HTMLVideoElement | null = null;
   let started = false;
-  let capsAt = -1;
-  let poster: HTMLImageElement | null = null;
-  const drawn = { idx: -2, q: '', patch: -1 };
-  let draws = 0;
+  let visible = false;
+  let beats = 0;
+  let played = 0;
+  let pushed = false;
+  let clock = 0;
+  set('scareBeats', 0);
+  set('played', 0);
+  set('variant', '');
+  set('mode', '');
+  set('loaded', '');
 
-  const kick = () => {
-    if (!raf) raf = requestAnimationFrame(frame);
-  };
-  const broken = () => {
-    // a frame that would not decode: an AVIF set on a browser without AVIF. Use the other set.
-    if (info.ext !== 'avif' || avifBroken) return;
-    avifBroken = true;
-    switchSet();
-  };
-  let seq = new Sequence(info, base, setName === 'mobile', kick, broken);
-
-  // --- the scare ---
-  let scareDone = false;
-  try {
-    scareDone = Boolean(sessionStorage.getItem(SCARE_KEY));
-  } catch {
-    scareDone = false;
-  }
-  let scarePlays = 0;
-  let scareState: 'idle' | 'arming' | 'playing' = 'idle';
-  let scareStart = 0;
-  let armedAt = 0;
-  let catchUp = false;
-  let patches: (ImageBitmap | null)[] = [];
-  let patchState: 'none' | 'loading' | 'ready' | 'failed' = 'none';
-  let face: HTMLCanvasElement | null = null;
-  let faceDraws = 0;
-  canvas.dataset.scare = 'idle';
-  canvas.dataset.scarePlays = '0';
-  canvas.dataset.faceMode = faceUrl ? 'photo' : 'stand-in';
-
-  const loadPatches = () => {
-    const sc = info.scare;
-    if (!sc || patchState !== 'none') return;
-    patchState = 'loading';
-    const mine = seq;
-    const variant = faceUrl ? 'g' : 'f';
-    const jobs: Promise<ImageBitmap | null>[] = sc.has.map((has, j) =>
-      has
-        ? fetch(`${base}${info.dir}/s/${variant}-${pad(j, 2)}.${info.ext}`)
-            .then((r) => {
-              if (!r.ok) throw new Error(String(r.status));
-              return r.blob();
-            })
-            .then((b) => createImageBitmap(b))
-        : Promise.resolve(null),
-    );
-    if (faceUrl) jobs.push(prepareFace(faceUrl).then(() => null));
-    Promise.all(jobs)
-      .then((list) => {
-        if (mine !== seq) return list.forEach((b) => b?.close());
-        patches = list.slice(0, sc.count);
-        patchState = 'ready';
-        canvas.dataset.scareReady = '1';
-        kick();
-      })
-      .catch(() => {
-        patchState = 'failed';
-      });
+  // --- geometry: set on resize, never read while scrolling ---
+  let stop0 = 0;
+  let step = 1;
+  let screen = 1;
+  const measure = () => {
+    const r = section.getBoundingClientRect();
+    screen = r.height / SCREENS;
+    step = STEP * screen;
+    stop0 = r.top + window.scrollY + LEAD * screen;
+    set('stops', [0, 1, 2, 3].map((k) => Math.round(stop0 + k * step)).join(' '));
   };
 
-  // The supplied photograph, prepared once: dark, tinted to the lamp, lit on one side only,
-  // with grain. Drawn with "lighter", so everything that is black in it stays the dark of the gap.
-  const prepareFace = (url: string) =>
-    new Promise<void>((resolve, reject) => {
-      const img = new Image();
-      img.decoding = 'async';
-      img.onload = () => {
-        const W = 240;
-        const H = 324;
-        const c = document.createElement('canvas');
-        c.width = W;
-        c.height = H;
-        const g = c.getContext('2d');
-        if (!g) return reject(new Error('no 2d context'));
-        // cover fit
-        const s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-        const dw = img.naturalWidth * s;
-        const dh = img.naturalHeight * s;
-        if ('filter' in g) g.filter = 'grayscale(0.55) contrast(1.15) brightness(0.9)';
-        g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-        if ('filter' in g) g.filter = 'none';
-        // the corridor's tungsten
-        g.globalCompositeOperation = 'multiply';
-        g.fillStyle = 'rgb(214, 170, 120)';
-        g.fillRect(0, 0, W, H);
-        // She looks out through the gap, and the jamb hides the right of the picture: the torch
-        // reaches one eye and the cheek under it, the contour beyond them falls into the dark,
-        // and so does everything towards the door edge. No more than a third of the face is lit,
-        // and that no brighter than the skin of the hand on the door.
-        const fall = g.createLinearGradient(0, 0, W, 0);
-        fall.addColorStop(0, 'rgb(14, 13, 12)');
-        fall.addColorStop(0.16, 'rgb(128, 124, 120)');
-        fall.addColorStop(0.27, 'rgb(150, 146, 140)');
-        fall.addColorStop(0.4, 'rgb(84, 78, 72)');
-        fall.addColorStop(0.55, 'rgb(18, 15, 13)');
-        fall.addColorStop(1, 'rgb(0, 0, 0)');
-        g.fillStyle = fall;
-        g.fillRect(0, 0, W, H);
-        // and falls off towards the top and the bottom of the head
-        const vert = g.createRadialGradient(W * 0.27, H * 0.4, H * 0.06, W * 0.27, H * 0.4, H * 0.5);
-        vert.addColorStop(0, 'rgb(255, 255, 255)');
-        vert.addColorStop(1, 'rgb(6, 5, 5)');
-        g.fillStyle = vert;
-        g.fillRect(0, 0, W, H);
-        g.globalCompositeOperation = 'source-over';
-        // grain, matched to the frames: fine, a little stronger in the dark
-        const data = g.getImageData(0, 0, W, H);
-        let seed = 9173;
-        for (let i = 0; i < data.data.length; i += 4) {
-          seed = (seed * 1664525 + 1013904223) >>> 0;
-          const n = ((seed >>> 16) / 65535 - 0.5) * 14;
-          data.data[i] = clamp(data.data[i] + n, 0, 255);
-          data.data[i + 1] = clamp(data.data[i + 1] + n * 0.97, 0, 255);
-          data.data[i + 2] = clamp(data.data[i + 2] + n * 0.92, 0, 255);
-        }
-        g.putImageData(data, 0, 0);
-        face = c;
-        resolve();
-      };
-      img.onerror = () => reject(new Error('face'));
-      img.src = url;
-    });
-
-  // frame coordinates (0..1) to canvas pixels
-  const fx = (x: number) => ((x * info.w - crop.x) * cw) / crop.w;
-  const fy = (y: number) => ((y * info.h - crop.y) * ch) / crop.h;
-
-  // Draw the prepared photograph into the head quad, clipped to the gap between jamb and door.
-  // Two affine triangles stand in for the perspective: at this size the difference cannot be seen.
-  const drawFace = (q: Quad, alpha: number) => {
-    if (!face || alpha <= 0) return;
-    const P = q.quad.map(([x, y]) => [fx(x), fy(y)]);
-    const W = face.width;
-    const H = face.height;
-    ctx.save();
-    ctx.beginPath();
-    q.clip.forEach(([x, y], i) => (i ? ctx.lineTo(fx(x), fy(y)) : ctx.moveTo(fx(x), fy(y))));
-    ctx.closePath();
-    ctx.clip();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = alpha;
-    const tri = (a: number[], b: number[], c: number[], ua: number[], ub: number[], uc: number[]) => {
-      // affine map taking the source triangle (ua, ub, uc) to (a, b, c)
-      const d = (ub[0] - ua[0]) * (uc[1] - ua[1]) - (uc[0] - ua[0]) * (ub[1] - ua[1]);
-      if (!d) return;
-      const m11 = ((b[0] - a[0]) * (uc[1] - ua[1]) - (c[0] - a[0]) * (ub[1] - ua[1])) / d;
-      const m12 = ((c[0] - a[0]) * (ub[0] - ua[0]) - (b[0] - a[0]) * (uc[0] - ua[0])) / d;
-      const m21 = ((b[1] - a[1]) * (uc[1] - ua[1]) - (c[1] - a[1]) * (ub[1] - ua[1])) / d;
-      const m22 = ((c[1] - a[1]) * (ub[0] - ua[0]) - (b[1] - a[1]) * (uc[0] - ua[0])) / d;
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(a[0], a[1]);
-      ctx.lineTo(b[0], b[1]);
-      ctx.lineTo(c[0], c[1]);
-      ctx.closePath();
-      ctx.clip();
-      ctx.transform(m11, m21, m12, m22, a[0] - m11 * ua[0] - m12 * ua[1], a[1] - m21 * ua[0] - m22 * ua[1]);
-      ctx.drawImage(face as HTMLCanvasElement, 0, 0);
-      ctx.restore();
-    };
-    tri(P[0], P[1], P[2], [0, 0], [W, 0], [W, H]);
-    tri(P[0], P[2], P[3], [0, 0], [W, H], [0, H]);
-    // the shadow of the door edge: the half of the gap nearer the leaf gets almost no light
-    const [j1, e1, e2, j2] = q.clip.map(([x, y]) => [fx(x), fy(y)]);
-    const em = [(e1[0] + e2[0]) / 2, (e1[1] + e2[1]) / 2];
-    const jm = [(j1[0] + j2[0]) / 2, (j1[1] + j2[1]) / 2];
-    const shade = ctx.createLinearGradient(em[0], em[1], em[0] + (jm[0] - em[0]) * 0.55, em[1] + (jm[1] - em[1]) * 0.55);
-    shade.addColorStop(0, 'rgba(0, 0, 0, 0.9)');
-    shade.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = shade;
-    ctx.fillRect(Math.min(...P.map((p) => p[0])) - 4, Math.min(...P.map((p) => p[1])) - 4, Math.max(...P.map((p) => p[0])) - Math.min(...P.map((p) => p[0])) + 8, Math.max(...P.map((p) => p[1])) - Math.min(...P.map((p) => p[1])) + 8);
-    ctx.restore();
-    faceDraws++;
-    canvas.dataset.faceDraws = String(faceDraws);
-  };
-
-  // The door beat: lean in towards the gap while it plays, settle back while the walk catches up.
-  const pushIn = (sc: ScareInfo) => {
+  // --- the scare: lean in towards the gap while the door moves, settle back after ---
+  const pushIn = (sc: NonNullable<FileInfo['scare']>) => {
+    const cw = view.clientWidth;
+    const ch = view.clientHeight;
+    if (!cw || !ch) return;
+    // the part of the frame the stage shows (object-fit: cover, centred), in frame pixels
+    const k = Math.max(cw / info.w, ch / info.h);
+    const crop = { w: cw / k, h: ch / k, x: (info.w - cw / k) / 2, y: (info.h - ch / k) / 2 };
     const [x, y, w, h] = sc.rect;
     const ox = clamp(((x + w / 2 - crop.x) / crop.w) * 100, 0, 100);
     const oy = clamp(((y + h / 2 - crop.y) / crop.h) * 100, 0, 100);
-    canvas.style.transformOrigin = `${ox.toFixed(1)}% ${oy.toFixed(1)}%`;
-    canvas.style.transition = `transform ${Math.round((sc.count / sc.fps) * 1000)}ms cubic-bezier(0.25, 0.1, 0.35, 1)`;
-    canvas.style.transform = 'scale(1.045)';
+    view.style.transformOrigin = `${ox.toFixed(1)}% ${oy.toFixed(1)}%`;
+    view.style.transition = `transform ${Math.round((sc.end - sc.at) * 1000)}ms cubic-bezier(0.25, 0.1, 0.35, 1)`;
+    view.style.transform = 'scale(1.045)';
+    pushed = true;
   };
   const pushOut = () => {
-    if (!canvas.style.transform) return;
-    canvas.style.transition = 'transform 900ms cubic-bezier(0.45, 0, 0.25, 1)';
-    canvas.style.transform = '';
+    if (!pushed) return;
+    pushed = false;
+    view.style.transition = 'transform 900ms cubic-bezier(0.45, 0, 0.25, 1)';
+    view.style.transform = '';
   };
 
-  // --- drawing ---
-  const paint = (p: Pick, patch: number) => {
-    const bw = 'naturalWidth' in p.bmp ? p.bmp.naturalWidth : p.bmp.width;
-    const bh = 'naturalHeight' in p.bmp ? p.bmp.naturalHeight : p.bmp.height;
-    const kx = bw / info.w;
-    const ky = bh / info.h;
-    ctx.drawImage(p.bmp, crop.x * kx, crop.y * ky, crop.w * kx, crop.h * ky, 0, 0, cw, ch);
-    const sc = info.scare;
-    if (patch >= 0 && sc) {
-      const bmp = patches[patch];
-      if (bmp) {
-        const [x, y, w, h] = sc.rect;
-        const k = cw / crop.w;
-        ctx.drawImage(bmp, (x - crop.x) * k, (y - crop.y) * k, w * k, h * k);
-      }
-      const q = sc.quads[patch];
-      if (face && q && bmp) {
-        // fades in with the door
-        const t = patch / (sc.count - 1);
-        drawFace(q, smooth(0.08, 0.3, t) * (1 - smooth(0.82, 0.95, t)));
-      }
-    }
-    drawn.idx = p.idx;
-    drawn.q = p.q;
-    drawn.patch = patch;
-    draws++;
-    canvas.dataset.draws = String(draws);
-    canvas.dataset.frame = String(p.idx);
-    canvas.dataset.quality = p.q;
-    canvas.dataset.patch = String(patch);
+  // --- playing a chapter ---
+  const stopPlayback = () => {
+    run++;
+    pending = 0;
+    window.cancelAnimationFrame(clock);
+    // a video that never came up has nothing to hand over: it goes at once. One that is up
+    // stops on its frame, and goes when the next layer has covered it.
+    if (playing && !playing.classList.contains('is-on')) release(playing);
+    else if (playing) playing.pause();
+    playing = null;
+    pushOut();
+  };
+  const rest = (stop: number) => {
+    state = 'rest';
+    set('state', 'rest');
+    set('pose', stop);
+    setCaps((i) => i === restCap(stop));
+    preload(stop);
   };
 
-  const setCaps = (p: number) => {
-    const n = caps.length;
-    for (let i = 0; i < n; i++) {
-      const a = 0.03 + (i * 0.96) / n;
-      const b = a + 0.96 / n - 0.05;
-      const o = i === n - 1 ? smooth(a, a + 0.05, p) : smooth(a, a + 0.05, p) * (1 - smooth(b - 0.05, b, p));
-      caps[i].style.opacity = o.toFixed(3);
-      caps[i].style.transform = `translate3d(0, ${((1 - o) * 14).toFixed(1)}px, 0)`;
-    }
+  // No video: a slow crossfade to the end pose, the captions in their order.
+  const walk = (k: number, id: FileId, mine: number, why: string) => {
+    set('mode', 'poster');
+    set('why', why); // for whoever looks into it: why this chapter had no video
+    const cues = info.files[id].cues;
+    const duration = info.files[id].duration;
+    const t0 = performance.now();
+    const total = WALK_MS[k] / rate();
+    const fade = WALK_FADE_MS / rate();
+    let faded = false;
+    const tick = (now: number) => {
+      if (mine !== run) return;
+      const u = (now - t0) / total;
+      setCaps(cuesAt(cues, Math.min(1, u) * duration));
+      if (!faded && u >= 1 - fade / total) {
+        faded = true;
+        show(poses[k], fade);
+      }
+      if (u >= 1) return rest(k);
+      clock = requestAnimationFrame(tick);
+    };
+    clock = requestAnimationFrame(tick);
   };
 
-  function frame(now: number) {
-    raf = 0;
-    if (!cw || (!inView && !still) || document.hidden) return;
-    const last = info.frames - 1;
-    const target = still ? Math.round(STILL_AT * last) : Math.round(progress * last);
-    canvas.dataset.target = String(target);
-    if (prevTarget >= 0 && target !== prevTarget) dir = target > prevTarget ? 1 : -1;
+  const makeVideo = (src: string, id: FileId) => {
+    const v = document.createElement('video');
+    v.className = 'corr__video';
+    v.dataset.file = id;
+    v.muted = true;
+    v.defaultMuted = true;
+    v.playsInline = true;
+    v.setAttribute('muted', '');
+    v.setAttribute('playsinline', '');
+    v.setAttribute('disableremoteplayback', '');
+    v.setAttribute('aria-hidden', 'true');
+    v.disablePictureInPicture = true;
+    v.controls = false;
+    v.preload = 'auto';
+    v.tabIndex = -1;
+    v.src = src;
+    v.defaultPlaybackRate = rate();
+    v.playbackRate = rate();
+    view.appendChild(v);
+    videos.add(v);
+    return v;
+  };
 
-    // the scare: armed when the walker passes the door going forwards, for the first time this session
-    const sc = info.scare;
-    if (sc && !still && !scareDone && started) {
-      if (patchState === 'none' && target > sc.frame - 40 && target < sc.frame + 6) loadPatches();
-      if (scareState === 'idle' && patchState === 'ready' && prevTarget >= 0 && prevTarget < sc.frame && target >= sc.frame && target < last) {
-        scareState = 'arming';
-        armedAt = now;
-      }
-    }
-    let show = target;
-    let patch = -1;
-    if (sc && scareState === 'arming') {
-      show = sc.frame;
-      if (seq.has(sc.frame)) {
-        // sessionStorage decides: one play per session, whatever happens next
-        if (once(SCARE_KEY)) {
-          scareState = 'playing';
-          scareStart = now;
-          scarePlays++;
-          canvas.dataset.scarePlays = String(scarePlays);
-          canvas.dataset.scare = 'playing';
-          doorCreak(sc.count / sc.fps);
-          pushIn(sc);
-        } else {
-          scareState = 'idle';
-        }
-        scareDone = true;
-      } else if (now - armedAt > 600) {
-        scareState = 'idle'; // the frame never arrived: let it go, the next pass may still get it
-      }
-    }
-    if (sc && scareState === 'playing') {
-      const j = Math.floor(((now - scareStart) * sc.fps) / 1000);
-      if (j >= sc.count) {
-        scareState = 'idle';
-        canvas.dataset.scare = 'done';
+  const begin = (k: number) => {
+    stopPlayback();
+    const mine = run;
+    const scare = k === LAST && !scareDone();
+    const id = fileOf(k, scare);
+    state = 'play';
+    set('state', 'play');
+    if (k === LAST) set('variant', scare ? 'scare' : 'plain');
+    setCaps(() => false);
+    preload(k);
+
+    void chooseCodec().then(async () => {
+      if (mine !== run) return;
+      const clip = codec ? clipOf(id) : null;
+      if (!clip) return walk(k, id, mine, 'no codec');
+      const ok = await Promise.race([clip.ready, new Promise<boolean>((r) => window.setTimeout(() => r(false), READY_WAIT_MS))]);
+      if (mine !== run) return;
+      if (!ok) return walk(k, id, mine, clip.state === 'failed' ? 'file failed' : 'file late');
+
+      const video = makeVideo(clip.url, id) as FrameVideo;
+      const sc = clip.info.scare;
+      let shown = false;
+      let triedDirect = false;
+      let creaked = false;
+      let counted = false;
+      let settling = false;
+      let over = false;
+      // The end: the pose is up (or coming up), the chapter is at rest.
+      const finish = () => {
+        if (mine !== run || over) return;
+        over = true;
+        window.cancelAnimationFrame(clock);
+        playing = null;
         pushOut();
-        catchUp = true;
-        shownTarget = sc.frame;
-        // it never plays again on this page: the decoded patches (on a phone each is nearly a
-        // whole frame) are freed
-        patches.forEach((b) => b?.close());
-        patches = [];
-      } else {
-        show = sc.frame;
-        patch = sc.has[j] ? j : -1;
+        played++;
+        set('played', played);
+        rest(k);
+      };
+      const settle = (ms: number) => {
+        if (settling) return;
+        settling = true;
+        show(poses[k], ms);
+        window.setTimeout(finish, ms + 30);
+      };
+      const fail = (why: string) => {
+        if (mine !== run || shown) return;
+        release(video);
+        playing = null;
+        walk(k, id, mine, why);
+      };
+      const reveal = () => {
+        if (mine !== run || shown) return;
+        shown = true;
+        window.clearTimeout(watchdog);
+        set('mode', 'video');
+        show(video, VIDEO_FADE_MS);
+      };
+      // The beat counts once the open door has been on screen: from then on this session gets
+      // the variant without it.
+      const present = (t: number) => {
+        if (!sc || counted || !shown || t < sc.at + 4 / 24 || t >= sc.end) return;
+        counted = true;
+        once(SCARE_KEY);
+        beats++;
+        set('scareBeats', beats);
+      };
+      const watchdog = window.setTimeout(() => fail('no frame'), FRAME_WAIT_MS);
+      video.addEventListener('error', () => {
+        if (mine !== run || shown) return;
+        // a browser that will not play from memory gets the file's own address, once
+        if (!triedDirect) {
+          triedDirect = true;
+          video.src = clip.direct;
+          video.playbackRate = rate();
+          video.play().catch(() => fail('play refused'));
+          return;
+        }
+        fail('media error');
+      });
+      video.addEventListener('ended', () => {
+        if (mine !== run) return;
+        if (!shown) return fail('no frame');
+        settle(VIDEO_FADE_MS);
+      });
+      if (video.requestVideoFrameCallback) {
+        const onFrame: FrameCallback = (_now, meta) => {
+          if (mine !== run) return;
+          reveal();
+          present(meta.mediaTime);
+          if (!video.ended) video.requestVideoFrameCallback?.(onFrame);
+        };
+        video.requestVideoFrameCallback(onFrame);
+      }
+      const tick = () => {
+        if (mine !== run) return;
+        const t = video.currentTime;
+        if (t > 0 && !video.requestVideoFrameCallback) {
+          reveal();
+          present(t);
+        }
+        if (shown) setCaps(cuesAt(clip.info.cues, t));
+        // (a little longer than what is left of the video, so the video is still there under it)
+        if (shown && t >= clip.info.duration - SETTLE_S) settle((SETTLE_S * 1000 + 80) / rate());
+        if (sc && shown) {
+          if (!creaked && t >= sc.at && t < sc.end) {
+            creaked = true;
+            doorCreak(sc.end - sc.at);
+            pushIn(sc);
+          }
+          if (creaked && t >= sc.end) pushOut();
+        }
+        clock = requestAnimationFrame(tick);
+      };
+      playing = video;
+      video.play().then(
+        () => {
+          if (mine === run) clock = requestAnimationFrame(tick);
+        },
+        (e: unknown) => fail(`play refused: ${(e as Error)?.name ?? ''}`),
+      );
+    });
+  };
+
+  // --- from one stop to another ---
+  const go = (to: number, speed: number, now: number) => {
+    const from = chapter;
+    chapter = to;
+    set('chapter', to);
+    if (to > from) {
+      // Forwards. Chapters that were passed over show their end pose; the one the visitor is
+      // heading for plays, unless the page is flying.
+      const interrupted = state === 'play';
+      stopPlayback();
+      if (interrupted || to - from > 1) show(poses[to - 1], FADE_MS);
+      state = 'play';
+      set('state', 'play');
+      setCaps(() => false);
+      if (speed <= FAST_PX_MS && !interrupted) return begin(to);
+      // Too fast to start, or a cut to the end pose that has to land before the next chapter
+      // moves off it: the chapter waits. It starts with the next slow reading of the scroll
+      // position, or when the page comes to rest, or here if nothing more is heard.
+      pending = to;
+      notBefore = interrupted ? now + FADE_MS : 0;
+      const mine = run;
+      window.setTimeout(
+        () => {
+          if (mine === run && pending === to && performance.now() - lastT > 100 && onStage(window.scrollY)) begin(to);
+        },
+        interrupted ? FADE_MS + 20 : 400,
+      );
+    } else {
+      // Backwards: the pose of the stop before, nothing plays.
+      stopPlayback();
+      show(poses[to], FADE_MS);
+      rest(to);
+    }
+  };
+
+  // --- reading the scroll position ---
+  let lastY = window.scrollY;
+  let lastT = 0;
+  let speed = 0;
+  let raf = 0;
+  let corrections = 0;
+  let correctTimer = 0;
+  const sample = (now: number) => {
+    raf = 0;
+    const y = window.scrollY;
+    // the first reading after a pause is taken as one frame's movement
+    const dt = lastT && now - lastT < 250 ? Math.max(1, now - lastT) : 1000 / 60;
+    speed = Math.abs(y - lastY) / dt;
+    lastY = y;
+    lastT = now;
+    const rel = y - stop0;
+    let to = chapter;
+    if (rel > anchor * step + INTENT_PX) {
+      to = clamp(Math.ceil((rel - INTENT_PX) / step), 0, LAST);
+      anchor = clamp(Math.floor((rel - INTENT_PX) / step), 0, LAST);
+    } else if (rel < anchor * step - INTENT_PX) {
+      to = clamp(Math.floor((rel + INTENT_PX) / step), 0, LAST);
+      anchor = clamp(Math.ceil((rel + INTENT_PX) / step), 0, LAST);
+    }
+    // arrived on the stop of its chapter: from here on that stop is the one to leave
+    if (to === chapter && Math.abs(rel - chapter * step) <= INTENT_PX) anchor = chapter;
+    if (to !== chapter) go(to, speed, now);
+    else if (pending === chapter && pending > 0 && speed <= FAST_PX_MS && now >= notBefore && onStage(y)) begin(chapter);
+  };
+  // Is the stage still what the visitor is looking at? (Past the last stop it scrolls away.)
+  const onStage = (y: number) => y <= stop0 + LAST * step + screen * 0.25;
+  const onScroll = () => {
+    if (!raf) raf = requestAnimationFrame(sample);
+  };
+
+  // The page has come to rest.
+  const onSettle = () => {
+    // a jump ends before the next frame: read where it went first
+    window.cancelAnimationFrame(raf);
+    sample(performance.now());
+    const y = window.scrollY;
+    lastY = y;
+    lastT = 0;
+    speed = 0;
+    const rel = y - stop0;
+    if (pending === chapter && pending > 0) {
+      // a pass that ended here plays the chapter it ended on; one that left has only its pose
+      if (onStage(y) && visible) begin(chapter);
+      else {
+        stopPlayback();
+        show(poses[chapter], 0);
+        rest(chapter);
       }
     }
-    if (catchUp && scareState === 'idle') {
-      // walk on to where the scroll has got to, quickly but through every frame
-      const step = clamp(target - shownTarget, -3, 3);
-      shownTarget += step;
-      show = shownTarget;
-      if (shownTarget === target) catchUp = false;
-    } else if (scareState === 'idle') {
-      shownTarget = target;
+    // Between the first stop and the last the page rests on the stop of its chapter. If the
+    // browser left it elsewhere (it snapped back, or it does not snap), take it there.
+    const want = chapter * step;
+    const between = rel > -INTENT_PX && rel < LAST * step + INTENT_PX;
+    const free = (chapter === 0 && rel <= 0) || (chapter === LAST && rel >= want);
+    if (between && !free && Math.abs(rel - want) > 2) {
+      // not while the visitor is still turning the wheel or has a finger down: once they pause
+      const quiet = performance.now() - lastInput;
+      if (quiet < INPUT_QUIET_MS) {
+        window.clearTimeout(correctTimer);
+        correctTimer = window.setTimeout(() => {
+          if (performance.now() - lastT > 100 || !lastT) onSettle();
+        }, INPUT_QUIET_MS - quiet + 20);
+        return;
+      }
+      if (corrections < 3) {
+        corrections++;
+        // at once: the stage is pinned, so nothing is seen to move, and a jump cannot get in
+        // the way of the next gesture as a glide would
+        try {
+          window.scrollTo({ top: Math.round(stop0 + want), behavior: 'instant' });
+        } catch {
+          window.scrollTo(0, Math.round(stop0 + want)); // a browser from before 'instant'
+        }
+        return;
+      }
+      // the page will not go there: believe the page
+      const here = clamp(Math.round(rel / step), 0, LAST);
+      if (here !== chapter) {
+        stopPlayback();
+        chapter = here;
+        set('chapter', here);
+        show(poses[here], FADE_MS);
+        rest(here);
+      }
     }
-
-    if (started) seq.focus(show, show === target ? dir : 1);
-    let p = seq.pick(show);
-    if (scareState === 'playing' && (!p || p.idx !== show)) patch = -1;
-    if (!p && poster) p = { bmp: poster, idx: -1, q: 'poster' };
-    if (p && (p.idx !== drawn.idx || p.q !== drawn.q || patch !== drawn.patch)) paint(p, patch);
-
-    if (!still && progress !== capsAt) {
-      setCaps(progress);
-      capsAt = progress;
-    }
-    prevTarget = target;
-    canvas.dataset.loaded = String(seq.loaded);
-    if (scareState !== 'idle' || catchUp) kick();
-  }
+    corrections = 0;
+    anchor = chapter;
+  };
+  let settleTimer = 0;
+  let touching = false;
+  const hasScrollEnd = 'onscrollend' in window;
+  const settleSoon = () => {
+    window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(() => {
+      if (touching) return settleSoon();
+      onSettle();
+    }, 160);
+  };
 
   // --- loading: nothing but the poster until the visitor does something ---
-  const loadPoster = () => {
-    const img = new Image();
-    img.decoding = 'async';
-    img.onload = () => {
-      poster = img;
-      drawn.idx = -2;
-      kick();
-    };
-    img.src = `${base}${info.poster}`;
-  };
-  const stillFrame = () => [Math.round(STILL_AT * (info.frames - 1))];
-  const begin = () => {
+  const firstInput = () => {
     if (started) return;
     started = true;
-    events.forEach((ev) => window.removeEventListener(ev, begin));
-    if (still) seq.start(false, stillFrame());
-    else seq.start(true);
-    kick();
+    events.forEach((ev) => window.removeEventListener(ev, firstInput));
+    loadPoses();
+    // the full first pose over the small poster, if the visitor is still at the start
+    if (chapter === 0 && state === 'rest') show(poses[0], FADE_MS);
+    preload(chapter);
   };
   const events = ['scroll', 'wheel', 'touchstart', 'pointerdown', 'pointermove', 'keydown'];
-  events.forEach((ev) => window.addEventListener(ev, begin, { passive: true }));
-  // No input at all: once the page has been idle for a while after load, take a head start
-  // with the coarse pass only (or the single still frame).
-  const headStart = () => {
-    if (started) return;
-    if (still) return begin();
-    seq.start(false);
-  };
+  events.forEach((ev) => window.addEventListener(ev, firstInput, { passive: true }));
+  // No input at all: once the page has been idle well after load, take the same head start.
   const afterLoad = () => {
     const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-    window.setTimeout(() => (ric ? ric(headStart, { timeout: 3000 }) : headStart()), 4000);
+    window.setTimeout(() => (ric ? ric(firstInput, { timeout: 3000 }) : firstInput()), 8000);
   };
   if (document.readyState === 'complete') afterLoad();
   else window.addEventListener('load', afterLoad, { once: true });
 
-  function switchSet() {
-    const name = choose();
-    const next = manifest.sets[name];
-    if (!next || next === info) return;
-    seq.destroy();
-    patches.forEach((b) => b?.close());
-    patches = [];
-    patchState = 'none';
-    delete canvas.dataset.scareReady;
-    scareState = 'idle';
-    catchUp = false;
-    pushOut();
-    setName = name;
-    info = next;
-    canvas.dataset.set = setName;
-    seq = new Sequence(info, base, setName === 'mobile', kick, broken);
-    poster = null;
-    loadPoster();
-    layout();
-    if (started) {
-      if (still) seq.start(false, stillFrame());
-      else seq.start(true);
+  // --- start: wherever the page is (a reload restores the scroll position), at rest ---
+  measure();
+  chapter = clamp(Math.round((window.scrollY - stop0) / step), 0, LAST);
+  anchor = chapter;
+  set('chapter', chapter);
+  if (chapter > 0) {
+    // the pose is needed before any input: the page was reloaded inside the corridor
+    loadPoses();
+    show(poses[chapter], 0);
+  }
+  // any real input says the visitor is still at it: the page is not moved under their hand
+  let lastInput = 0;
+  const noteInput = () => {
+    lastInput = performance.now();
+  };
+  for (const ev of ['wheel', 'touchstart', 'touchmove', 'keydown']) window.addEventListener(ev, noteInput, { passive: true });
+  rest(chapter);
+
+  new ResizeObserver(measure).observe(section);
+  window.addEventListener('resize', measure, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
+  if (hasScrollEnd) window.addEventListener('scrollend', onSettle, { passive: true });
+  else {
+    // no scrollend: a pause in the scroll events, once the finger is off the glass
+    window.addEventListener('scroll', settleSoon, { passive: true });
+    window.addEventListener('touchstart', () => (touching = true), { passive: true });
+    for (const ev of ['touchend', 'touchcancel']) {
+      window.addEventListener(
+        ev,
+        () => {
+          touching = false;
+          settleSoon();
+        },
+        { passive: true },
+      );
     }
-    kick();
   }
-
-  canvas.dataset.set = setName;
-  loadPoster();
-  new ResizeObserver((entries) => {
-    const r = entries[0].contentRect;
-    if (!r.width || !r.height) return;
-    cssW = r.width;
-    cssH = r.height;
-    layout();
-    kick();
-  }).observe(canvas);
-  narrow.addEventListener('change', switchSet);
-
-  if (still) {
-    // one frame, no pin, no walk, no scare
-    canvas.dataset.scare = 'off';
-    return;
-  }
-
-  ScrollTrigger.create({
-    trigger: section,
-    start: 'top top',
-    end: 'bottom bottom',
-    onUpdate: (self) => {
-      progress = self.progress;
-      kick();
-    },
-    onToggle: () => kick(),
-  });
-  new IntersectionObserver(
-    (e) => {
-      inView = e[0].isIntersecting;
-      if (inView) kick();
-      else seq.release(); // the decoded window goes while the corridor is off screen
-    },
-    { rootMargin: '20% 0px' },
-  ).observe(section);
+  new IntersectionObserver((e) => {
+    visible = e[0].isIntersecting;
+    if (visible) return;
+    // Off screen: whatever was playing is over, and the stage waits on a still.
+    if (state === 'play' || playing || videos.size) {
+      stopPlayback();
+      show(poses[chapter], 0);
+      rest(chapter);
+    }
+  }).observe(section);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) kick();
+    if (!playing) return;
+    if (document.hidden) playing.pause();
+    else playing.play().catch(() => {});
+  });
+  // Turning the phone changes the set: the walk starts over from the pose of this stop.
+  narrow.addEventListener('change', () => {
+    const name: SetName = narrow.matches ? 'mobile' : 'desktop';
+    if (name === setName || !manifest.sets[name]) return;
+    stopPlayback();
+    for (const v of [...videos]) release(v);
+    for (const c of clips.values()) if (c.url) URL.revokeObjectURL(c.url);
+    clips.clear();
+    codecAsked = null;
+    codec = null;
+    setName = name;
+    info = manifest.sets[name];
+    set('set', name);
+    posesAsked = false;
+    if (started) {
+      loadPoses();
+      preload(chapter);
+    }
+    show(poses[chapter], 0);
+    rest(chapter);
   });
 }

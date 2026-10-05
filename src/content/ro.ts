@@ -61,6 +61,8 @@ export const ro: Copy = {
       'Camera dumneavoastră este ultima.',
     ],
     alt: 'Un drum la lumina lanternei pe un coridor întunecat de hotel, cu uși numerotate, până la camera 313.',
+    skip: 'Sari peste',
+    skipLabel: 'Sari peste coridor',
   },
   file: {
     title: 'Dosarul',
