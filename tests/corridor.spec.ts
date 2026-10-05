@@ -52,6 +52,7 @@ for (const kind of KINDS) {
 
     // a fourth gesture leaves normally: the next section comes into view and nothing pulls back
     await gesture(page, kind, 1, 'PageDown');
+    await expect.poll(() => scrollY(page), { timeout: 10000, message: 'the page moves on past the last stop' }).toBeGreaterThan(stops[3] + 20);
     const end = await settledY(page);
     expect(end, 'the page moved on past the last stop').toBeGreaterThan(stops[3] + 20);
     const fileTop = await page.locator('#file').evaluate((el) => el.getBoundingClientRect().top);

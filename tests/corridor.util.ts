@@ -1,6 +1,7 @@
 // Shared by the corridor tests: opening the page, reading the stage's state, and making the
 // gestures a visitor makes, with what each engine offers.
-//   Chromium, touch projects   real touch scroll gestures through CDP (Input.synthesizeScrollGesture)
+//   Chromium, touch projects   a finger on the glass, through CDP (Input.dispatchTouchEvent): the
+//                              browser makes the scroll and the fling out of it itself
 //   Chromium, pointer project  the mouse wheel and the keyboard
 //   WebKit                     the keyboard; the mouse wheel in a second context without `isMobile`
 //                              (Playwright's mobile WebKit refuses wheel events, and it has no CDP)
@@ -70,8 +71,26 @@ export async function jumpTo(page: Page, y: number) {
   await page.evaluate((v) => window.scrollTo(0, v), y);
 }
 
-// The page has stopped moving.
+// The page has stopped moving: no scroll event for half a second, heard inside the page (two
+// readings that agree prove nothing on an engine that draws ten frames a second), and then two
+// readings that agree.
 export async function settledY(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        let timer = 0;
+        const quiet = () => {
+          window.removeEventListener('scroll', heard);
+          resolve();
+        };
+        const heard = () => {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(quiet, 500);
+        };
+        window.addEventListener('scroll', heard, { passive: true });
+        heard();
+      }),
+  );
   let last = NaN;
   await expect
     .poll(
@@ -112,18 +131,45 @@ export interface Swipe {
   fling?: boolean;
 }
 // One finger swipe. dir 1 moves the page forwards (the finger goes up).
+// The finger is put down, moved and lifted as touch events with their own times, sixteen
+// milliseconds apart and sent at that pace; the browser recognises the drag and, from the speed
+// the finger had when it left, the fling. (Input.synthesizeScrollGesture would be one call, but
+// with a touch source it does nothing at all in headless Chromium on Linux, which is where the
+// suite runs before a deploy.) Without a fling the finger rests before it lifts.
 export async function swipe(page: Page, dir: 1 | -1, o: Swipe = {}) {
   const vp = page.viewportSize()!;
-  const distance = o.distance ?? 300;
-  await (await cdp(page)).send('Input.synthesizeScrollGesture', {
-    x: Math.round(vp.width / 2),
-    y: Math.round(dir > 0 ? vp.height * 0.8 : vp.height * 0.25),
-    yDistance: -dir * distance,
-    speed: o.speed ?? 1600,
-    gestureSourceType: 'touch',
-    preventFling: o.fling === false,
-  });
+  const distance = Math.min(o.distance ?? 300, vp.height - 120);
+  const speed = o.speed ?? 1600;
+  const x = Math.round(vp.width / 2);
+  const from = dir > 0 ? Math.min(vp.height - 30, Math.max(vp.height * 0.8, distance + 60)) : Math.max(30, Math.min(vp.height * 0.25, vp.height - distance - 60));
+  const session = await cdp(page);
+  const steps = Math.max(4, Math.round(((distance / speed) * 1000) / 16));
+  const t0 = Date.now();
+  const send = async (type: 'touchStart' | 'touchMove' | 'touchEnd', y: number, at: number) => {
+    const wait = t0 + at - Date.now();
+    if (wait > 0) await page.waitForTimeout(wait);
+    await session.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y: Math.round(y), id: 1 }], timestamp: (t0 + at) / 1000 });
+  };
+  await send('touchStart', from, 0);
+  let at = 0;
+  for (let i = 1; i <= steps; i++) {
+    at += 16;
+    await send('touchMove', from - (dir * distance * i) / steps, at);
+  }
+  const to = from - dir * distance;
+  if (o.fling === false) {
+    for (let i = 0; i < 8; i++) {
+      at += 24;
+      await send('touchMove', to, at);
+    }
+  }
+  await send('touchEnd', to, at + 4);
 }
+
+// WebKit's Linux port (the one the suite meets before a deploy) aims the snap anew with every
+// notch of the wheel, so three notches in a row travel up to three stops. That is that port's
+// wheel, not Safari's and not a phone's: there one turn of the wheel is one notch.
+export const notchSnaps = (page: Page) => process.platform === 'linux' && page.context().browser()?.browserType().name() === 'webkit';
 
 // One gesture, as a visitor makes it: a swipe with its fling, a turn of the wheel (three
 // notches in quick succession), or one key.
@@ -132,7 +178,7 @@ export async function gesture(page: Page, kind: Gesture, dir: 1 | -1, key?: stri
   if (kind === 'wheel') {
     const vp = page.viewportSize()!;
     await page.mouse.move(vp.width / 2, vp.height / 2);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < (notchSnaps(page) ? 1 : 3); i++) {
       await page.mouse.wheel(0, dir * 100);
       await page.waitForTimeout(40);
     }

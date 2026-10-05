@@ -296,7 +296,6 @@ export function initCorridor() {
   let notBefore = 0; // and the earliest it may start (after a cut to the pose it starts on)
   let playing: HTMLVideoElement | null = null;
   let started = false;
-  let visible = false;
   let beats = 0;
   let played = 0;
   let pushed = false;
@@ -597,7 +596,9 @@ export function initCorridor() {
     else if (pending === chapter && pending > 0 && speed <= FAST_PX_MS && now >= notBefore && onStage(y)) begin(chapter);
   };
   // Is the stage still what the visitor is looking at? (Past the last stop it scrolls away.)
-  const onStage = (y: number) => y <= stop0 + LAST * step + screen * 0.25;
+  // From the numbers alone: the observer further down reports a frame late, and a page that
+  // was put on a stop and left it at once has not been told yet that the section is on screen.
+  const onStage = (y: number) => y >= stop0 - (LEAD + 1) * screen && y <= stop0 + LAST * step + screen * 0.25;
   const onScroll = () => {
     if (!raf) raf = requestAnimationFrame(sample);
   };
@@ -614,7 +615,7 @@ export function initCorridor() {
     const rel = y - stop0;
     if (pending === chapter && pending > 0) {
       // a pass that ended here plays the chapter it ended on; one that left has only its pose
-      if (onStage(y) && visible) begin(chapter);
+      if (onStage(y)) begin(chapter);
       else {
         stopPlayback();
         show(poses[chapter], 0);
@@ -729,8 +730,7 @@ export function initCorridor() {
     }
   }
   new IntersectionObserver((e) => {
-    visible = e[0].isIntersecting;
-    if (visible) return;
+    if (e[0].isIntersecting) return;
     // Off screen: whatever was playing is over, and the stage waits on a still.
     if (state === 'play' || playing || videos.size) {
       stopPlayback();
