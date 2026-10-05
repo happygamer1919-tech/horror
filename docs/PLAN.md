@@ -129,3 +129,21 @@ screenshots at 390px and 1440px, a critique against the concept, and fixes.
   `npm run corridor:frames` into `public/corridor/`, scrubbed by `src/scripts/corridor.ts`.
   Reviewed in three rounds (7.9 / 7.8, 7.8 / 8.0, 7.7 / 7.9 against a bar of 8) and shipped on
   the owner's decision.
+
+## Update 5: the corridor as three chapters of video
+
+- The frame-scrubbed walk is replaced by real video in three chapters (to door 304, to the
+  scratched door 305, to the last door 313). One swipe, wheel turn or key press plays one
+  chapter at the speed it was shot and it stops on its caption. Scrolling back crossfades to
+  the previous stop; nothing plays in reverse. The scare is a second variant of chapter 3,
+  played once per session.
+- Native scrolling everywhere. The stage is CSS sticky and the stops are CSS scroll snap;
+  the script only reads the scroll position. No touch or wheel listener is blocking and
+  nothing calls preventDefault (tested). The smooth-scroll library is removed.
+- Built by `npm run corridor:video` from the masters in `corridor-src/` into
+  `public/corridor/` (`m/` phone 720x1440, `d/` desktop 1600x900, H.264 and AV1, poses and
+  posters as WebP). The image sequences are deleted.
+- Tests run in Chromium phone emulation, Chromium desktop and Playwright WebKit. Playback
+  smoothness is measured by `npm run test:perf` (requestVideoFrameCallback, 4x CPU throttle).
+- Rulings applied: `aggregateRating` removed from the business markup; the guest book font
+  stays.
