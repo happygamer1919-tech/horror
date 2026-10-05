@@ -154,15 +154,9 @@ for (const lang of LANGS) {
       const h2 = await page.locator('main h2').allTextContents();
       expect(h2.length).toBe(9);
       for (const h of h2) expect(h.trim().length).toBeGreaterThan(2);
-      // Canvases actually drew something.
-      const painted = await page.evaluate(() => {
-        const c = document.querySelector<HTMLCanvasElement>('[data-corridor]')!;
-        const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
-        let sum = 0;
-        for (let i = 0; i < d.length; i += 4001) sum += d[i];
-        return sum;
-      });
-      expect(painted).toBeGreaterThan(0);
+      // The corridor stage shows a picture: the poster that lies under everything has loaded.
+      const pose = page.locator('#corridor img[data-poster]');
+      await expect.poll(() => pose.evaluate((el) => (el as HTMLImageElement).complete && (el as HTMLImageElement).naturalWidth > 0)).toBe(true);
 
       expect(seen.errors, 'console errors').toEqual([]);
       expect(seen.failed, 'failed requests').toEqual([]);
@@ -538,9 +532,10 @@ for (const lang of LANGS) {
       await page.goto(`${BASE}/${lang}/`);
       await expect(page.locator('[data-lift]')).toBeHidden();
       await expect(page.locator('.torch')).toBeHidden();
-      // No pin: the corridor is an ordinary block and every caption can be read.
+      // No pin: the corridor is an ordinary block (three stills, under three screens; pinned it
+      // is five) and every caption can be read.
       const corr = await page.locator('#corridor').boundingBox();
-      expect(corr!.height).toBeLessThan(844 * 2.2);
+      expect(corr!.height).toBeLessThan(844 * 3);
       for (const cap of await page.locator('[data-cap]').all()) {
         await cap.scrollIntoViewIfNeeded();
         await expect(cap).toBeVisible();

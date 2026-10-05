@@ -29,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });`;
 
+// The corridor's own hook (src/scripts/corridor.ts): no codec, so no video is fetched or played.
+const NO_CORRIDOR_VIDEO = `window.__corridorCodec = 'none';`;
+
 const variants: Variant[] = [
   { name: 'base', about: 'The site as built.' },
   { name: 'no-torch', about: 'Flashlight overlay removed.', css: '.torch{display:none!important}' },
@@ -66,7 +69,7 @@ const variants: Variant[] = [
   },
   { name: 'no-fog-blend', about: 'Hero fog canvas without mix-blend-mode.', css: '.hero__fog{mix-blend-mode:normal!important}' },
   { name: 'no-fog-gl', about: 'WebGL fog never starts (CSS halo stays).', init: noContext('data-fog', ['webgl', 'experimental-webgl', 'webgl2']) },
-  { name: 'no-corridor', about: 'Corridor canvas never draws.', init: noContext('data-corridor', ['2d']) },
+  { name: 'no-corridor', about: 'Corridor plays no video: its chapters are crossfades between stills.', init: NO_CORRIDOR_VIDEO },
   { name: 'no-cctv', about: 'CCTV feeds never draw.', init: noContext('data-feed', ['2d']) },
   {
     name: 'no-reveal',
@@ -78,7 +81,7 @@ const variants: Variant[] = [
     name: 'floor',
     about: 'Everything above switched off at once: the cost of the plain document.',
     css: '.torch,.grain,.tint,.dim{display:none!important} .hero__fog{display:none!important} [data-dying]{opacity:1!important} .hero *{filter:none!important} html.motion [data-reveal]{opacity:1!important;transform:none!important;transition:none!important}',
-    init: noContext('data-fog', ['webgl', 'experimental-webgl', 'webgl2']) + noContext('data-corridor', ['2d']) + noContext('data-feed', ['2d']),
+    init: noContext('data-fog', ['webgl', 'experimental-webgl', 'webgl2']) + NO_CORRIDOR_VIDEO + noContext('data-feed', ['2d']),
   },
 ];
 
