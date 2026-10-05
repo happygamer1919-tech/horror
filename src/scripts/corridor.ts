@@ -116,6 +116,12 @@ export function initCorridor() {
   const poses = [0, 1, 2, 3].map((k) => view.querySelector<HTMLImageElement>(`[data-pose="${k}"]`)).filter((el): el is HTMLImageElement => Boolean(el));
   if (poses.length !== 4) return;
 
+  // The poster is far below the first screen. Have it decoded before anybody gets there.
+  const posterEl = view.querySelector<HTMLImageElement>('[data-poster]');
+  const warm = () => void posterEl?.decode?.().catch(() => {});
+  if (posterEl?.complete) warm();
+  else posterEl?.addEventListener('load', warm, { once: true });
+
   const narrow = window.matchMedia('(orientation: portrait), (max-width: 760px)');
   let setName: SetName = narrow.matches ? 'mobile' : 'desktop';
   let info = manifest.sets[setName];

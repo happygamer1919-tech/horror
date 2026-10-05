@@ -445,13 +445,10 @@ test('a chapter plays at the speed it was shot and stops on its caption', async 
   await expect.poll(() => page.locator('.corr__video').count()).toBe(0);
 });
 
-test('the stage is never black: from the start pose, through a chapter, to its end pose', async ({ page }) => {
+test('the stage is never black: on arriving, from the start pose, through a chapter, to its end pose', async ({ page }) => {
   await open(page, { rate: 2 });
+  await page.waitForLoadState('load');
   const stops = await stopsOf(page);
-  await jumpTo(page, stops[0]);
-  await expectRest(page, 0, stops);
-  await wake(page);
-  await expect(stage(page)).toHaveAttribute('data-codec', /.+/);
   const vp = page.viewportSize()!;
   // the middle of the stage, where the torch falls; the page's own layers (grain, flashlight) included
   const clip = { x: Math.round(vp.width * 0.15), y: Math.round(vp.height * 0.2), width: Math.round(vp.width * 0.7), height: Math.round(vp.height * 0.5) };
@@ -461,7 +458,13 @@ test('the stage is never black: from the start pose, through a chapter, to its e
     for (let i = 0; i < data.length; i += 3) if (data[i] + data[i + 1] + data[i + 2] > 3 * 40) bright++;
     return bright / (data.length / 3);
   };
-  const shots: number[] = [await lit()];
+  // the visitor arrives in one move, before any picture but the poster can have loaded: the
+  // very first screenshot already has the corridor in it
+  await jumpTo(page, stops[0]);
+  const shots: number[] = [await lit(), await lit()];
+  await expectRest(page, 0, stops);
+  await expect(stage(page)).toHaveAttribute('data-codec', /.+/);
+  shots.push(await lit());
   await page.keyboard.press('ArrowDown');
   // through the hand-over from the pose to the video, the walk, and the hand-over back
   const until = Date.now() + 4500;

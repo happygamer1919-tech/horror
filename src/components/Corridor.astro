@@ -47,10 +47,11 @@ const stops = [1, 2];
   <div class="corr__pin" data-corridor data-base={`${base}/corridor/`} data-manifest={JSON.stringify(manifest)} data-chapter="0" data-state="rest" data-pose="0">
     <div class="corr__view" data-view role="img" aria-label={t.corridor.alt}>
       {/* The only picture that loads with the page: the first frame, small. It stays under
-          everything else for good, so the stage is never empty. */}
+          everything else for good, so the stage is never empty. Decoded with the page, not
+          when it first comes on screen: Safari would show the bare stage for a moment. */}
       <picture>
         <source media="(orientation: portrait), (max-width: 760px)" srcset={`${base}/corridor/${manifest.sets.mobile.poster}`} />
-        <img class="corr__poster" data-poster src={`${base}/corridor/${manifest.sets.desktop.poster}`} alt="" decoding="async" fetchpriority="low" />
+        <img class="corr__poster" data-poster src={`${base}/corridor/${manifest.sets.desktop.poster}`} alt="" decoding="sync" fetchpriority="low" />
       </picture>
       {/* The poses: the start, and the end of each chapter. The script gives them their source
           after the first input. */}
