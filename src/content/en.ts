@@ -60,7 +60,7 @@ export const en: Copy = {
       'The lights were fine a minute ago.',
       'Your room is the last one.',
     ],
-    alt: 'A long hotel corridor with numbered doors. The ceiling lamps go out one by one.',
+    alt: 'A walk by torchlight down a dark hotel corridor with numbered doors, to room 313.',
   },
   file: {
     title: 'The file',

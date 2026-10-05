@@ -60,7 +60,7 @@ export const ro: Copy = {
       'Acum un minut, becurile încă mergeau.',
       'Camera dumneavoastră este ultima.',
     ],
-    alt: 'Un coridor lung de hotel, cu uși numerotate. Lămpile din tavan se sting una câte una.',
+    alt: 'Un drum la lumina lanternei pe un coridor întunecat de hotel, cu uși numerotate, până la camera 313.',
   },
   file: {
     title: 'Dosarul',

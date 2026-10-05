@@ -116,3 +116,16 @@ screenshots at 390px and 1440px, a critique against the concept, and fixes.
   reach 8, so no full render was run and the 2D canvas corridor stays live. Stills are in
   `docs/corridor-stills/`.
 - `npm run test:perf` measures phone scroll at 4x CPU throttle, outside the deploy gate.
+
+## Update 4: content, guest book, AI corridor
+
+- Content: 60-90 min, two levels (No electroshock, Hardcore), minors play without electroshock,
+  Instagram, square logo in `docs/brand/`.
+- Guest book: three Google reviews as handwritten entries, pull quote, right before the
+  check-in card.
+- Corridor: the 2D canvas corridor and the path-traced 3D scene are both retired. The corridor
+  is a walk made of AI-generated video (Higgsfield: `nano_banana_pro` stills, `minimax_h3`
+  video with first and last frame control), masters in `corridor-src/`, frames built by
+  `npm run corridor:frames` into `public/corridor/`, scrubbed by `src/scripts/corridor.ts`.
+  Reviewed in three rounds (7.9 / 7.8, 7.8 / 8.0, 7.7 / 7.9 against a bar of 8) and shipped on
+  the owner's decision.
