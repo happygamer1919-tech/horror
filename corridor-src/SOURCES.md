@@ -1,16 +1,17 @@
 # Corridor masters: where each file came from
 
 The corridor on the site is a walk made of AI-generated video (Higgsfield), not a photograph
-and not a 3D render. This folder holds the masters; `npm run corridor:frames`
-(`scripts/corridor-frames.mjs`) turns them into the frames under `public/corridor/`. Nothing
-here is fetched at build time and nothing is generated again: the build only reads these files.
+and not a 3D render. This folder holds the masters; `npm run corridor:video`
+(`scripts/corridor-video.mjs`) turns them into the videos and stills under `public/corridor/`.
+Nothing here is fetched at build time and nothing is generated again: the build only reads
+these files and re-encodes them.
 
 **The scare shows a generated face. It is not a photograph of anybody and depicts no real person.**
 
 All jobs were run on 2026-10-04, in three rounds (the stills were reviewed after each). Job ids
 are Higgsfield job ids. Credits spent: round 1 62, round 2 24, round 3 52, 138 in all.
 
-## Files: what the shipped frames are built from
+## Files: what the shipped videos are built from
 
 | File | Round | What it is | Size (bytes) | sha256 (first 16) |
 |------|-------|------------|--------------|-------------------|
@@ -171,25 +172,75 @@ Duration 10 s. Start image K1b (`19966fee-5ac8-4f53-8cff-d03f54fb9ac8`), end ima
 
 ## What the build does with them
 
-- **The walk** is the four segments in order, 612 frames. Segment N ends on the still segment
-  N+1 starts on, and the two renderings of that still differ slightly, so the duplicate frame
-  is dropped and the last three frames of a segment dissolve into the first frame of the next.
-  At door 308 the walk dissolves into the first frame of `scarec.mp4` instead, so the frame the
-  scare is played over is the scare clip's own first frame.
-- **Frames are picked at equal steps of motion**, not of time: the clips ease in and out of
-  every keyframe, and equal steps of time would rush through the middle of each segment and
-  freeze at its ends.
-- **Desktop set:** 168 frames, 1600 x 900 (Lanczos), AVIF. **Phone set:** 112 frames, a
-  720 x 1440 window of each frame that follows the subject, enlarged to 900 x 1800, WebP.
-- **Sharpness is evened out** (`scripts/corridor-even.cjs`) on every frame at its final size:
-  the keyframes come out of the video model crisper than the frames in motion, so crisp
-  frames are softened a touch and soft ones get an unsharp mask.
-- **The finishing pass** (`scripts/corridor-finish.cjs`) follows on every frame: everything
-  outside the torch beam about a stop darker, a slightly lifted black, fine film grain with a
-  new pattern per frame. In the first two segments the video model lit the whole corridor as
-  if by a second lamp, so up to door 305 everything outside the beam is pulled down further,
-  and that extra darkening fades out over the 30 timeline frames after it.
-- **The scare:** 13 frames of `scarec.mp4`, graded (`scripts/corridor-grade.cjs`) so that the
-  face in the gap sits in deep shadow, shipped as patches over the held walk frame. A second
-  set of the same patches has the gap empty, for the case that a photograph is supplied
-  (`src/assets/scare/README.md`).
+The corridor is shown as video in three chapters (it was an image sequence scrubbed by the
+scroll position until 2026-10-05). `scripts/corridor-video.mjs` makes, for a landscape set
+(`d`, 1600 x 900) and a phone set (`m`, 720 x 1440):
+
+| File | Chapter | From | Frames | Seconds |
+|------|---------|------|--------|---------|
+| `c1` | 1: door 301 to door 304 | `seg1.mp4` | 124 | 5.17 |
+| `c2` | 2: to the scratched door 305 | `seg2.mp4` | 124 | 5.17 |
+| `c3` | 3: to door 308, on to the last door 313 | `seg3.mp4`, `seg4c.mp4` | 366 | 11.89 |
+| `c3s` | 3 with the door beat at 308 | `seg3.mp4`, 13 frames of `scarec.mp4`, `seg4c.mp4` | 381 | 12.51 |
+
+each as H.264 (`.h264.mp4`: High profile, level 4.0, 8 bit 4:2:0) and as AV1 (`.av1.mp4`: Main
+profile, 10 bit 4:2:0), without sound, with one keyframe, the index at the front of the file.
+Next to them: `p0.webp` to `p3.webp`, the pose at each stop (the first frame, and the last
+frame of each chapter), a small `poster-{d,m}.webp` of the first frame, which is the only file
+that loads with the page, and `manifest.json` (sizes, lengths, caption times, the time of the
+door beat, what each file weighs).
+
+- **The picture is made exactly as the frames of the image sequence were** (the reviewed
+  look), frame by frame, before anything is encoded:
+  - The walk is the four segments in order, 612 frames. Segment N ends on the still segment
+    N+1 starts on, and the two renderings of that still differ slightly, so the duplicate frame
+    is dropped and the last three frames of a segment dissolve into the first frame of the next.
+    At door 308 the walk dissolves into the first frame of `scarec.mp4` instead, so the frame
+    the door beat starts from is the scare clip's own first frame.
+  - Phone set: a 720 x 1440 window of each frame that follows the subject.
+  - Sharpness is evened out (`scripts/corridor-even.cjs`): the keyframes come out of the video
+    model crisper than the frames in motion, so crisp frames are softened a touch and soft ones
+    get an unsharp mask. The phone frames were shipped at 900 x 1800 and the step decides by a
+    measure taken at that size, so it still runs there; the frame is then brought back to the
+    window's own 720 x 1440.
+  - The finishing pass (`scripts/corridor-finish.cjs`): everything outside the torch beam about
+    a stop darker, a slightly lifted black. In the first two segments the video model lit the
+    whole corridor as if by a second lamp, so up to door 305 everything outside the beam is
+    pulled down further, and that extra darkening fades out over the 30 timeline frames after it.
+  - The door beat: 13 frames of `scarec.mp4`, graded (`scripts/corridor-grade.cjs`) so that the
+    face in the gap sits in deep shadow, feathered into the held frame at door 308, between two
+    frames of that held frame: 15 frames, 625 ms.
+- **What changed is the sampling.** The image sequence was 168 frames (phone: 112) picked at
+  equal steps of motion, to be scrubbed. The videos are every frame of the timeline, each
+  shown for as long as it was shot, so the walk eases in and out of every door as generated.
+  - Segments 1 to 3 play at 24 frames a second, as generated. Nothing is interpolated:
+    `minterpolate` to 48 frames a second was tried on chapters 1 and 3 and ghosts the number
+    plates and the door edges in the fast part of the walk.
+  - `seg4c.mp4` was generated at about half the pace of the others (its motion per frame is
+    4.5 against 9.0 for `seg3.mp4`, on the measure the build prints). It plays at 1.5 times its
+    speed: every one of its frames is kept and shown for 1/36 s instead of 1/24 s. No frame is
+    dropped, repeated or blended; the files carry the exact time of every frame.
+  - A chapter starts on the frame the chapter before it ends on.
+- **No film grain is baked in.** The finishing pass can add fine grain with a new pattern on
+  every frame, and the reviewed frames had it, but no encoder at these file sizes keeps it. The
+  frames of the image sequence had already lost all of it to their AVIF and WebP compression
+  (measured: they carry less fine detail than the same frames rendered without grain), and the
+  video encoders drop it too, at the cost of 0.5 to 1.2 dB of the picture (H.264) for the same
+  file size. The grain a visitor sees is the page's own grain layer.
+- **Colour.** The files are tagged BT.709 primaries and matrix, video range, sRGB transfer
+  curve, which is what the frames are. With the BT.709 curve tagged instead, Safari and Chrome
+  with a hardware decoder show the video two to four levels lighter than the stills (measured
+  on the built page), and every chapter would start and end with a small jump in brightness.
+- **The poses** are stills of the first frame and of the last frame of each chapter, WebP. On
+  the phone set they are 900 x 1800, the pictures the image sequence had, not the video's
+  720 x 1440: the stage rests on them.
+- **File sizes.** One phone visitor downloads chapters 1 and 2, one variant of chapter 3, the
+  four poses and the poster: 3,000,000 bytes at most, on either codec. The build looks for the
+  best encoder quality that fits and stops if it cannot. The landscape set is encoded at a
+  fixed good quality and may not pass 8,000,000 bytes.
+- **A photograph for the face** (`src/assets/scare/README.md`): if one is in the slot when the
+  build runs, the generated face is taken out of the gap and the photograph is drawn in
+  (`scripts/corridor-face.cjs`) before the door beat is encoded.
+
+Needs ffmpeg with libx264 and libsvtav1. The clips are unpacked once into `.cache/` here
+(gitignored), and the finished frames are kept there too, about 7 GB in all.
