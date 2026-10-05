@@ -21,7 +21,7 @@ const sizes = [
   { w: 1440, h: 900, dpr: 1, mobile: false },
 ];
 // the start, then points inside each caption (not on a fade), then the last door
-const POINTS = [0.02, 0.09, 0.4, 0.6, 0.86, 0.99];
+const POINTS = [0.02, 0.09, 0.405, 0.57, 0.86, 0.99];
 
 const toFrame = (page, i, n) =>
   page.evaluate(
@@ -86,7 +86,8 @@ try {
       await settle(page, f - 8);
       await page.waitForFunction(() => document.querySelector('[data-corridor]').dataset.scareReady === '1', null, { timeout: 30000 });
       await toFrame(page, f + 1, info.frames);
-      await page.waitForFunction(() => Number(document.querySelector('[data-corridor]').dataset.patch) >= 8, null, { timeout: 10000, polling: 'raf' });
+      // the screenshot lands two or three frames of the beat after this, on the peak (frames 7 to 10)
+      await page.waitForFunction(() => Number(document.querySelector('[data-corridor]').dataset.patch) >= 6, null, { timeout: 10000, polling: 'raf' });
       await shot(page, '19-scare');
       console.log(`19-scare-${s.w}  frame ${f}, patch ${await page.evaluate(() => document.querySelector('[data-corridor]').dataset.patch)}`);
       await ctx.close();

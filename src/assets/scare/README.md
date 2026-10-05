@@ -10,24 +10,25 @@ Nothing else is needed. On the next build the site uses it: the door opens a han
 its handle edge, and the photograph is drawn into the gap between the door edge and the door
 frame, darkened and tinted to the torch, lit on one side only, with film grain added.
 
-While no file is here, the scare frames are used as they were generated: a woman's face in
-deep shadow with one eye catching the torch. That face is generated; it is not a photograph
-and shows no real person (see `corridor-src/SOURCES.md`). The hand on the door edge is part
-of the frames either way.
+While no file is here, the scare frames are used as they were generated: a sliver of a
+woman's face in deep shadow, one eye catching the torch. That face is generated; it is not a
+photograph and shows no real person (see `corridor-src/SOURCES.md`). The hand gripping the door
+edge above the handle is part of the frames either way.
 
 ## The photograph to supply
 
 - **Framing:** one face, front on or turned slightly to its left, filling the picture from
   hairline to chin. Portrait, about 3 : 4 (for example 600 x 800 px). Smaller is fine: on
-  screen the picture is drawn about 100 px wide on a desktop screen and 95 px on a phone, and
+  screen the picture is drawn about 100 px wide, on a desktop screen and on a phone alike, and
   it is seen for about half a second.
-- **What shows of it:** the left half at most. The gap is to the right of the door handle;
-  the door edge is on its left and the door frame on its right, and the frame hides the right
-  half of the face. At its widest the gap shows a strip about 45 px wide.
+- **What shows of it:** one narrow upright strip. The gap is to the right of the door handle;
+  the door edge is on its left and the door frame on its right. The door edge hides the left
+  sixth of the picture and the frame everything right of about two fifths of its width. At its
+  widest the gap is about 28 px wide on screen.
 - **The eye:** the eye on the left of the picture is the one that is seen. Put it about a
   third of the way in from the left edge and a little above the middle of the picture, open
   and looking into the lens. The site does not look for a face: it places the picture by its
-  edges, so that this spot lands where the torch reaches into the gap.
+  edges, so that this spot lands where the generated eye is, in the lit half of the gap.
 - **Background:** black, or as dark as possible. The picture is added to the darkness of the gap,
   so everything black in it disappears and everything bright in it shows.
 - **Light:** lit from the front and a little from above, soft, no flash glare. The site keeps
