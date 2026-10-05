@@ -106,9 +106,9 @@ test('in-page links glide and leave no smooth behaviour behind', async ({ page, 
     return { steps: new Set(w.__ys).size, behaviours: w.__behaviours };
   });
   expect(behaviours[0], 'the page travels with smooth behaviour').toBe('smooth');
-  // WebKit's Linux build draws this page about ten times a second where the suite runs before
-  // a deploy: a glide of a third of a second is two or three positions there, sometimes one.
-  // Everywhere else the glide itself is counted.
+  // WebKit's Linux build draws this page about ten times a second on a CI runner: a glide of
+  // a third of a second is two or three positions there, sometimes one. Everywhere else the
+  // glide itself is counted.
   if (!(browserName === 'webkit' && process.platform === 'linux')) expect(steps).toBeGreaterThan(5);
   // Once it has arrived, scripted scrolling is immediate again.
   await expect.poll(() => page.evaluate(() => document.documentElement.style.scrollBehavior), { timeout: 4000 }).toBe('');
@@ -148,7 +148,7 @@ test('on touch the fog waits for the page to rest before it starts', async ({ pa
   test.skip(!isMobile, 'touch only');
   // The premise is a scroll event at least every 100 ms. WebKit's Linux build draws this page
   // about ten times a second on a CI runner and hands out scroll events as it draws: the gaps
-  // grow past the fog's own wait, and the test would be measuring the runner.
+  // grow past the fog's own wait, and the test would be measuring the machine.
   test.skip(browserName === 'webkit' && process.platform === 'linux', 'scroll events come too far apart on this build to keep the page moving');
   const fogRequests: number[] = [];
   page.on('request', (r) => {

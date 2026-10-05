@@ -125,6 +125,15 @@ async function cdp(page: Page) {
   return s;
 }
 
+// What is on the screen right now, as a PNG of the whole viewport, asked of Chromium directly
+// and with no clip. Playwright's own screenshot works out a clip from the scroll position
+// first, and on a page that is gliding the picture it then takes is of a later moment, cut at
+// the old offset: the pinned stage came out half a screen lower and read as a black stage.
+export async function viewportShot(page: Page): Promise<Buffer> {
+  const { data } = await (await cdp(page)).send('Page.captureScreenshot', { format: 'png' });
+  return Buffer.from(data, 'base64');
+}
+
 export interface Swipe {
   distance?: number;
   speed?: number;
@@ -166,10 +175,13 @@ export async function swipe(page: Page, dir: 1 | -1, o: Swipe = {}) {
   await send('touchEnd', to, at + 4);
 }
 
-// WebKit's Linux port (the one the suite meets before a deploy) aims the snap anew with every
-// notch of the wheel, so three notches in a row travel up to three stops. That is that port's
-// wheel, not Safari's and not a phone's: there one turn of the wheel is one notch.
-export const notchSnaps = (page: Page) => process.platform === 'linux' && page.context().browser()?.browserType().name() === 'webkit';
+// WebKit's Linux port is the one the suite meets on the CI runner. It is not Safari and not a
+// phone, and where it behaves in a way of its own a test says so and allows for it:
+//   - it aims the snap anew with every notch of the wheel, so three notches in a row travel up
+//     to three stops: there one turn of the wheel is one notch;
+//   - short of CPU, it comes to rest up to 18 px before a position the page was jumped to
+//     (measured with two cores: 5933 gave 5915 to 5917, 15044 gave 15026 and 15027).
+export const linuxWebKit = (page: Page) => process.platform === 'linux' && page.context().browser()?.browserType().name() === 'webkit';
 
 // One gesture, as a visitor makes it: a swipe with its fling, a turn of the wheel (three
 // notches in quick succession), or one key.
@@ -178,7 +190,7 @@ export async function gesture(page: Page, kind: Gesture, dir: 1 | -1, key?: stri
   if (kind === 'wheel') {
     const vp = page.viewportSize()!;
     await page.mouse.move(vp.width / 2, vp.height / 2);
-    for (let i = 0; i < (notchSnaps(page) ? 1 : 3); i++) {
+    for (let i = 0; i < (linuxWebKit(page) ? 1 : 3); i++) {
       await page.mouse.wheel(0, dir * 100);
       await page.waitForTimeout(40);
     }

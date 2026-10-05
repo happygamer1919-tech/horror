@@ -7,10 +7,10 @@
 // the keyboard and the wheel in WebKit.
 import { test, expect, type Page } from '@playwright/test';
 import { createRequire } from 'node:module';
-import { BASE, POSE, POSTER, SCARE_KEY, VIDEO, attr, codecOf, expectRest, gesture, gesturesOf, jumpTo, open, pageFor, pose, poster, scrollY, setInfo, settledY, stage, stopsOf, swipe, wake, type Gesture, type SetInfo } from './corridor.util';
+import { BASE, POSE, POSTER, SCARE_KEY, VIDEO, attr, codecOf, expectRest, gesture, gesturesOf, jumpTo, open, pageFor, pose, poster, scrollY, setInfo, linuxWebKit, settledY, stage, stopsOf, swipe, viewportShot, wake, type Gesture, type SetInfo } from './corridor.util';
 
 // sharp comes with Astro; only this much of it is used here
-type Sharp = (input: Buffer) => { removeAlpha: () => { raw: () => { toBuffer: (o: { resolveWithObject: true }) => Promise<{ data: Buffer }> } } };
+type Sharp = (input: Buffer) => { removeAlpha: () => { raw: () => { toBuffer: (o: { resolveWithObject: true }) => Promise<{ data: Buffer; info: { width: number; height: number; channels: number } }> } } };
 const sharp = createRequire(import.meta.url)('sharp') as Sharp;
 
 const KINDS: Gesture[] = ['touch', 'wheel', 'key'];
@@ -453,11 +453,23 @@ test('the stage is never black: on arriving, from the start pose, through a chap
   const vp = page.viewportSize()!;
   // the middle of the stage, where the torch falls; the page's own layers (grain, flashlight) included
   const clip = { x: Math.round(vp.width * 0.15), y: Math.round(vp.height * 0.2), width: Math.round(vp.width * 0.7), height: Math.round(vp.height * 0.5) };
+  // (WebKit has no such direct shot and is asked for the clip alone, which is all it has time for)
+  const whole = test.info().project.use.browserName === 'chromium';
   const lit = async () => {
-    const { data } = await sharp(await page.screenshot({ clip, type: 'png' })).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data, info } = await sharp(whole ? await viewportShot(page) : await page.screenshot({ clip, type: 'png' }))
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const k = whole ? info.width / vp.width : 0; // device pixels to a CSS pixel
+    const [x0, x1, y0, y1] = whole ? [clip.x, clip.x + clip.width, clip.y, clip.y + clip.height].map((v) => Math.round(v * k)) : [0, info.width, 0, info.height];
     let bright = 0;
-    for (let i = 0; i < data.length; i += 3) if (data[i] + data[i + 1] + data[i + 2] > 3 * 40) bright++;
-    return bright / (data.length / 3);
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const i = (y * info.width + x) * info.channels;
+        if (data[i] + data[i + 1] + data[i + 2] > 3 * 40) bright++;
+      }
+    }
+    return bright / ((x1 - x0) * (y1 - y0));
   };
   // the visitor arrives in one move, before any picture but the poster can have loaded: the
   // very first screenshot already has the corridor in it
@@ -512,10 +524,12 @@ test('the stops the script works with are the stops the page snaps to, and the r
   // (WebKit draws the page to the first stop from up to a sixth of a screen before it, where
   // the stage is already pinned: that last stretch is left out there)
   const lead = test.info().project.use.browserName === 'webkit' ? [] : [css.top + 40, stops[0] - 30];
+  // (a snap takes the page to a stop, hundreds of pixels away; see linuxWebKit for the 24)
+  const slack = linuxWebKit(page) ? 24 : 0;
   for (const y of [240, css.top - 180, ...lead, stops[3] + 37, css.fileTop + 911, css.height - css.vh - 333, css.height - css.vh]) {
     await jumpTo(page, y);
     await page.waitForTimeout(350);
-    expect(await settledY(page), `the page stays at ${y}`).toBe(y);
+    expect(Math.abs((await settledY(page)) - y), `the page stays at ${y}`).toBeLessThanOrEqual(slack);
   }
   // inside it the page rests on a stop
   for (const [y, k] of [
