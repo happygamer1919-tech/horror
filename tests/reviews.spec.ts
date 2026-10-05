@@ -288,11 +288,13 @@ test('indexable build: the reviews add no Review markup and no second rating', a
       expect(keys).not.toContain('reviewBody');
       const json = JSON.stringify(blocks);
       for (const quote of [...QUOTES[lang], ...AUTHORS]) expect(json).not.toContain(quote);
-      // The one rating node is the one the business entry carried before the guest book
-      // was filled in (LocalBusiness.aggregateRating, from the config). Nothing was added.
-      expect(types.filter((t) => t === 'AggregateRating')).toHaveLength(1);
+      // No rating is marked up either: the owner had the aggregate rating removed from the
+      // business entry. The rating is shown on the page only.
+      expect(types).not.toContain('AggregateRating');
+      expect(keys).not.toContain('aggregateRating');
       const business = blocks.find((b) => b['@type'] === 'LocalBusiness');
-      expect(business.aggregateRating).toEqual({ '@type': 'AggregateRating', ratingValue: 4.8, reviewCount: 39, bestRating: 5 });
+      expect(business).toBeTruthy();
+      expect(business.aggregateRating).toBeUndefined();
       // The quotes themselves are on the page.
       for (const quote of QUOTES[lang]) expect(html).toContain(quote.replace(/&/g, '&amp;'));
     }

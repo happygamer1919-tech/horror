@@ -62,12 +62,6 @@ const jsonLd = [
       opens: h.open,
       closes: h.close,
     })),
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: site.rating.value,
-      reviewCount: site.rating.count,
-      bestRating: 5,
-    },
     hasMap: site.maps.profileUrl,
     ...(instagramUrl ? { sameAs: [instagramUrl] } : {}),
   },
