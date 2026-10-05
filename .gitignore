@@ -9,5 +9,5 @@ playwright-report/
 .env
 .env.*
 
-# corridor frame build: frames extracted from corridor-src/*.mp4 (see corridor-src/SOURCES.md)
+# corridor video build: frames extracted from corridor-src/*.mp4, and the finished frames (see corridor-src/SOURCES.md)
 corridor-src/.cache/
