@@ -455,18 +455,6 @@ html.torch-js .torch__drift {
   }
 }
 
-/* Lenis */
-html.lenis,
-html.lenis body {
-  height: auto;
-}
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-.lenis.lenis-stopped {
-  overflow: hidden;
-}
-
 /* Idle: after 20 seconds without input the lights go down (see torch.ts).
    The layer sits under the hero copy (47) and the hero buttons (49), over everything the
    scene is made of: the facade, the sign and the lit room (45), the rain, the sections, the

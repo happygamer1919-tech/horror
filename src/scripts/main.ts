@@ -4,7 +4,7 @@ import { initLift } from './lift';
 import { initTorch } from './torch';
 import { initNeon } from './neon';
 import { initFacade } from './facade';
-import { initScroll, nativeScroll } from './scroll';
+import { initScroll, touchFirst } from './scroll';
 import { initCorridor } from './corridor';
 import { initLevel } from './level';
 import { initCheckin } from './checkin';
@@ -54,7 +54,7 @@ const startFog = () => {
   import('./fog').then((m) => m.initFog()).catch(() => {});
 };
 const wakeFog = () => {
-  if (!nativeScroll) return startFog();
+  if (!touchFirst) return startFog();
   window.clearTimeout(fogTimer);
   fogTimer = window.setTimeout(startFog, FOG_REST_MS);
 };

@@ -1,5 +1,7 @@
-// Scrolling: native on touch devices, Lenis on pointer devices, in-page links on both.
-// Performance itself is measured by `npm run test:perf` (tests/perf), not here.
+// Scrolling: the browser's own, on every device; in-page links glide.
+// Performance itself is measured by `npm run test:perf` (tests/perf), not here. The corridor's
+// scroll snap is in tests/corridor.spec.ts, the audit of every touch and wheel listener in
+// tests/listeners.spec.ts.
 import { test, expect, type Page } from '@playwright/test';
 
 const BASE = '/horror';
@@ -9,6 +11,7 @@ const open = async (page: Page, lang: string = 'ro') => {
   await page.addInitScript(() => sessionStorage.setItem('hotel:lift', '1'));
   await page.goto(`${BASE}/${lang}/`);
 };
+// The smooth-scroll library the site used on pointer devices marked the root element.
 const hasLenis = (page: Page) => page.evaluate(() => document.documentElement.classList.contains('lenis'));
 // Where the top edge of an element sits, in viewport pixels, once the page stops moving.
 const settledTop = async (page: Page, selector: string) => {
@@ -27,28 +30,28 @@ const settledTop = async (page: Page, selector: string) => {
   return last;
 };
 
-test('touch devices scroll natively, pointer devices get the smooth scroll library', async ({ page, isMobile }) => {
+test('every device scrolls natively: no smooth scroll library is loaded', async ({ page }) => {
   const requested: string[] = [];
   page.on('request', (r) => requested.push(r.url()));
   await open(page);
-  if (isMobile) {
-    // Give a late import every chance to show up before saying it did not.
-    await page.waitForLoadState('networkidle');
-    await page.evaluate(() => window.scrollTo(0, 600));
-    await page.waitForTimeout(400);
-    expect(await hasLenis(page)).toBe(false);
-    expect(requested.filter((u) => /lenis/i.test(u))).toEqual([]);
-  } else {
-    await expect.poll(() => hasLenis(page), { timeout: 8000 }).toBe(true);
-  }
+  // Give a late import every chance to show up before saying it did not.
+  await page.waitForLoadState('networkidle');
+  await page.mouse.move(200, 300);
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await page.waitForTimeout(400);
+  expect(await hasLenis(page)).toBe(false);
+  expect(requested.filter((u) => /lenis/i.test(u))).toEqual([]);
+  // and a scripted scroll is where it was put, at once: nothing eases it
+  expect(await page.evaluate(() => window.scrollY)).toBe(600);
 });
 
-test('nothing on a touch device can hold a scroll back: no blocking touch or wheel listeners', async ({ page, isMobile, context }) => {
-  test.skip(!isMobile, 'touch only');
+test('nothing can hold a scroll back: the browser itself reports no blocking touch or wheel listener', async ({ page, isMobile, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'asked of the browser through CDP');
   await open(page);
   await page.waitForLoadState('networkidle');
   // First input starts the lazy parts (fog), so their listeners are counted too.
-  await page.touchscreen.tap(195, 300);
+  if (isMobile) await page.touchscreen.tap(195, 300);
+  else await page.mouse.click(300, 300);
   await page.waitForTimeout(500);
   // A listener registered with passive: false makes the browser wait for page script before
   // it may scroll. Ask the browser itself which listeners exist on the scroll path.
@@ -65,9 +68,8 @@ test('nothing on a touch device can hold a scroll back: no blocking touch or whe
 });
 
 for (const lang of LANGS) {
-  test(`${lang}: the Check in button lands on the registration card, below the header`, async ({ page, isMobile }) => {
+  test(`${lang}: the Check in button lands on the registration card, below the header`, async ({ page }) => {
     await open(page, lang);
-    if (!isMobile) await expect.poll(() => hasLenis(page), { timeout: 8000 }).toBe(true);
     await page.locator('[data-cta]').click();
     await expect(page.locator('#checkin-title')).toBeInViewport({ timeout: 8000 });
     const top = await settledTop(page, '#checkin');
@@ -79,8 +81,7 @@ for (const lang of LANGS) {
   });
 }
 
-test('in-page links glide on touch and leave no smooth behaviour behind', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'touch only');
+test('in-page links glide and leave no smooth behaviour behind', async ({ page }) => {
   await open(page);
   // Sample the scroll position while the link is being followed: a jump has no steps in between.
   await page.evaluate(() => {
@@ -95,8 +96,8 @@ test('in-page links glide on touch and leave no smooth behaviour behind', async 
   expect(steps).toBeGreaterThan(5);
   // Once it has arrived, scripted scrolling is immediate again.
   await expect.poll(() => page.evaluate(() => document.documentElement.style.scrollBehavior), { timeout: 4000 }).toBe('');
-  await page.evaluate(() => window.scrollTo(0, 1000));
-  expect(await page.evaluate(() => window.scrollY)).toBe(1000);
+  await page.evaluate(() => window.scrollTo(0, 500));
+  expect(await page.evaluate(() => window.scrollY)).toBe(500);
 });
 
 test('the Book bar and the back-to-top link work with native scroll', async ({ page, isMobile }) => {
@@ -115,7 +116,7 @@ test('the Book bar and the back-to-top link work with native scroll', async ({ p
   await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 8000 }).toBe(0);
 });
 
-test('reduced motion: no smooth scroll library and links jump', async ({ browser, baseURL }) => {
+test('reduced motion: links jump', async ({ browser, baseURL }) => {
   const context = await browser.newContext({ baseURL, reducedMotion: 'reduce', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   await page.goto(`${BASE}/ro/`);

@@ -194,10 +194,9 @@ for (const lang of LANGS) {
       await expect(frame).toHaveAttribute('src', SLOTS_URL);
       await expect.poll(() => hits).toContain(SLOTS_URL);
       await expect(page.frameLocator('[data-booking-frame]').locator('p')).toHaveText('stub widget.easyweek.io');
-      // Dialog semantics: modal, named, scroll locked, Lenis kept out.
+      // Dialog semantics: modal, named, scroll locked.
       expect(await dialog.evaluate((d) => d.matches(':modal'))).toBe(true);
       await expect(dialog).toHaveAttribute('aria-labelledby', 'bk-title');
-      await expect(dialog).toHaveAttribute('data-lenis-prevent', '');
       expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe('hidden');
       // The new-tab fallback is always there.
       const tab = dialog.locator('[data-booking-tab]');

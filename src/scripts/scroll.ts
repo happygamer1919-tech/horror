@@ -1,14 +1,12 @@
 // Scrolling.
 //
-// Pointer devices (mouse, trackpad): Lenis smooth scroll wired into GSAP's ticker, so
-// ScrollTrigger and Lenis share one clock.
-//
-// Touch devices: the browser's own scroll, untouched. Lenis listens to touchstart, touchmove
-// and touchend with `passive: false`, which makes the browser ask the page's JavaScript before
-// it may move the page under a finger. Measured in docs/perf-notes.md: with Lenis every scroll
-// frame on a phone depended on the main thread, without it none does. Lenis never smoothed
-// touch scrolling here anyway (syncTouch was off), so nothing visible is lost.
-// ScrollTrigger follows native scroll events on its own, and the corridor pin is CSS sticky.
+// The browser's own scroll, on every device. Nothing here listens to touch or wheel and nothing
+// calls preventDefault: the corridor's chapters are CSS scroll snap (Corridor.astro), and a
+// smooth-scroll library would fight it. (The site used Lenis on mouse and trackpad until the
+// corridor became video. Lenis registers wheel and touch listeners with `passive: false`,
+// which makes the browser ask the page's JavaScript before it may move the page; measured in
+// docs/perf-notes.md.)
+// ScrollTrigger follows native scroll events on its own.
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { still } from './env';
@@ -18,29 +16,15 @@ gsap.registerPlugin(ScrollTrigger);
 export { gsap, ScrollTrigger };
 
 // The primary input is a finger: no hover, or a coarse pointer.
-export const nativeScroll = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+export const touchFirst = window.matchMedia('(hover: none), (pointer: coarse)').matches;
 
 export function initScroll() {
   ScrollTrigger.config({ ignoreMobileResize: true });
   if (still) return;
-  if (nativeScroll) {
-    initNativeAnchors();
-    return;
-  }
-  // Loaded on demand, so phones never download or parse it.
-  import('lenis')
-    .then(({ default: Lenis }) => {
-      const lenis = new Lenis({ lerp: 0.12, anchors: true });
-      lenis.on('scroll', ScrollTrigger.update);
-      gsap.ticker.add((time) => lenis.raf(time * 1000));
-      gsap.ticker.lagSmoothing(0);
-    })
-    .catch(() => {
-      // Without the library the page scrolls natively, which is a complete experience.
-    });
+  initNativeAnchors();
 }
 
-// In-page links ("Check in", "Back to top") glide instead of jumping, as they did with Lenis.
+// In-page links ("Check in", "Back to top", the corridor's "Skip") glide instead of jumping.
 // The browser does the work: the link is followed normally (hash, focus order, :target and
 // scroll-padding all stay native) and only the scroll behaviour is smooth while it travels.
 function initNativeAnchors() {
