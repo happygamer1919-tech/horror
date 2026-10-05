@@ -176,7 +176,9 @@ export async function swipe(page: Page, dir: 1 | -1, o: Swipe = {}) {
 }
 
 // WebKit's Linux port is the one the suite meets on the CI runner. It is not Safari and not a
-// phone, and where it behaves in a way of its own a test says so and allows for it:
+// phone, which is why its job there reports and does not hold a deploy back
+// (.github/workflows/deploy.yml). Where it behaves in a way of its own a test says so and
+// allows for it:
 //   - it aims the snap anew with every notch of the wheel, so three notches in a row travel up
 //     to three stops: there one turn of the wheel is one notch;
 //   - short of CPU, it comes to rest up to 18 px before a position the page was jumped to

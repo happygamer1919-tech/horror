@@ -11,14 +11,19 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  SITE_INDEXABLE: 'false'
+
+# The suite builds the site itself. Started by hand on another branch, the workflow runs the
+# two test jobs and publishes nothing.
 jobs:
-  build:
+  # Chromium: the phone and the desktop projects. This is the gate: it must pass before
+  # anything is published.
+  test:
     runs-on: ubuntu-latest
-    env:
-      SITE_INDEXABLE: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,9 +31,38 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
-      # The suite builds the site itself and must pass before anything is published.
-      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=phone-390 --project=desktop-1440
+
+  # WebKit: reported, and it does not hold a deploy back (owner's ruling, 2026-10-05). On a
+  # Linux runner WebKit is its Linux port, which draws this page about ten times a second
+  # there and scrolls in ways of its own: three runs went red on timing while Chromium passed
+  # and macOS WebKit passed. `npm test` on a Mac runs this project against the port Safari is
+  # built from, and that is done before every push.
+  test-webkit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+      - run: npx playwright test --project=webkit-phone
+
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

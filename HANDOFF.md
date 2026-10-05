@@ -158,21 +158,7 @@ enabled there, passing the page language is a one-line change.
 
 - The hero line under the title now reads "An hour or more to find the key and learn why."
   (it said "One hour"), because it sits under "60-90 min". One string per language to revert.
-- **WebKit in the deploy gate: this blocks the deploy of the video chapters.** The WebKit
-  tests are part of the gate and CI runs them on WebKit's Linux build, which draws this page
-  about ten times a second on a runner. Three pushes went red there. The first two had real
-  causes that are fixed (one small fragility in the corridor script, the rest test tooling
-  that behaves differently on Linux). The third (run 37367570164) failed on four WebKit-only
-  tests that are about timing: a chapter still playing after 30 seconds, too few screenshots
-  taken in 4.5 seconds, a brightness reading taken mid-fade. All Chromium tests passed in
-  that run (phone and desktop), and the full suite passes on macOS including WebKit.
-  Options: (a) keep Chromium phone and desktop as the gate and let the WebKit job report
-  without blocking, with `npm test` on a Mac (WebKit as Safari builds it) before every push,
-  as now; (b) keep WebKit blocking and spend more work making those tests tolerate the slow
-  runner, outcome uncertain; (c) re-run the build on a day GitHub Actions is healthy (it was
-  degraded during all three runs) and see. Recommended: (a). It was not done because it
-  loosens the gate, which is the owner's call. A macOS runner would be the better home for
-  the WebKit job; one was tried and GitHub never supplied it.
+- While idle, the header, the mobile book bar and the floating button stay lit.
 
 ## Flags and config
 
@@ -195,7 +181,7 @@ commit `public/og/`. Logo: `npm run logo`.
 |-------|--------|
 | `npm run build` | exit 0 |
 | `npm test` on macOS (Chromium phone, Chromium desktop, WebKit phone) | exit 0, 375 passed, 29 skipped (tests that apply to another project only), no retries |
-| The same suite on GitHub's Linux runner | **failed**: 370 passed, 2 failed, 2 passed on retry; all four are WebKit tests, all Chromium tests passed |
+| CI gate on GitHub's Linux runner (Chromium phone and desktop) | passed; the WebKit job there reports only (see deviation 13) |
 | One gesture advances exactly one chapter; three reach the last door; a fourth leaves | tested: touch swipe and key (Chromium phone), wheel and key (Chromium desktop, WebKit) |
 | Scare plays once, not on a second pass or after a reload | tested in all three projects |
 | Fast flings from the top of the page reach the check-in card | tested: touch flings (Chromium phone), wheel (desktop, WebKit) |
@@ -270,7 +256,13 @@ From the video-chapter brief:
     it is short of CPU; a snap would be hundreds of pixels). That build draws this page about
     ten times a second on a runner and its wheel snaps per notch. macOS WebKit (`npm test` on
     a Mac, run before every push) and Chromium run all four in full.
-13. **The corridor folder in the repository grew from 16.5 MB to 24.6 MB** (two sets, two
+13. **The WebKit tests report in CI and do not block a deploy** (owner's ruling, 2026-10-05).
+    The gate is the Chromium phone and desktop tests. CI runs WebKit on its Linux build,
+    which went red three times on timing while Chromium and macOS WebKit passed. `npm test`
+    on a Mac runs WebKit as Safari builds it, before every push. A macOS runner would be the
+    better home for the WebKit job; one was tried on an evening GitHub Actions was degraded
+    and never arrived, so it is worth one more try.
+14. **The corridor folder in the repository grew from 16.5 MB to 24.6 MB** (two sets, two
     codecs, two variants of chapter 3). A visitor downloads one set in one codec.
 
 Still standing from earlier briefs: the corridor shipped under the agreed review score on the
