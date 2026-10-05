@@ -8,11 +8,13 @@ function gaussField(w,h,seed){const r=rng(seed),n=new Float32Array(w*h);for(let 
   // a small blur gives the grain a clump of about 1.5 px, then back to unit variance
   const o=new Float32Array(w*h);let s2=0;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;const l=x>0?n[i-1]:n[i],rr=x<w-1?n[i+1]:n[i],u=y>0?n[i-w]:n[i],d=y<h-1?n[i+w]:n[i];const v=n[i]*0.5+(l+rr+u+d)*0.125;o[i]=v;s2+=v*v;}
   const k=1/Math.sqrt(s2/o.length);for(let i=0;i<o.length;i++)o[i]*=k;return o;}
-function finish(buf,w,h,seed){
+// dark: 0 to 1, how much further everything outside the beam is pulled down (used for the first
+// two segments, where the video model lit the whole corridor as if by a second lamp).
+function finish(buf,w,h,seed,dark=0){
   const g=gaussField(w,h,seed*7919+13), c1=gaussField(w,h,seed*104729+7), c2=gaussField(w,h,seed*15485863+3);
   for(let i=0,p=0;i<w*h;i++,p+=3){
     let r=buf[p],gg=buf[p+1],b=buf[p+2]; const l=(r*3+gg*6+b)/10;
-    const f=0.6+0.4*ss(25,130,l); r*=f;gg*=f;b*=f;                 // outside the beam: darker
+    const lo=0.6-0.22*dark, hi=130+40*dark; const f=lo+(1-lo)*ss(25,hi,l); r*=f;gg*=f;b*=f;   // outside the beam: darker
     r=3+r*0.988;gg=3+gg*0.988;b=3+b*0.988;                           // black lift
     const l2=(r*3+gg*6+b)/10; const amp=1.6+1.4*ss(8,60,l2)-1.2*ss(170,245,l2);
     const n=g[i]*amp, ch=0.3*(1-ss(20,70,l2));                       // grain, chroma only in shadows

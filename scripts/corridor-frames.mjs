@@ -27,11 +27,13 @@
 // Its first frame IS the walk frame there, in both sets, so the scare patches (the region of the
 // picture that changes, feathered into that frame) lie over it without a seam.
 //
-// Every shipped frame gets the finishing pass (corridor-finish.cjs) at its final size, and every
-// scare frame the grade (corridor-grade.cjs) before it is resized. Those two files are the
-// functions the review stills were made with; the timeline, the dissolves and the sampling
-// below follow the reference build of the review round step for step, so the desktop set is
-// the reviewed frames, pixel for pixel, before encoding.
+// Every shipped frame, at its final size, has its sharpness evened out (corridor-even.cjs: the
+// keyframes come out of the video model crisper than the frames in motion) and then gets the
+// finishing pass (corridor-finish.cjs); every scare frame gets the grade (corridor-grade.cjs)
+// before it is resized. Those three files are the functions the review stills were made with;
+// the timeline, the dissolves and the sampling below follow the reference build of the review
+// round step for step, so the desktop set is the reviewed frames, pixel for pixel, before
+// encoding.
 import sharp from 'sharp';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -42,6 +44,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const { finish } = require('./corridor-finish.cjs');
+const { evenSharpness, lapVar } = require('./corridor-even.cjs');
 const { grade } = require('./corridor-grade.cjs');
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -53,11 +56,12 @@ const args = Object.fromEntries(process.argv.slice(2).map((a) => a.replace(/^--/
 
 const W = 2560; // the masters
 const H = 1440;
-const CLIP = 124; // frames in every clip
-const WALK = ['seg1', 'seg2', 'seg3', 'seg4b'];
-const SCARE = 'scareb';
+const WALK = ['seg1', 'seg2', 'seg3', 'seg4c'];
+const SCARE = 'scarec';
+const FRAMES = { seg1: 124, seg2: 124, seg3: 124, seg4c: 243, scarec: 124 }; // frames in each clip
 const DISSOLVE = [1 / 3, 2 / 3, 1]; // the last three frames of a clip, towards the next keyframe
 const MOTION_FLOOR = 0.4; // the least a step of the timeline counts for
+const DARK_FADE = 30; // timeline frames over which the extra darkening of the first two clips fades out
 const LW = 320; // motion is measured at this size
 const LH = 180;
 
@@ -70,28 +74,28 @@ const SCARE_SEED = 5000; // plus the clip frame number
 // The phone window: 720 x 1440 of the master, enlarged to 900 x 1800. Where its centre is at
 // each keyframe (x in master pixels); in between it moves with the walk, eased.
 //   K1 the lit wall and door 301        K2 door 304, its plate, the shoes, the wall running away
-//   K3 door 305, plate and scratches    K4 door 308: plate, handle and the gap to the right of it
+//   K3 door 305, plate and scratches    K4 door 308: plate, handle, the hand and the gap to its right
 //   K5 door 313 with plate and handle, the exit doors and the green sign at the right edge
 const WIN_W = 720;
 const WINDOW = [830, 1520, 1100, 1770, 1300];
 
 // The scare beat: 15 frames at 24 fps. The first and the last are the held walk frame itself
-// (the door shut); the 13 between come from these frames of the clip: the door opens in three,
-// the face is there for eight, the door shuts in two.
+// (the door shut); the 13 between come from these frames of the clip: fingers come round the
+// door edge and the door opens in three, the face is there for eight, the door shuts in two.
 const SCARE_FPS = 24;
-const SCARE_PICK = [0, 24, 30, 36, 42, 48, 54, 60, 66, 72, 78, 84, 92, 102, 0];
+const SCARE_PICK = [0, 38, 44, 50, 54, 58, 62, 66, 70, 74, 78, 84, 92, 100, 0];
 // Where the gap opens (the grade's window, master pixels): between the handle edge of the leaf
 // and the jamb to the right of it.
 const GAP_X0 = 1790;
 const GAP_X1 = 1968;
 // The "g" variant, for a supplied photograph: the gap is taken to near black from the top of
 // the frame down to just above the hand on the door edge.
-const HAND_TOP = 826;
+const HAND_TOP = 812;
 const GAP_BLACK = 0.07;
 // Where the photograph goes: the head, in master pixels (hairline to chin of the generated
 // face). The quad hangs on the jamb, which does not move: `lead` is how far left of the jamb
 // the picture starts, so that its left eye sits where the generated one does.
-const HEAD = { top: 451, bottom: 666, width: 161, lead: 75 };
+const HEAD = { top: 410, bottom: 640, width: 175, lead: 71 };
 
 const pad = (n, w = 3) => String(n).padStart(w, '0');
 const exists = (p) => stat(p).then(() => true, () => false);
@@ -103,13 +107,13 @@ async function extract() {
   for (const clip of [...WALK, SCARE]) {
     const dir = join(CACHE, clip);
     const have = (await exists(dir)) ? (await readdir(dir)).filter((f) => f.endsWith('.png')).length : 0;
-    if (have === CLIP) continue;
+    if (have === FRAMES[clip]) continue;
     await rm(dir, { recursive: true, force: true });
     await mkdir(dir, { recursive: true });
     console.log(`extracting ${clip}.mp4`);
     execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', join(SRC, `${clip}.mp4`), join(dir, '%03d.png')], { stdio: 'inherit' });
     const got = (await readdir(dir)).filter((f) => f.endsWith('.png')).length;
-    if (got !== CLIP) throw new Error(`${clip}.mp4: ${got} frames, expected ${CLIP}`);
+    if (got !== FRAMES[clip]) throw new Error(`${clip}.mp4: ${got} frames, expected ${FRAMES[clip]}`);
   }
 }
 const png = (clip, n) => join(CACHE, clip, `${pad(n)}.png`);
@@ -121,14 +125,14 @@ const raw = async (clip, n) => {
 
 // --- the timeline ------------------------------------------------------------------------------
 // One entry per frame of the walk: a source frame `a`, and optionally a second one `b` it is
-// dissolved into with weight `w`. 493 entries; `keys` are the timeline indices of K1 to K5.
+// dissolved into with weight `w`. 612 entries; `keys` are the timeline indices of K1 to K5.
 function timeline() {
   const out = [];
   const keys = [0];
   WALK.forEach((clip, s) => {
     // what this clip ends on: the first frame of the next clip, or of the scare clip at door 308
     const next = s === 2 ? SCARE : WALK[s + 1];
-    const plain = CLIP - (next ? DISSOLVE.length : 0);
+    const plain = FRAMES[clip] - (next ? DISSOLVE.length : 0);
     if (s === 3) {
       // The clip after door 308 starts on its own rendering of that keyframe, not on the scare
       // clip's: its second and third frame dissolve out of the held frame.
@@ -224,6 +228,12 @@ function windowLeft(cum, keys, i) {
   return clamp(Math.round(cx - WIN_W / 2), 0, W - WIN_W);
 }
 
+// How much further the finishing pass pulls down everything outside the beam, for a timeline
+// index: fully up to the keyframe at door 305 (in the first two clips the video model lit the
+// whole corridor as if by a second lamp), fading to nothing over the next 30 timeline frames.
+// The held frame at door 308 and the scare frames get none.
+const darkAt = (t, k3) => (t <= k3 ? 1 : Math.max(0, 1 - (t - k3) / DARK_FADE));
+
 // --- encoding ----------------------------------------------------------------------------------
 // Format per set, as the frames have always been shipped. Desktop: AVIF. Phone: WebP, which
 // every phone decodes, and fast. Dark frames get a higher quality: at the base setting the
@@ -248,8 +258,14 @@ const lumaOf = (buf) => {
 const image = (buf, w, h) => sharp(buf, { raw: { width: w, height: h, channels: 3 } });
 
 // --- the scare -------------------------------------------------------------------------------------
-// The gap between the door edge and the jamb in one (ungraded) frame: its left and right edge
-// as straight lines, measured where the gap is plain dark (above the head and below the arm).
+// The gap between the door edge and the jamb in one (ungraded) frame, as two straight lines.
+// Both are measured above the head, where the gap is plain dark. The door edge is measured a
+// second time below the face, where the dark of the gap still starts at the door edge (the
+// figure stands against the jamb side). The jamb does not move and the camera is locked off,
+// so its lean is a constant of the clip (JAMB_LEAN, measured on the clip: 1954 at y 260, 1930
+// at y 1060).
+const JAMB_LEAN = -0.03;
+const EDGE_LEAN = -0.025; // the door edge's, used while the gap is too narrow to measure twice
 function gapOf(frame) {
   const lum = (x, y) => {
     const p = (y * W + x) * 3;
@@ -279,13 +295,12 @@ function gapOf(frame) {
     return { y: (y0 + y1) / 2, l: med(ls), r: med(rs) };
   };
   const top = band(240, 360);
-  const bot = band(1040, 1140);
-  if (!top || !bot) return null;
-  const at = (y) => {
-    const t = (y - top.y) / (bot.y - top.y);
-    return { l: top.l + (bot.l - top.l) * t, r: top.r + (bot.r - top.r) * t };
-  };
-  return { at, width: (top.r - top.l + bot.r - bot.l) / 2 };
+  if (!top) return null;
+  const low = band(700, 770);
+  const lean = low ? (low.l - top.l) / (low.y - top.y) : EDGE_LEAN;
+  const at = (y) => ({ l: top.l + lean * (y - top.y), r: top.r + JAMB_LEAN * (y - top.y) });
+  const mid = at((HEAD.top + HEAD.bottom) / 2);
+  return { at, width: mid.r - mid.l };
 }
 
 // The same graded frame with nobody in the gap: near black between door edge and jamb, down to
@@ -379,7 +394,9 @@ function cut(def, img, hold, rect) {
 // --- main ----------------------------------------------------------------------------------------
 await extract();
 const tl = timeline();
+const K3 = tl.keys[2];
 const K4 = tl.keys[3];
+if (darkAt(K4, K3) !== 0) throw new Error('the held frame would be darkened');
 const { steps, cum } = await motion(tl);
 console.log(`timeline: ${tl.frames.length} frames, keyframes at ${tl.keys.join(', ')}; motion ${steps.reduce((a, b) => a + b, 0).toFixed(0)}, largest source step ${Math.max(...steps).toFixed(1)}`);
 for (const k of tl.keys.slice(1, 4)) console.log(`  join at ${k}: source steps ${steps.slice(k - 5, k + 5).map((s) => s.toFixed(2)).join(' ')}`);
@@ -389,8 +406,8 @@ if (args.windows) {
   await mkdir(args.windows, { recursive: true });
   for (const [n, i] of tl.keys.entries()) {
     const left = windowLeft(cum, tl.keys, i);
-    const px = await blend(tl.frames[i], FIT.mobile(left));
-    finish(px, SETS.mobile.w, SETS.mobile.h, SETS.mobile.seed);
+    const px = await evenSharpness(await blend(tl.frames[i], FIT.mobile(left)), SETS.mobile.w, SETS.mobile.h);
+    finish(px, SETS.mobile.w, SETS.mobile.h, SETS.mobile.seed, darkAt(i, K3));
     await image(px, SETS.mobile.w, SETS.mobile.h).jpeg({ quality: 90 }).toFile(join(args.windows, `k${n + 1}.jpg`));
     console.log(`K${n + 1}: window ${left} to ${left + WIN_W}`);
   }
@@ -434,15 +451,18 @@ for (const [set, def] of Object.entries(SETS)) {
   let posterBuf = null;
   let differ = 0;
   const lowres = new Array(def.frames); // each shipped frame, before finishing, at a fifth of its size
+  const sharpness = new Array(def.frames); // what the evening step measured on each frame
   // --scare: the walk frames on disk stay, only the held frame is made again (for the patches)
   const queue = list.map((t, i) => [t, i]).filter(([, i]) => !args.scare || i === scareIndex);
   await Promise.all(
     Array.from({ length: 6 }, async () => {
       for (let job = queue.shift(); job; job = queue.shift()) {
         const [t, i] = job;
-        const px = await blend(tl.frames[t], FIT[set](left(t)));
-        lowres[i] = await image(px, def.w, def.h).resize(def.w / 5, def.h / 5).raw().toBuffer();
-        finish(px, def.w, def.h, def.seed + i);
+        const plainPx = await blend(tl.frames[t], FIT[set](left(t)));
+        lowres[i] = await image(plainPx, def.w, def.h).resize(def.w / 5, def.h / 5).raw().toBuffer();
+        sharpness[i] = await lapVar(plainPx, def.w, def.h);
+        const px = await evenSharpness(plainPx, def.w, def.h);
+        finish(px, def.w, def.h, def.seed + i, darkAt(t, K3));
         if (i === 0) posterBuf = px;
         if (i === scareIndex) hold = px;
         if (args.verify && set === 'desktop') {
@@ -461,6 +481,10 @@ for (const [set, def] of Object.entries(SETS)) {
     const sorted = [...shipped].sort((a, b) => a - b);
     console.log(
       `${set}: ${def.frames} frames; keyframes K1 to K5 at frames ${tl.keys.map(at).join(', ')}; step between shipped frames (mean abs difference at ${def.w / 5} x ${def.h / 5}): largest ${sorted[sorted.length - 1].toFixed(2)}, median ${sorted[sorted.length >> 1].toFixed(2)}, smallest ${sorted[0].toFixed(2)}`,
+    );
+    const sh = [...sharpness].sort((a, b) => a - b);
+    console.log(
+      `${set}: sharpness evened: ${sharpness.filter((v) => v > 300).length} frames softened, ${sharpness.filter((v) => v < 260).length} sharpened, ${sharpness.filter((v) => v >= 260 && v <= 300).length} left alone (measure: smallest ${sh[0].toFixed(0)}, median ${sh[sh.length >> 1].toFixed(0)}, largest ${sh[sh.length - 1].toFixed(0)})`,
     );
   }
   if (args.verify && set === 'desktop') {
@@ -489,8 +513,10 @@ for (const [set, def] of Object.entries(SETS)) {
   const toSet = async (buf, n) => {
     const img = sharp(buf, { raw: { width: W, height: H, channels: 3 } });
     const px = await (set === 'mobile' ? img.extract({ left: k4left, top: 0, width: WIN_W, height: H }) : img).resize(def.w, def.h, { kernel: 'lanczos3' }).removeAlpha().raw().toBuffer();
-    return finish(px, def.w, def.h, SCARE_SEED + n);
+    scareSharp.push(await lapVar(px, def.w, def.h));
+    return finish(await evenSharpness(px, def.w, def.h), def.w, def.h, SCARE_SEED + n, 0);
   };
+  const scareSharp = [];
   const holdLuma = lumaOf(hold);
   let sbytes = 0;
   let scount = 0;
@@ -524,6 +550,7 @@ for (const [set, def] of Object.entries(SETS)) {
       clip: norm([[t.r, HEAD.top - 40], [t.l, HEAD.top - 40], [b.l, HEAD.bottom + 40], [b.r, HEAD.bottom + 40]]),
     });
   }
+  console.log(`${set}: sharpness measure of the held frame ${sharpness[scareIndex].toFixed(0)}, of the scare frames ${Math.min(...scareSharp).toFixed(0)} to ${Math.max(...scareSharp).toFixed(0)}`);
   manifest.sets[set] = {
     dir: def.dir,
     ext: def.ext,
