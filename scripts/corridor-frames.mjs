@@ -91,7 +91,7 @@ const GAP_BLACK = 0.07;
 // Where the photograph goes: the head, in master pixels (hairline to chin of the generated
 // face). The quad hangs on the jamb, which does not move: `lead` is how far left of the jamb
 // the picture starts, so that its left eye sits where the generated one does.
-const HEAD = { top: 451, bottom: 666, width: 161, lead: 58 };
+const HEAD = { top: 451, bottom: 666, width: 161, lead: 75 };
 
 const pad = (n, w = 3) => String(n).padStart(w, '0');
 const exists = (p) => stat(p).then(() => true, () => false);
