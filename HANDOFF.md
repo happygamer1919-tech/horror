@@ -6,13 +6,10 @@ Live: https://happygamer1919-tech.github.io/horror/
 - Russian: https://happygamer1919-tech.github.io/horror/ru/
 - English: https://happygamer1919-tech.github.io/horror/en/
 
-Status on 2026-10-05: **the video-chapter corridor is on `main` but NOT live.** The live site
-still shows the previous corridor (the same walk, scrubbed by scroll). The deploy is blocked:
-the WebKit tests fail on GitHub's Linux runner (three pushes, see "Decisions for you"), while
-the whole suite passes on macOS and the Chromium tests pass on the runner. Everything else
-below is live. The new corridor is three chapters of real video (the approved AI-generated
-walk, same look, captions, scare and torch): one swipe, wheel turn or key press plays one
-chapter and it stops on its caption. The site is a preview and is hidden from search engines.
+Status on 2026-10-05: everything below is live. The corridor is three chapters of real video
+(the approved AI-generated walk, same look, captions, scare and torch): one swipe, wheel turn
+or key press plays one chapter and it stops on its caption. The site is a preview and is
+hidden from search engines.
 
 ## What is live
 
@@ -181,7 +178,7 @@ commit `public/og/`. Logo: `npm run logo`.
 |-------|--------|
 | `npm run build` | exit 0 |
 | `npm test` on macOS (Chromium phone, Chromium desktop, WebKit phone) | exit 0, 375 passed, 29 skipped (tests that apply to another project only), no retries |
-| CI gate on GitHub's Linux runner (Chromium phone and desktop) | passed; the WebKit job there reports only (see deviation 13) |
+| CI on GitHub's Linux runner | gate (Chromium phone and desktop): 348 passed, 22 skipped; WebKit job, report only (deviation 13): 26 passed, 8 skipped |
 | One gesture advances exactly one chapter; three reach the last door; a fourth leaves | tested: touch swipe and key (Chromium phone), wheel and key (Chromium desktop, WebKit) |
 | Scare plays once, not on a second pass or after a reload | tested in all three projects |
 | Fast flings from the top of the page reach the check-in card | tested: touch flings (Chromium phone), wheel (desktop, WebKit) |
@@ -191,7 +188,10 @@ commit `public/og/`. Logo: `npm run logo`.
 | Corridor download on a phone | 2.92 MB (H.264) or 2.98 MB (AV1) for the three chapters, four stills and the poster |
 | Corridor download on a desktop | 6.30 MB (H.264) or 4.07 MB (AV1) |
 | `npm run test:perf`, page scroll | 0.1 percent dropped frames (worst run 0.2), no long task at all |
-| Lighthouse mobile, live | not run: the video chapters are not deployed yet |
+| Lighthouse mobile, live `/ro/` | Performance 95, Accessibility 100 |
+| Lighthouse mobile, live `/ru/` | Performance 98, Accessibility 100 |
+| Lighthouse mobile, live `/en/` | Performance 96, Accessibility 100 |
+| The three chapters on the live site, phone emulation | play as video in Chromium and in WebKit: 5.4 s, 5.4 s, 12.7 s with the door; each rests on its stop |
 
 Notes on the numbers:
 
