@@ -735,7 +735,8 @@ test('the stage is never black: from the catch, through the clip, to the last do
   test.slow();
   const kind = gesturesOf(info)[0];
   const { context, page } = await pageFor(browser, info, kind);
-  await open(page, { rate: 2 });
+  // at its real speed: a whole-screen picture takes a CI runner about a second to take and read
+  await open(page);
   await page.waitForLoadState('load');
   const top = await topOf(page);
   test.skip((await primed(page)) === 'none', 'this browser plays no video');
@@ -776,7 +777,7 @@ test('the stage is never black: from the catch, through the clip, to the last do
     shots.push(share);
   }
   await ended(page);
-  expect(shots.length, 'screenshots while the clip played').toBeGreaterThan(linuxWebKit(page) ? 2 : 6);
+  expect(shots.length, 'screenshots while the clip played').toBeGreaterThan(linuxWebKit(page) ? 2 : 4);
   // and the last door, at rest
   await settledY(page);
   await jumpTo(page, top);

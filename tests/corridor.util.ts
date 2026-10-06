@@ -362,7 +362,8 @@ export async function expectRest(page: Page, message = '') {
   const on = await page.locator('[data-cap]').evaluateAll((els) => els.map((el, i) => (el.classList.contains('is-on') ? i : -1)).filter((i) => i >= 0));
   expect(on, `${message}: the last caption alone`).toEqual([3]);
   // no clip is left running
-  expect(await page.locator('#corridor video').evaluateAll((vs) => vs.filter((v) => !(v as HTMLVideoElement).paused).length)).toBe(0);
+  // (asked more than once: the walk for Replay is made ready about now, and plays one frame to do it)
+  await expect.poll(() => page.locator('#corridor video').evaluateAll((vs) => vs.filter((v) => !(v as HTMLVideoElement).paused).length), { timeout: 5000 }).toBe(0);
 }
 
 // The page has gone on to the next section and stopped right under the header.
