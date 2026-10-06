@@ -48,7 +48,21 @@ createServer(async (req, res) => {
       file = join(file, 'index.html');
     }
     const body = await readFile(file);
-    res.writeHead(200, { 'Content-Type': types[extname(file)] ?? 'application/octet-stream' }).end(body);
+    const type = types[extname(file)] ?? 'application/octet-stream';
+    // Byte ranges, as GitHub Pages answers them: Safari asks for a video in ranges and will
+    // not play one from a server that ignores them.
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
+    if (range && (range[1] || range[2])) {
+      const from = range[1] ? Number(range[1]) : Math.max(0, body.length - Number(range[2]));
+      const to = range[1] && range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1;
+      if (from > to || from >= body.length) {
+        res.writeHead(416, { 'Content-Range': `bytes */${body.length}` }).end();
+        return;
+      }
+      res.writeHead(206, { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${from}-${to}/${body.length}`, 'Content-Length': to - from + 1 }).end(body.subarray(from, to + 1));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': body.length }).end(body);
   } catch {
     await send404();
   }
