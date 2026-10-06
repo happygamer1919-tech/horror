@@ -1,38 +1,49 @@
 // Pictures of the corridor as the built site shows it, for docs/screenshots/:
-//   20-chapter-1, -2, -3      each chapter as a strip: eight screenshots at even steps of its
-//                             playing time, tiled into one image
-//   20-chapter-3-scare        the door beat: eight screenshots across its 625 ms
-//   03-corridor-1, -2, -3     the stage at rest at the end of each chapter
-//   03-corridor-still         what a visitor with reduced motion gets
-//   19-scare                  the door, open
+//   21-clip               the clip as a strip: twelve screenshots at even steps of its playing
+//                         time, the first play (the variant with the door), tiled into one image
+//   19-scare              the door, open
+//   03-corridor-start     the stage before the clip: the first frame
+//   03-corridor-rest      the stage after it: the last door, its caption, the Replay button
+//   03-corridor-tap       the "Tap to enter" button, where the browser will not start a video
+//   03-corridor-still     what a visitor with reduced motion gets
 // each at 390 x 844 (touch, 2x) and 1440 x 900. Builds nothing: run `npm run build` first.
 //   node scripts/corridor-shots.mjs [lang]
 //
-// The chapters are played slowly while the screenshots are taken (the page's own test hook for
-// the playing speed): a screenshot takes longer than a frame lasts, and what is photographed
-// must be the frame of that moment. The captions follow the video's time, so they are where
-// they are at full speed. Each chapter is started by putting the page on its stop, and a key
-// that does nothing is pressed before every screenshot, so the page does not take the slow
-// playing for an idle visitor and dim its lights.
+//   node scripts/corridor-shots.mjs --framing=NAME:DIR [--framing=NAME:DIR ...]
+// makes 22-framing-NAME-390 instead: a strip of the frames in DIR (made by
+// `node scripts/corridor-video.mjs --framing=NAME --stills=DIR --at=...`) on the phone stage,
+// with the page around them, to compare ways of cutting the phone window.
+//
+// The clip is played slowly while the screenshots are taken, and held on its frame for each
+// one: a screenshot takes longer than a frame lasts, and what is photographed must be the
+// frame of that moment. The captions follow the clip's time, so they are where they are at
+// full speed. The page is told a speed slower still (its own test hook), because it lets go
+// of the page a second after the clip should have ended at the speed it was told, and the
+// stops for the screenshots take longer than that. The clip is started the way a visitor
+// starts it, by scrolling down to it with a key.
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import { spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const lang = process.argv[2] ?? 'ro';
+const argv = process.argv.slice(2);
+const lang = argv.find((a) => !a.startsWith('--')) ?? 'ro';
+const framings = argv.filter((a) => a.startsWith('--framing=')).map((a) => a.slice(10).split(':'));
 const PORT = 4343;
 const server = spawn('node', [join(ROOT, 'scripts', 'serve.mjs')], { cwd: ROOT, env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 800));
 const url = `http://localhost:${PORT}/horror/${lang}/`;
 const out = (name, w) => join(ROOT, 'docs', 'screenshots', `${name}-${w}.jpg`);
 const sizes = [
-  { w: 390, h: 844, dpr: 2, mobile: true, tile: 240, cols: 8 },
+  { w: 390, h: 844, dpr: 2, mobile: true, tile: 240, cols: 6 },
   { w: 1440, h: 900, dpr: 1, mobile: false, tile: 640, cols: 4 },
 ];
-const STEPS = 8;
-const SLOW = 0.25;
+const STEPS = 12;
+const SLOW = 0.15; // how fast the clip plays here
+const TOLD = 0.07; // and what the page is told (about as slow as a browser will play)
 
 // tiles in rows of `cols`, each with its time written under it
 async function sheet(shots, s, file) {
@@ -61,16 +72,18 @@ async function sheet(shots, s, file) {
 
 const browser = await chromium.launch();
 try {
-  for (const s of sizes) {
-    const make = async ({ reduced = false, scareDone = false, rate = 8 } = {}) => {
+  for (const s of framings.length ? sizes.slice(0, 1) : sizes) {
+    const make = async ({ reduced = false, seen = false, rate = 1, refuse = false } = {}) => {
       const ctx = await browser.newContext({ viewport: { width: s.w, height: s.h }, deviceScaleFactor: s.dpr, isMobile: s.mobile, hasTouch: s.mobile, reducedMotion: reduced ? 'reduce' : 'no-preference' });
       await ctx.addInitScript(
-        ([done, r]) => {
+        ([done, r, no]) => {
           sessionStorage.setItem('hotel:lift', '1');
-          if (done) sessionStorage.setItem('hotel:scare', '1');
+          if (done) sessionStorage.setItem('hotel:corridor', '1');
           window.__corridorRate = r;
+          // a browser that starts no video by itself
+          if (no) HTMLMediaElement.prototype.play = () => Promise.reject(new DOMException('no', 'NotAllowedError'));
         },
-        [scareDone, rate],
+        [seen, rate, refuse],
       );
       const page = await ctx.newPage();
       page.on('pageerror', (e) => console.log('page error:', e.message));
@@ -78,100 +91,129 @@ try {
       return { ctx, page };
     };
     const stage = (page) => page.locator('[data-corridor]');
-    const state = (page) => stage(page).evaluate((el) => ({ ...el.dataset, manifest: undefined }));
-    const stops = async (page) => (await stage(page).getAttribute('data-stops')).split(' ').map(Number);
+    const data = (page, key) => stage(page).evaluate((el, k) => el.dataset[k] ?? '', key);
     const info = (page) => stage(page).evaluate((el) => JSON.parse(el.dataset.manifest).sets[el.dataset.set]);
-    const rest = (page, k) => page.waitForFunction((n) => ((d) => d.chapter === String(n) && d.state === 'rest')(document.querySelector('[data-corridor]').dataset), k, { timeout: 120000 });
-    const setRate = (page, r) => page.evaluate((v) => (window.__corridorRate = v), r);
-    const to = async (page, k) => {
-      // stop k, at rest
-      const st = await stops(page);
-      await page.evaluate((y) => window.scrollTo(0, y), st[Math.max(0, k)]);
-      await rest(page, Math.max(0, k));
-      await page.waitForTimeout(500);
-    };
+    const state = (page, want) => page.waitForFunction((v) => document.querySelector('[data-corridor]').dataset.state === v, want, { timeout: 120000 });
+    // the corridor at the top of the screen, as it is while the clip plays (a jump: nothing is caught)
+    const toTop = (page) => page.evaluate(() => window.scrollTo(0, Number(document.querySelector('[data-corridor]').dataset.top)));
+    // a key that does nothing: the page does not take the wait for an idle visitor and dim its lights
     const shoot = async (page) => {
       await page.keyboard.press('Shift');
       return page.screenshot({ type: 'png' });
     };
-    // forwards one stop: the chapter of that stop starts
-    const start = async (page, k) => {
-      const st = await stops(page);
-      await page.evaluate((y) => window.scrollTo(0, y), st[k]);
-    };
-    // Play chapter k from the stop before it and take a screenshot each time the video reaches
-    // one of `times` (seconds of the chapter).
-    const strip = async (page, k, id, times) => {
-      await to(page, k - 1);
-      await page.waitForFunction((f) => document.querySelector('[data-corridor]').dataset.loaded.split(' ').includes(f), id, { timeout: 60000 });
-      await setRate(page, SLOW);
-      await start(page, k);
-      const shots = [];
-      for (const t of times) {
-        await page.waitForFunction(
-          ([f, at]) => {
-            const d = document.querySelector('[data-corridor]').dataset;
-            const v = document.querySelector(`.corr__video[data-file="${f}"]`);
-            return (v && v.currentTime >= at) || (d.state === 'rest' && d.played !== '0');
-          },
-          [id, t],
-          { timeout: 120000, polling: 'raf' },
-        );
-        shots.push({ png: await shoot(page), label: `${t.toFixed(2)} s` });
+    // down to the corridor as a visitor comes: by scrolling, here with the keyboard
+    const walkIn = async (page) => {
+      await page.keyboard.press('Shift');
+      await page.waitForFunction(() => document.querySelector('[data-corridor]').dataset.primed || document.querySelector('[data-corridor]').dataset.prime, null, { timeout: 60000 });
+      for (let i = 0; i < 6 && (await data(page, 'state')) === 'idle'; i++) {
+        await page.keyboard.press('PageDown');
+        await page.waitForTimeout(500);
       }
-      await setRate(page, 8);
-      return shots;
     };
-    const even = (duration) => Array.from({ length: STEPS }, (_, i) => 0.12 + ((duration - 0.3) * i) / (STEPS - 1));
+    const at = async (page, t) => {
+      await page.waitForFunction(
+        (time) => {
+          const v = document.querySelector('.corr__video');
+          if (!v || v.currentTime < time) return document.querySelector('[data-corridor]').dataset.state !== 'play';
+          v.pause();
+          return true;
+        },
+        t,
+        { timeout: 120000, polling: 'raf' },
+      );
+      await page.waitForTimeout(120);
+      const png = await shoot(page);
+      await page.evaluate(() => document.querySelector('.corr__video')?.play());
+      return png;
+    };
 
-    // the three chapters, the scare switched off so chapter 3 is the plain walk
-    {
-      const { ctx, page } = await make({ scareDone: true });
-      const set = await info(page);
-      for (const [k, id] of [[1, 'c1'], [2, 'c2'], [3, 'c3']]) {
-        const shots = await strip(page, k, id, even(set.files[id].duration));
-        await rest(page, k);
-        await page.waitForTimeout(900); // the caption has finished coming up
+    // ways of cutting the phone window, side by side: their frames on the stage, with the page
+    if (framings.length) {
+      for (const [name, dir] of framings) {
+        const meta = JSON.parse(await readFile(join(dir, 'frames.json'), 'utf8'));
+        const { ctx, page } = await make();
         await page.keyboard.press('Shift');
-        await page.screenshot({ path: out(`03-corridor-${k}`, s.w), type: 'jpeg', quality: 84 });
-        console.log(out(`03-corridor-${k}`, s.w));
-        shots[shots.length - 1] = { png: await shoot(page), label: `${set.files[id].duration.toFixed(2)} s, at rest` };
-        await sheet(shots, s, out(`20-chapter-${k}`, s.w));
+        await toTop(page);
+        await page.waitForTimeout(600);
+        const caps = await info(page).then((set) => set.clips.plain.cues);
+        const shots = [];
+        for (const [t, time] of Object.entries(meta.time)) {
+          const file = await readFile(join(dir, `t${String(t).padStart(4, '0')}.webp`));
+          await stage(page).evaluate(
+            async (el, [src, w, h, cues, time]) => {
+              el.style.setProperty('--corr-w', w);
+              el.style.setProperty('--corr-h', h);
+              const img = el.querySelector('[data-pic="first"]');
+              img.src = src;
+              await img.decode();
+              img.classList.add('is-on');
+              el.querySelector('[data-corr-skip]').hidden = false;
+              el.querySelectorAll('[data-cap]').forEach((li, i) => li.classList.toggle('is-on', cues.some((c) => c.cap === i && time >= c.in && (c.out === undefined || time < c.out))));
+            },
+            [`data:image/webp;base64,${file.toString('base64')}`, meta.w, meta.h, caps, time],
+          );
+          await page.waitForTimeout(350);
+          shots.push({ png: await shoot(page), label: `${time.toFixed(2)} s` });
+        }
+        await sheet(shots, s, out(`22-framing-${name}`, s.w));
+        await ctx.close();
       }
-      await ctx.close();
+      continue;
     }
-    // the scare, first pass of a fresh session: the beat, and the frame with the door open
+
+    // the first play of a fresh session: the clip with the door
     {
-      const { ctx, page } = await make();
-      const set = await info(page);
-      const sc = set.files.c3s.scare;
-      const times = Array.from({ length: STEPS }, (_, i) => sc.at - 1 / 24 + ((sc.end - sc.at + 2 / 24) * i) / (STEPS - 1));
-      // up to the door at speed, then slowly through the beat
-      await to(page, 2);
-      await page.waitForFunction(() => document.querySelector('[data-corridor]').dataset.loaded.split(' ').includes('c3s'), null, { timeout: 60000 });
-      await setRate(page, 1);
-      await start(page, 3);
-      await page.waitForFunction((at) => ((v) => v && v.currentTime >= at - 0.6)(document.querySelector('.corr__video[data-file="c3s"]')), sc.at, { timeout: 60000, polling: 'raf' });
-      await page.evaluate((r) => (document.querySelector('.corr__video[data-file="c3s"]').playbackRate = r), 0.1);
+      const { ctx, page } = await make({ rate: TOLD });
+      const clip = (await info(page)).clips.scare;
+      await toTop(page);
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: out('03-corridor-start', s.w), type: 'jpeg', quality: 84 });
+      console.log(out('03-corridor-start', s.w));
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await walkIn(page);
+      await state(page, 'play');
+      await page.evaluate((r) => (document.querySelector('.corr__video').playbackRate = r), SLOW);
       const shots = [];
-      for (const t of times) {
-        await page.waitForFunction((at) => document.querySelector('.corr__video[data-file="c3s"]').currentTime >= at, t, { timeout: 60000, polling: 'raf' });
-        const png = await shoot(page);
-        shots.push({ png, label: `${t.toFixed(3)} s` });
-        // the frame the review still was taken from: the face in the gap, about the middle of the beat
-        if (shots.length === Math.ceil(STEPS / 2) + 1) {
-          await sharp(png).jpeg({ quality: 84 }).toFile(out('19-scare', s.w));
-          console.log(out('19-scare', s.w), (await state(page)).scareBeats);
+      for (let i = 0; i < STEPS; i++) {
+        const t = 0.1 + ((clip.duration - 0.25) * i) / (STEPS - 1);
+        shots.push({ png: await at(page, t), label: i === STEPS - 1 ? `${clip.duration.toFixed(2)} s, the end` : `${t.toFixed(2)} s` });
+        // the beat: the face in the gap, about the middle of it
+        if (t < clip.scare.at && 0.1 + ((clip.duration - 0.25) * (i + 1)) / (STEPS - 1) > clip.scare.at) {
+          await sharp(await at(page, (clip.scare.at + clip.scare.end) / 2)).jpeg({ quality: 84 }).toFile(out('19-scare', s.w));
+          console.log(out('19-scare', s.w), await data(page, 'scareBeats'));
         }
       }
-      await sheet(shots, s, out('20-chapter-3-scare', s.w));
+      await sheet(shots, s, out('21-clip', s.w));
       await ctx.close();
     }
-    // reduced motion: three stills, no pin
+    // afterwards: the last door, its caption, the Replay button
+    {
+      const { ctx, page } = await make({ seen: true });
+      await page.keyboard.press('Shift');
+      await toTop(page);
+      await page.waitForFunction(() => document.querySelector('[data-pic="last"]').classList.contains('is-on'), null, { timeout: 30000 });
+      await page.waitForTimeout(900);
+      await page.keyboard.press('Shift');
+      await page.screenshot({ path: out('03-corridor-rest', s.w), type: 'jpeg', quality: 84 });
+      console.log(out('03-corridor-rest', s.w));
+      await ctx.close();
+    }
+    // a browser that will not start a video by itself
+    {
+      const { ctx, page } = await make({ refuse: true });
+      await walkIn(page);
+      await state(page, 'tap');
+      await page.waitForTimeout(900);
+      await page.keyboard.press('Shift');
+      await page.screenshot({ path: out('03-corridor-tap', s.w), type: 'jpeg', quality: 84 });
+      console.log(out('03-corridor-tap', s.w));
+      await ctx.close();
+    }
+    // reduced motion: three stills, nothing held
     {
       const { ctx, page } = await make({ reduced: true });
-      await page.evaluate(() => document.getElementById('corridor').scrollIntoView());
-      await page.waitForFunction(() => [1, 2, 3].every((k) => ((el) => el.complete && el.naturalWidth > 0)(document.querySelector(`img[data-pose="${k}"]`))), null, { timeout: 30000 });
+      await toTop(page);
+      await page.waitForFunction(() => ['still-1', 'still-2', 'last'].every((k) => ((el) => el.complete && el.naturalWidth > 0)(document.querySelector(`img[data-pic="${k}"]`))), null, { timeout: 30000 });
       await page.waitForTimeout(300);
       // the fixed layers would be stitched into the middle of a picture this tall
       await page.addStyleTag({ content: '.torch,.bar,.sticky,.skip-link,.ask{display:none!important}' });
