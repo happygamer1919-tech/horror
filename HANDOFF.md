@@ -193,7 +193,7 @@ commit `public/og/`. Logo: `npm run logo`.
 | `npm run build` | exit 0 |
 | `npm test` on macOS (Chromium phone, Chromium desktop, WebKit phone) | exit 0, 411 passed, 32 skipped (tests that apply to another project only), no retries |
 | CI gate on GitHub's Linux runner (Chromium phone and desktop) | 372 passed, 24 skipped, no retries |
-| CI WebKit job (macOS runner, report only) | all corridor tests passed there |
+| CI WebKit job (macOS runner, report only) | 39 passed, 8 skipped |
 | A fast fling from the page top stops at the corridor and the clip plays | tested: touch fling (Chromium phone), wheel and key (desktop, WebKit) |
 | After the clip the page goes on to the next section by itself | tested |
 | Skip at any moment (first frame, middle, the door, the last second) | tested by button, by Escape, by a second strong swipe or wheel turn |
@@ -210,9 +210,10 @@ commit `public/og/`. Logo: `npm run logo`.
 | Frames presented over the clip at 4x CPU throttle | 526 of 527 (99.8 percent) in H.264 and in AV1 |
 | Phone download, first play | 2.89 MB (H.264) or 2.94 MB (AV1): clip, poster, two stills |
 | `npm run test:perf`, page scroll at 4x throttle | corridor already seen: 0.1 percent dropped frames; first visit (held, played, let go): 0 percent; no long task in either |
+| Lighthouse mobile, live `/ro/`, `/ru/`, `/en/` | Performance 94, 98, 98; Accessibility 100, 100, 100 |
+| The corridor on the live site, phone emulation, Chromium (touch fling) and WebKit (wheel) | clip ready 0.7 to 0.8 s after the first input; the fling is caught and the page held; hold 9.83 and 9.85 s; the page then rests on the next section |
 
-`npm run test:perf` is separate from `npm test` and is not part of the deploy gate. The live
-checks (Lighthouse and the walk on the deployed pages) are in the report for this update.
+`npm run test:perf` is separate from `npm test` and is not part of the deploy gate.
 
 ## Screenshots
 
