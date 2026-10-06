@@ -34,14 +34,15 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test --project=phone-390 --project=desktop-1440
 
-  # WebKit: reported, and it does not hold a deploy back (owner's ruling, 2026-10-05). On a
-  # Linux runner WebKit is its Linux port, which draws this page about ten times a second
-  # there and scrolls in ways of its own: three runs went red on timing while Chromium passed
-  # and macOS WebKit passed. `npm test` on a Mac runs this project against the port Safari is
-  # built from, and that is done before every push.
+  # WebKit: reported, and it does not hold a deploy back (owner's ruling, 2026-10-05). It runs
+  # on macOS, the port Safari is built from. WebKit's Linux port draws this page about ten
+  # times a second on a runner, scrolls in ways of its own and does not get the corridor's
+  # clip ready to play: its runs said nothing about Safari. `npm test` on a Mac runs this
+  # project the same way, and that is done before every push.
   test-webkit:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     continue-on-error: true
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,7 +50,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps webkit
+      - run: npx playwright install webkit
       - run: npx playwright test --project=webkit-phone
 
   build:
