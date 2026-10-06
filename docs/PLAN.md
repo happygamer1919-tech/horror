@@ -147,3 +147,20 @@ screenshots at 390px and 1440px, a critique against the concept, and fixes.
   smoothness is measured by `npm run test:perf` (requestVideoFrameCallback, 4x CPU throttle).
 - Rulings applied: `aggregateRating` removed from the business markup; the guest book font
   stays.
+
+## Update 6: the corridor as one held clip
+
+- The chapters failed the owner's test on a real iPhone (a normal flick skipped every clip)
+  and are retired, with scroll snap.
+- When the corridor's top reaches the top of the screen the page is held (the body is fixed
+  in place, the stage goes full screen; no blocking listener) and one clip plays: 9.8 seconds
+  at 60 pictures a second, re-cut from the same masters, the scare at its own speed, captions
+  as timed overlays. Then the page glides on. Skip, Escape and a second strong swipe leave.
+- Once per session; afterwards an ordinary one-screen section with the last door and Replay
+  (the clip without the scare). Coming up from below never holds.
+- Not ready on arrival: no hold. play() refused: "Tap to enter". The hold is bounded at clip
+  length plus one second.
+- Phone picture: a 4:5 window (896x1120) that keeps the corridor's depth in view.
+- CI: Chromium phone and desktop on Linux are the gate; WebKit runs on a macOS runner and
+  reports.
+
