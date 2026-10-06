@@ -69,7 +69,7 @@ const variants: Variant[] = [
   },
   { name: 'no-fog-blend', about: 'Hero fog canvas without mix-blend-mode.', css: '.hero__fog{mix-blend-mode:normal!important}' },
   { name: 'no-fog-gl', about: 'WebGL fog never starts (CSS halo stays).', init: noContext('data-fog', ['webgl', 'experimental-webgl', 'webgl2']) },
-  { name: 'no-corridor', about: 'Corridor plays no video: its chapters are crossfades between stills.', init: NO_CORRIDOR_VIDEO },
+  { name: 'no-corridor', about: 'Corridor plays no video and never holds the page: it shows its stills.', init: NO_CORRIDOR_VIDEO },
   { name: 'no-cctv', about: 'CCTV feeds never draw.', init: noContext('data-feed', ['2d']) },
   {
     name: 'no-reveal',

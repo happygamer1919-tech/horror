@@ -55,7 +55,7 @@ const sections = await page.evaluate(() => {
     const el = document.querySelector(sel);
     return el ? Math.round(el.getBoundingClientRect().top + window.scrollY) : 0;
   };
-  return { hero: 0, corridor: y('#corridor') + window.innerHeight * 1.5, file: y('#file') + 200, checkin: y('#checkin') };
+  return { hero: 0, corridor: y('#corridor'), file: y('#file') + 200, checkin: y('#checkin') };
 });
 const stops = positions.length ? positions.map((y) => [`y=${y}`, y]) : Object.entries(sections);
 

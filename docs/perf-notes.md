@@ -38,10 +38,17 @@ Files:
 |------|--------------|
 | `tests/perf/scroll.perf.ts` | The acceptance test. 3 measured runs plus 1 profiled run, asserts the budget, prints `PERF_SUMMARY {...}`, writes `test-results/perf-summary.json`. |
 | `tests/perf/blocked.perf.ts` | The hang test: does an 800 ms main thread hang hold a touch scroll back? Two control pages first, so the instrument proves itself. Writes `test-results/perf-blocked.json`. |
-| `tests/perf/harness.ts` | Emulation, the scripted scroll, trace analysis. |
+| `tests/perf/harness.ts` | Emulation, the scripted scroll, trace analysis. The scroll is made twice: with the corridor already seen (the scroll measurement, `perf-summary.json`), and on a first visit, where the corridor holds the page while its clip plays (`perf-summary.first-visit.json`). |
+| `tests/perf/video.perf.ts` | The corridor's clip: from the catch to its first frame on screen (budget 300 ms, no throttle and 4x), frames presented over the whole clip at 4x per codec (budget 95 percent), and how long the page was held against the clip's length. Writes `test-results/perf-corridor-start.json` and `test-results/perf-video.json`. |
 | `tests/perf/variants.ts` | Experiments: each switches one suspected cause off by injected CSS or a stub, without touching the source. |
 | `tests/perf/rest.perf.ts` | Opt-in (`PERF_REST=1`): work per second with no input, per experiment. |
 | `tests/perf/layers.mjs` | Layer evidence: every composited layer, its size, why Chrome made it, repaints during a short scroll. |
+
+One trap, found on 2026-10-05: a Playwright locator call or `waitForFunction` anywhere before
+or during the measured scroll loads Playwright's own script into the page, and that script
+listens to `touchstart` without `passive`. Chrome then reports every scroll frame as depending
+on the main thread (0 of 1183 without it, 1105 of 1140 with it, on the same build). The
+harness reads the page with plain `page.evaluate` only (`corridorState`, `until`).
 
 Conditions: Chromium (Playwright's Chrome for Testing 153), 390 x 844 at dpr 3, `isMobile`,
 `hasTouch`, an Android Chrome user agent, `hover: none` and `pointer: coarse` emulated (Playwright

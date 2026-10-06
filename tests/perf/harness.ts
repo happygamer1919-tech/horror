@@ -10,6 +10,15 @@
 //      touch scrolling and any smooth-scroll library behave the way they do under a finger.
 //   4. Measures only between the first touch and the moment the last swipe has settled.
 //
+// The corridor holds the page once per session while its clip plays, so the scroll is made in
+// one of two ways, each the same every time:
+//   seen    the session has seen the corridor: it is a section like any other, and the scroll
+//           runs through the whole page without a stop. This is the scroll measurement.
+//   first   a first visit, the clip fetched and warm before the scroll starts: the second
+//           swipe is caught, the swipes stop while the page is held, the clip plays to its
+//           end and the page glides on, and then the swipes go on. The frames of the clip and
+//           of the glide are inside the measured window.
+//
 // Definitions
 //   Frames are counted per display refresh (60 per second here), from the compositor's own
 //   PipelineReporter trace events, the source of the DevTools "Frames" track. Refreshes where
@@ -104,8 +113,12 @@ export interface Offender {
   functions: { fn: string; url: string; ms: number }[];
 }
 
+export type Visit = 'seen' | 'first';
+
 export interface RunMetrics {
   variant: string;
+  // How the corridor was passed, how the play ended ('' when nothing was held), and every hold in ms.
+  corridor: { visit: Visit; end: string; holds: number[] };
   // Was the machine itself able to hold 60 fps on an empty page right before and after?
   // Noisy = the machine was busy with something else, so the run is set aside and repeated.
   machine: { load1: number; idleDroppedPct: number; spinMs: number; noisy: boolean };
@@ -211,6 +224,27 @@ export interface RunMetrics {
 
 const round = (n: number, d = 1) => Number(n.toFixed(d));
 
+// What the corridor's stage says about itself (its data attributes), read with a plain
+// evaluate, and a wait made of such readings. Never a locator and never waitForFunction here:
+// both load Playwright's own script into the page, and that script listens to touchstart
+// without `passive`. From then on Chrome reports every scroll frame as depending on the main
+// thread (measured: 0 of 1183 scroll frames without it, 1105 of 1140 with it, same build), and
+// the run measures the test tool.
+export const corridorState = (page: Page) =>
+  page.evaluate(() => {
+    const d = document.querySelector<HTMLElement>('[data-corridor]')?.dataset;
+    return { lock: d?.lock ?? '', state: d?.state ?? '', end: d?.end ?? '', primed: d?.primed ?? '', codec: d?.codec ?? '', set: d?.set ?? '', top: Number(d?.top ?? 0) };
+  });
+export async function until(page: Page, what: string, test: (s: Awaited<ReturnType<typeof corridorState>>) => boolean, timeout = 30000) {
+  const started = Date.now();
+  for (;;) {
+    const s = await corridorState(page);
+    if (test(s)) return s;
+    if (Date.now() - started > timeout) throw new Error(`corridor: ${what} did not happen within ${timeout} ms (${JSON.stringify(s)})`);
+    await page.waitForTimeout(50);
+  }
+}
+
 async function settle(page: Page) {
   await page.waitForLoadState('load');
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -266,13 +300,15 @@ export async function measureScroll(
   browser: Browser,
   baseURL: string,
   variant: Variant,
-  opts: { profile?: boolean; path?: string; quietSpinMs?: number } = {},
+  opts: { profile?: boolean; path?: string; quietSpinMs?: number; visit?: Visit } = {},
 ): Promise<{ metrics: RunMetrics; trace: Buffer }> {
+  const visit = opts.visit ?? 'seen';
   const before = await machineCheck(browser);
   const context = await browser.newContext({ ...PHONE, baseURL });
-  await context.addInitScript(() => {
+  await context.addInitScript((seen) => {
     try {
       sessionStorage.setItem('hotel:lift', '1');
+      if (seen) sessionStorage.setItem('hotel:corridor', '1');
     } catch {
       /* private mode */
     }
@@ -285,7 +321,7 @@ export async function measureScroll(
     } catch {
       /* longtask is Chromium only */
     }
-  });
+  }, visit === 'seen');
   if (variant.init) await context.addInitScript(variant.init);
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
@@ -328,6 +364,13 @@ export async function measureScroll(
   await page.waitForTimeout(200);
   const throttledSpin = await spin(2);
   await page.waitForTimeout(500);
+  // A first visit: the clip is fetched and warm before the scroll, as it is for a visitor who
+  // has spent a moment on the hero (the first input here is a pointer move that touches nothing).
+  if (visit === 'first') {
+    await page.evaluate(() => void window.dispatchEvent(new Event('pointermove')));
+    await until(page, 'the clip being fetched and warm', (c) => c.primed === 'scare' || c.codec === 'none');
+    await page.waitForTimeout(500);
+  }
 
   await browser.startTracing(page, { categories: opts.profile ? PROFILE_CATEGORIES : LIGHT_CATEGORIES });
 
@@ -336,10 +379,12 @@ export async function measureScroll(
     w.__perf.on = true;
     w.__perf.t0 = performance.now();
     performance.mark('perf:scroll-start');
+    const corridor = document.querySelector<HTMLElement>('[data-corridor]');
     const tick = (t: number) => {
       if (!w.__perf.on) return;
       w.__perf.raf.push(t);
-      w.__perf.y.push(window.scrollY);
+      // (held, the page's own scroll position reads 0: it is on the corridor)
+      w.__perf.y.push(corridor?.dataset.lock === '1' ? Number(corridor.dataset.top) : window.scrollY);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -354,6 +399,12 @@ export async function measureScroll(
     await swipe(cdp, s.distance, s.speed);
     swipes++;
     await page.waitForTimeout(PAUSE_MS);
+    // Held by the corridor: the finger waits. The clip plays out, the page glides on to the
+    // next section, and the scroll goes on from there.
+    if ((await corridorState(page)).lock === '1') {
+      await until(page, 'the corridor letting the page go', (c) => c.lock === '0', 60000);
+      await page.waitForTimeout(1200);
+    }
     if (await atBottom()) {
       reachedBottom = true;
       break;
@@ -381,6 +432,8 @@ export async function measureScroll(
       viewport: window.innerHeight,
       pageHeight: document.documentElement.scrollHeight,
       smoothScrollLib: document.documentElement.classList.contains('lenis'),
+      corridorEnd: document.querySelector<HTMLElement>('[data-corridor]')?.dataset.end ?? '',
+      holds: performance.getEntriesByName('corridor:lock').map((e) => Math.round(e.duration)),
       // Which build was measured: the file name of the page's main script carries its hash.
       bundle: (document.querySelector('script[type="module"][src]') as HTMLScriptElement | null)?.src.split('/').pop() ?? '',
     };
@@ -416,6 +469,7 @@ export async function measureScroll(
 
   const metrics: RunMetrics = {
     variant: variant.name,
+    corridor: { visit, end: inPage.corridorEnd, holds: inPage.holds },
     machine: {
       load1: round(loadavg()[0]),
       idleDroppedPct,
