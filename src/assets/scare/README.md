@@ -1,6 +1,7 @@
 # The face behind door 308
 
-The scare is part of a video file (chapter 3 of the corridor, the variant with the door beat).
+The scare is part of a video file (the corridor's clip, the variant with the door beat, which
+is the one a visitor sees the first time).
 The face in the gap is generated: a sliver of a woman's face in deep shadow, one eye catching
 the torch. It is not a photograph and shows no real person (see `corridor-src/SOURCES.md`).
 
@@ -12,14 +13,14 @@ To put a photograph there instead:
    src/assets/scare/face.png
    ```
 
-2. Build the videos again (needs ffmpeg with libx264 and libsvtav1, and the masters in
+2. Build the clip again (needs ffmpeg with libx264 and libsvtav1, and the masters in
    `corridor-src/`):
 
    ```
    npm run corridor:video
    ```
 
-3. Commit what changed under `public/corridor/` (the two `c3s` files of each set and
+3. Commit what changed under `public/corridor/` (the two `walk-door` files of each set and
    `manifest.json`), and the photograph.
 
 The build takes the generated face out of the gap, and draws the photograph into the gap
@@ -63,11 +64,12 @@ built with (`face: true` or `false`).
 
 `tests/corridor-face.spec.ts` runs the compositing the build uses (`scripts/corridor-face.cjs`)
 on `tests/fixtures/face.png`: the photograph lights the gap and nothing outside it. It does
-not encode anything. After building with your own picture, look at the result: walk the
-corridor once in a fresh tab.
+not encode anything. After building with your own picture, look at the result: scroll down
+to the corridor once in a fresh tab.
 
-The scare plays once per browser session. To see it again while testing: close the tab, or
-clear `hotel:scare` in the tab's session storage.
+The scare plays once per browser session, on the first play of the corridor. To see it again
+while testing: close the tab, or clear `hotel:corridor` and `hotel:scare` in the tab's session
+storage.
 
 Where the picture goes (the head rectangle) and the outline of the gap for each frame of the
 beat are worked out in `scripts/corridor-video.mjs` (`HEAD` there is the head of the generated
