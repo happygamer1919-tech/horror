@@ -570,8 +570,16 @@ export function initCorridor() {
     c.priming = false;
     v.defaultPlaybackRate = rate();
     v.playbackRate = rate();
-    if (v.currentTime > 0.01 || v.ended) v.currentTime = 0;
+    // Back on its first frame, if the warm-up left it anywhere else. Until it is there, a frame
+    // that comes is one from before, not the clip's first.
+    let placed = !v.seeking;
+    if (v.currentTime > 0.01 || v.ended) {
+      placed = false;
+      v.currentTime = 0;
+    }
+    if (!placed) v.addEventListener('seeked', () => (placed = true), { once: true });
 
+    const reports = 'requestVideoFrameCallback' in v; // the browser says when a frame is on screen
     let shown = false;
     let creaked = false;
     let counted = false;
@@ -604,8 +612,7 @@ export function initCorridor() {
     if (v.requestVideoFrameCallback) {
       const onFrame: FrameCallback = (_now, meta) => {
         if (mine !== run) return;
-        // (a frame from before the clip was put back on its start is not its first frame)
-        if (!v.seeking && (shown || meta.mediaTime < 0.5)) reveal();
+        if (placed && !v.seeking) reveal();
         present(meta.mediaTime);
         if (!v.ended) v.requestVideoFrameCallback?.(onFrame);
       };
@@ -614,10 +621,10 @@ export function initCorridor() {
     const tick = () => {
       if (mine !== run) return;
       const t = v.currentTime;
-      if (t > 0 && !v.seeking && !v.requestVideoFrameCallback) {
-        reveal();
-        present(t);
-      }
+      // A browser that does not report frames says so by its clock. One that does, and has
+      // not for a quarter of a second of the clip, is believed by its clock as well.
+      if (placed && !v.seeking && t > (reports ? 0.25 : 0)) reveal();
+      present(t);
       if (shown) {
         setCaps(cuesAt(c.info.cues, t));
         // (a little longer than what is left of the clip, so the clip is still there under it)
