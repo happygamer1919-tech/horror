@@ -141,12 +141,13 @@ const WIN_W = FRAMING.win;
 // best: the quality that is good enough, per codec (the encoders' own scales, lower is better):
 // a set whose budget allows better than this stops here instead of filling the budget.
 // pose: WebP quality of the stills, before the lift dark pictures get (darkBoost below).
-// codecs: best first for this set, as the page lists them in <source>. A phone takes H.264,
-// which every phone decodes in hardware; AV1 is there for a browser without it. A desktop takes
-// AV1 where it can, at two thirds of the bytes.
+// codecs: best first for this set, as the page lists them in <source>. Both sets take H.264,
+// which every phone and every laptop decodes in hardware; AV1 is there for a browser without
+// it. (On the desktop set AV1 would save an eighth of the bytes, and would be decoded in
+// software, 60 pictures a second, on every machine older than its AV1 hardware.)
 // level: the H.264 level the set's size and 60 pictures a second need.
 const SETS = {
-  desktop: { dir: 'd', w: 1600, h: 900, look: [1600, 900], poster: [640, 360], seed: 1000, old: 168, budget: 8_000_000, ref: 5, level: '4.2', best: { h264: 23, av1: 32 }, pose: 68, codecs: ['av1', 'h264'] },
+  desktop: { dir: 'd', w: 1600, h: 900, look: [1600, 900], poster: [640, 360], seed: 1000, old: 168, budget: 8_000_000, ref: 5, level: '4.2', best: { h264: 23, av1: 32 }, pose: 68, codecs: ['h264', 'av1'] },
   mobile: { dir: 'm', w: FRAMING.w, h: FRAMING.h, look: FRAMING.look, poster: FRAMING.poster, seed: 3000, old: 112, budget: 3_000_000, ref: 6, level: '4.0', best: { h264: 23, av1: 32 }, pose: 56, codecs: ['h264', 'av1'] },
 };
 const NEW_SEED = 20000; // plus the timeline index, for frames the old sequence did not have

@@ -1153,7 +1153,7 @@ test('every clip file: a full type for each codec, the index at the front, colou
     const rest = (await size(s.poster)) + (await size(s.first)) + (await size(s.last));
     for (const [id, f] of Object.entries(s.clips)) {
       // a phone takes H.264, which every phone decodes in hardware; a desktop the modern codec first
-      expect(f.sources.map((x) => x.codec), `${name} ${id}`).toEqual(name === 'mobile' ? ['h264', 'av1'] : ['av1', 'h264']);
+      expect(f.sources.map((x) => x.codec), `${name} ${id}`).toEqual(['h264', 'av1']);
       for (const src of f.sources) {
         if (src.codec === 'av1') expect(src.type).toMatch(/^video\/mp4; codecs="av01\.0\.\d\dM\.(08|10)"$/);
         else expect(src.type).toMatch(/^video\/mp4; codecs="avc1\.6400(28|29|2a|1f|20)"$/);

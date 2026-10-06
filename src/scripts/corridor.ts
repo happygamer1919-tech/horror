@@ -816,8 +816,10 @@ export function initCorridor() {
     const can = !seen && phase === 'idle' && !document.hidden && driven(now) && !gliding();
     if (above && y + (can && speed > 0 ? speed * AHEAD_MS : 0) >= topY) {
       above = false;
-      // (a page that is already more than a screen past was not seen to arrive)
-      if (can && y - topY <= screen) arrive();
+      // (a hard flick covers a screen in a tenth of a second, and a busy main thread can be
+      // that late with a scroll event: the page is brought back from up to three screens on,
+      // under the stage, which covers it at once. Further than that it was not seen to arrive.)
+      if (can && y - topY <= screen * 3) arrive();
     } else if (!above && y < topY - 1) {
       above = true;
       prepare();
