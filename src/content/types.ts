@@ -83,10 +83,14 @@ export interface Copy {
     title: string;
     captions: string[];
     alt: string;
-    // The small link inside the corridor that leaves it. `skipLabel` is its full name for
-    // screen readers and starts with the visible word.
+    // The buttons on the corridor's stage. Skip leaves the clip while it plays; Replay plays
+    // it once more; `tap` is shown where the browser will not start a video by itself. A
+    // `...Label` is the button's full name for screen readers and starts with the visible word.
     skip: string;
     skipLabel: string;
+    replay: string;
+    replayLabel: string;
+    tap: string;
   };
   file: {
     title: string;

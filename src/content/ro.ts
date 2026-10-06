@@ -63,6 +63,9 @@ export const ro: Copy = {
     alt: 'Un drum la lumina lanternei pe un coridor întunecat de hotel, cu uși numerotate, până la camera 313.',
     skip: 'Sari peste',
     skipLabel: 'Sari peste coridor',
+    replay: 'Încă o dată',
+    replayLabel: 'Încă o dată prin coridor',
+    tap: 'Atingeți pentru a intra',
   },
   file: {
     title: 'Dosarul',

@@ -9,17 +9,20 @@ interface Props {
 const t = copy[Astro.props.lang];
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-// What the page needs of the build's manifest (scripts/corridor-video.mjs): sizes, poses, and
-// for each chapter file its length, its caption cues and its sources. Byte counts stay behind.
+// What the page needs of the build's manifest (scripts/corridor-video.mjs): sizes, stills, and
+// for each variant of the clip its length, its caption cues and its sources. Byte counts stay
+// behind.
 type Built = typeof built;
 type BuiltSet = Built['sets']['desktop'];
 const slim = (s: BuiltSet) => ({
   w: s.w,
   h: s.h,
   poster: s.poster,
-  poses: s.poses,
-  files: Object.fromEntries(
-    Object.entries(s.files).map(([id, f]) => [
+  first: s.first,
+  last: s.last,
+  stills: s.stills,
+  clips: Object.fromEntries(
+    Object.entries(s.clips).map(([id, f]) => [
       id,
       {
         duration: f.duration,
@@ -32,19 +35,11 @@ const slim = (s: BuiltSet) => ({
   ),
 });
 const manifest = { sets: { desktop: slim(built.sets.desktop), mobile: slim(built.sets.mobile) } };
-const stops = [1, 2];
+const phone = manifest.sets.mobile;
 ---
 
 <section class="corr" id="corridor" data-dark="0.2" aria-labelledby="corridor-title">
-  {/* Scroll snap, in CSS only. The two tall boxes mark where the page scrolls freely (everything
-      up to the first stop, everything from the last stop on); between them the page may rest
-      only on a stop. The first stop is the bottom of the first box, the last stop the top of
-      the second. */}
-  <div class="corr__free corr__free--before" data-stop="0" aria-hidden="true"></div>
-  {stops.map((k) => <div class="corr__stop" data-stop={k} style={`--k:${k}`} aria-hidden="true" />)}
-  <div class="corr__free corr__free--after" data-stop="3" aria-hidden="true"></div>
-
-  <div class="corr__pin" data-corridor data-base={`${base}/corridor/`} data-manifest={JSON.stringify(manifest)} data-chapter="0" data-state="rest" data-pose="0">
+  <div class="corr__pin" data-corridor data-base={`${base}/corridor/`} data-manifest={JSON.stringify(manifest)} data-next="file" data-state="idle" style={`--corr-w:${phone.w};--corr-h:${phone.h}`}>
     <div class="corr__view" data-view role="img" aria-label={t.corridor.alt}>
       {/* The only picture that loads with the page: the first frame, small. It stays under
           everything else for good, so the stage is never empty. Decoded with the page, not
@@ -53,12 +48,13 @@ const stops = [1, 2];
         <source media="(orientation: portrait), (max-width: 760px)" srcset={`${base}/corridor/${manifest.sets.mobile.poster}`} />
         <img class="corr__poster" data-poster src={`${base}/corridor/${manifest.sets.desktop.poster}`} alt="" decoding="sync" fetchpriority="low" />
       </picture>
-      {/* The poses: the start, and the end of each chapter. The script gives them their source
-          after the first input. */}
-      <img class="corr__pose" data-pose="0" alt="" />
-      <img class="corr__pose" data-pose="1" alt="" />
-      <img class="corr__pose" data-pose="2" alt="" />
-      <img class="corr__pose" data-pose="3" alt="" />
+      {/* The stills: the first frame and the last at full size, and two doors on the way for
+          visitors who asked for reduced motion. The script gives them their source, and puts
+          the clip between them. */}
+      <img class="corr__pic" data-pic="first" alt="" />
+      <img class="corr__pic" data-pic="still-1" alt="" />
+      <img class="corr__pic" data-pic="still-2" alt="" />
+      <img class="corr__pic" data-pic="last" alt="" />
     </div>
     <div class="corr__head wrap">
       <p class="place"><span class="place__no">02</span><span>{t.places.corridor}</span></p>
@@ -67,108 +63,58 @@ const stops = [1, 2];
     <ol class="corr__caps wrap">
       {t.corridor.captions.map((c) => <li data-cap>{c}</li>)}
     </ol>
-    <a class="corr__skip" href="#file" data-corr-skip aria-label={t.corridor.skipLabel}>{t.corridor.skip}</a>
+    <button class="corr__tap" type="button" data-corr-tap hidden><span>{t.corridor.tap}</span></button>
+    <button class="corr__btn" type="button" data-corr-skip aria-label={t.corridor.skipLabel} hidden>{t.corridor.skip}</button>
+    <button class="corr__btn" type="button" data-corr-replay aria-label={t.corridor.replayLabel} hidden>{t.corridor.replay}</button>
   </div>
 </section>
 
 <style>
-  /* A sticky stage in a tall section. The stage never moves while it is pinned, so the scroll
-     position inside the section is not seen: it only says which chapter the visitor is at.
-       --corr-lead  from the moment the stage pins to the first stop
-       --corr-step  from one stop to the next: longer than a screen, so that an ordinary swipe
-                    lands on the next stop and only a hard fling carries past it
-     After the last stop the section has one more screen, the one the stage leaves with. */
+  /* One screen, like any other section. The stage shows a still: the first frame before the
+     clip has played, the last door after. While the clip plays the script takes the stage out
+     of the page and holds it over the whole screen (.is-held), and holds the page (the rules
+     for html.corr-lock at the end). */
   .corr {
-    --corr-lead: 20vh;
-    --corr-step: 125vh;
-    --corr-screen: 100vh;
-    --corr-short: 100vh;
-    /* html's scroll padding (global.css): the snap positions are measured inside it */
-    --corr-pad-top: var(--header-h);
-    --corr-pad-bottom: 84px;
     position: relative;
-    height: calc(var(--corr-lead) + 3 * var(--corr-step) + var(--corr-screen));
-    background: #050404;
-  }
-  @supports (height: 1lvh) {
-    .corr {
-      --corr-lead: 20lvh;
-      --corr-step: 125lvh;
-      --corr-screen: 100lvh;
-      --corr-short: 100svh;
-    }
-  }
-  @media (min-width: 900px) {
-    .corr {
-      --corr-pad-bottom: 0px;
-    }
-  }
-  .corr__free,
-  .corr__stop {
-    display: none;
-  }
-  /* Scroll snap on the page itself, in force only inside the corridor.
-     The page is a mandatory snap container, and a snap area taller than the screen may be
-     scrolled freely for as long as it covers the screen. So one tall area reaches from above
-     the top of the page down to the first stop, another from the last stop to below the end of
-     the page, and the rest of the page never snaps or sticks. Between the two only the stops
-     are places to rest.
-     `overflow-y: clip` keeps the second area from making the page longer. A browser without it
-     gets no snapping at all: the chapters still follow the scroll position (corridor.ts). */
-  @supports (overflow: clip) {
-    :global(html.motion) {
-      scroll-snap-type: y mandatory;
-    }
-    :global(html.motion) .corr {
-      overflow-y: clip;
-    }
-    :global(html.motion) .corr__free,
-    :global(html.motion) .corr__stop {
-      display: block;
-      position: absolute;
-      left: 0;
-      width: 1px;
-      pointer-events: none;
-      scroll-snap-align: start;
-    }
-    /* Covers the screen up to the first stop, and its bottom edge, brought to the bottom of
-       the screen, IS the first stop: a marker of its own there would pull the page to it from
-       two thirds of a screen away (Chromium snaps to a marker as soon as it is on screen). */
-    :global(html.motion) .corr__free--before {
-      top: -400vh;
-      height: calc(400vh + var(--corr-lead) + var(--corr-short) - var(--corr-pad-bottom));
-      scroll-snap-align: end;
-    }
-    .corr__stop {
-      top: calc(var(--corr-lead) + var(--k) * var(--corr-step) + var(--corr-pad-top));
-      height: 1px;
-    }
-    .corr__free--after {
-      top: calc(var(--corr-lead) + 3 * var(--corr-step) + var(--corr-pad-top));
-      height: 200000px;
-    }
-  }
-
-  .corr__pin {
-    position: sticky;
-    top: 0;
     height: 100vh;
     height: 100lvh;
-    overflow: hidden;
+    background: #050404;
   }
-  /* The picture: the poses, and over them the chapter that is playing (the script adds the
-     videos). The scare leans the whole picture in towards the door. */
+  .corr__pin {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    background: #050404;
+  }
+  /* Held: fixed over everything the page scrolls, under the page's own layers (the torch at 40,
+     the header and the bars at 60, the grain at 90). As tall as the tallest the screen gets,
+     so it covers the screen whatever the browser's bars are doing, and the same height it has
+     in the page, so nothing inside it moves when it is taken or let go. A finger on it moves
+     nothing. */
+  .corr__pin.is-held {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    height: 100vh;
+    height: 100lvh;
+    touch-action: none;
+    overscroll-behavior: contain;
+  }
+  /* The picture: the stills, and between them the clip (the script adds the video). The scare
+     leans the whole picture in towards the door. */
   .corr__view {
     position: absolute;
     inset: 0;
     /* a stacking context of its own: the layers inside are restacked as they change, and none
-       of them may climb over the heading, the captions or the skip link */
+       of them may climb over the heading, the captions or the buttons */
     z-index: 0;
     isolation: isolate;
     background: #050404;
   }
   .corr__poster,
-  .corr__pose,
+  .corr__pic,
   :global(.corr__video) {
     position: absolute;
     inset: 0;
@@ -178,11 +124,11 @@ const stops = [1, 2];
     object-fit: cover;
     pointer-events: none;
   }
-  .corr__pose,
+  .corr__pic,
   :global(.corr__video) {
     opacity: 0;
   }
-  .corr__pose.is-on,
+  .corr__pic.is-on,
   :global(.corr__video.is-on) {
     opacity: 1;
   }
@@ -195,6 +141,31 @@ const stops = [1, 2];
       radial-gradient(ellipse at center, transparent 55%, rgba(5, 4, 4, 0.4) 100%),
       linear-gradient(rgba(5, 4, 4, 0.72), transparent 24%, transparent 56%, rgba(5, 4, 4, 0.86));
     pointer-events: none;
+  }
+  /* Phones, and anything held upright: the picture is a band across the screen, as wide as the
+     screen and as tall as its own shape makes it (the phone set: a window cut from the
+     landscape frames that keeps the far end of the corridor in the picture). Above it the
+     heading, below it the captions; its upper and lower edge run out into the dark of the
+     stage, which is the dark of the picture's own corners.
+     The same media query picks the phone set in the script. */
+  @media (orientation: portrait), (max-width: 760px) {
+    .corr__view {
+      --band: calc(100vw * var(--corr-h) / var(--corr-w));
+      inset: auto 0 auto 0;
+      top: max(0px, calc((100svh - var(--band)) * 0.42));
+      height: min(100%, var(--band));
+    }
+    .corr__view::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 100000;
+      background: linear-gradient(#050404, rgba(5, 4, 4, 0.5) 7%, rgba(5, 4, 4, 0) 20%, rgba(5, 4, 4, 0) 80%, rgba(5, 4, 4, 0.5) 93%, #050404);
+      pointer-events: none;
+    }
+    .corr__pin::after {
+      background: linear-gradient(rgba(5, 4, 4, 0.6), transparent 20%, transparent 70%, rgba(5, 4, 4, 0.7));
+    }
   }
   .corr__head {
     position: absolute;
@@ -231,12 +202,15 @@ const stops = [1, 2];
     text-wrap: balance;
     text-shadow: 0 2px 24px #000;
   }
+  /* One caption at a time, each up for under two seconds of the clip: it comes and goes in a
+     fifth of a second, so that most of its time it is fully there (the build checks the times,
+     scripts/corridor-video.mjs). */
   :global(html.motion) .corr__caps li {
     opacity: 0;
-    transform: translate3d(0, 14px, 0);
+    transform: translate3d(0, 8px, 0);
     transition:
-      opacity 0.6s ease,
-      transform 0.6s ease;
+      opacity 0.2s ease,
+      transform 0.2s ease;
   }
   :global(html.motion) .corr__caps li.is-on {
     opacity: 1;
@@ -250,48 +224,107 @@ const stops = [1, 2];
     }
   }
 
-  /* Skip: a small text link at the top right of the stage, level with the heading (the rule
-     of the place label runs above it), far from the captions and from the floating button at
-     the bottom. 44 px to touch. */
-  .corr__skip {
+  /* Skip while the clip plays, Replay once it has: one place, top right of the stage, level
+     with the heading (the rule of the place label runs above it), far from the captions and
+     from the floating button at the bottom. 44 px to touch. */
+  .corr__btn {
     position: absolute;
     top: calc(var(--header-h) + 42px);
-    right: calc(var(--gutter) - 10px);
-    z-index: 3;
+    right: var(--gutter);
+    z-index: 4;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 44px;
     min-height: 44px;
-    padding: 0 10px;
-    color: var(--ash);
-    font-size: 11px;
+    padding: 0 16px;
+    border: 1px solid var(--brass-lo);
+    background: rgba(7, 6, 6, 0.72);
+    color: var(--brass-hi);
+    font-family: var(--mono);
+    font-size: 12px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    text-decoration: underline;
-    text-decoration-color: var(--brass-lo);
-    text-underline-offset: 5px;
-    text-shadow: 0 1px 12px #000;
   }
-  .corr__skip:hover,
-  .corr__skip:focus-visible {
-    color: var(--brass-hi);
-    text-decoration-color: currentColor;
+  .corr__btn:hover,
+  .corr__btn:focus-visible {
+    border-color: var(--brass-hi);
+    color: var(--bone);
   }
   @media (min-width: 900px) {
-    .corr__skip {
+    .corr__btn {
       top: calc(var(--header-h) + 50px);
     }
   }
+  /* Where the browser will not start a video by itself (an iPhone in Low Power Mode): the
+     whole stage is the button, and the words sit in the middle of the picture. A finger on it
+     can still scroll the page: nothing is held until the clip plays. */
+  .corr__tap {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: rgba(5, 4, 4, 0.3);
+    font-family: var(--mono);
+  }
+  .corr__tap span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 52px;
+    padding: 14px 26px;
+    border: 1px solid var(--brass-lo);
+    background: rgba(7, 6, 6, 0.78);
+    color: var(--brass-hi);
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .corr__tap:focus-visible {
+    outline: none;
+  }
+  .corr__tap:focus-visible span {
+    outline: 2px solid var(--brass-hi);
+    outline-offset: 3px;
+  }
+  .corr__btn[hidden],
+  .corr__tap[hidden] {
+    display: none;
+  }
 
-  /* Static version (reduced motion, or no script): no pin, no snap, no video. The three end
-     poses as stills, every caption readable. */
+  /* The page, held while the clip plays (corridor.ts). The body is taken out of the flow at the
+     place it was scrolled to, so there is nothing left to scroll: no listener has to stop a
+     wheel or a finger. Where the scrollbar takes room, the room is kept, so nothing shifts
+     sideways (a browser that cannot keep the room keeps the scrollbar). */
+  :global(html.corr-lock) {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  :global(html.corr-lock.corr-lock--gutter) {
+    scrollbar-gutter: stable;
+  }
+  :global(html.corr-lock.corr-lock--bar) {
+    overflow-y: scroll;
+  }
+  :global(html.corr-lock body) {
+    position: fixed;
+    left: 0;
+    right: 0;
+  }
+  /* The section the page glides to afterwards takes the focus with it, without a ring. */
+  :global([data-corr-landing]:focus) {
+    outline: none;
+  }
+
+  /* Static version (reduced motion, or no script): no clip, nothing held. Three doors as
+     stills, every caption readable. */
   :global(html:not(.motion)) .corr {
     height: auto;
     padding-bottom: 72px;
   }
   :global(html:not(.motion)) .corr__pin {
-    position: relative;
     display: flex;
     flex-direction: column;
     height: auto;
@@ -309,13 +342,18 @@ const stops = [1, 2];
   }
   :global(html:not(.motion)) .corr__view {
     position: relative;
+    inset: auto;
     display: grid;
     gap: 12px;
     width: min(100% - 2 * var(--gutter), var(--max));
+    height: auto;
     margin-inline: auto;
     background: none;
   }
-  :global(html:not(.motion)) .corr__pose {
+  :global(html:not(.motion)) .corr__view::after {
+    content: none;
+  }
+  :global(html:not(.motion)) .corr__pic {
     position: relative;
     inset: auto;
     opacity: 1;
@@ -323,15 +361,15 @@ const stops = [1, 2];
     height: 52vh;
     background: #0b0908;
   }
-  /* with script the three end poses are shown; without it, the small first frame alone */
+  /* with script the three doors are shown; without it, the small first frame alone */
   :global(html:not(.motion)) .corr__poster {
     position: relative;
     inset: auto;
     height: 52vh;
   }
   :global(html.still) .corr__view picture,
-  :global(html:not(.motion)) .corr__pose[data-pose='0'],
-  :global(html:not(.js)) .corr__pose {
+  :global(html:not(.motion)) .corr__pic[data-pic='first'],
+  :global(html:not(.js)) .corr__pic {
     display: none;
   }
   :global(html:not(.motion)) .corr__caps {
@@ -345,14 +383,11 @@ const stops = [1, 2];
     max-width: none;
     font-size: clamp(1.3rem, 5vw, 2rem);
   }
-  :global(html:not(.motion)) .corr__skip {
-    display: none;
-  }
   @media (min-width: 900px) {
     :global(html:not(.motion)) .corr__view {
       grid-template-columns: repeat(3, 1fr);
     }
-    :global(html:not(.motion)) .corr__pose {
+    :global(html:not(.motion)) .corr__pic {
       height: auto;
       aspect-ratio: 16 / 9;
     }

@@ -193,7 +193,9 @@ export function initTorch() {
     'scroll',
     () => {
       const s = window.scrollY;
-      lean = Math.max(-1, Math.min(1, lean + (s - scrollY) / 240));
+      // (most of a screen in one step is a jump, not a scroll: the corridor holds the page by
+      // taking it out of the flow, which reads as a jump to 0 and back, corridor.ts)
+      if (Math.abs(s - scrollY) < vh * 0.8) lean = Math.max(-1, Math.min(1, lean + (s - scrollY) / 240));
       scrollY = s;
       if (!manual) kick();
     },

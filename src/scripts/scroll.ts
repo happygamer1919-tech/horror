@@ -1,8 +1,8 @@
 // Scrolling.
 //
 // The browser's own scroll, on every device. Nothing here listens to touch or wheel and nothing
-// calls preventDefault: the corridor's chapters are CSS scroll snap (Corridor.astro), and a
-// smooth-scroll library would fight it. (The site used Lenis on mouse and trackpad until the
+// calls preventDefault: the one place the page is held, the corridor while its clip plays,
+// does it without either (corridor.ts). (The site used Lenis on mouse and trackpad until the
 // corridor became video. Lenis registers wheel and touch listeners with `passive: false`,
 // which makes the browser ask the page's JavaScript before it may move the page; measured in
 // docs/perf-notes.md.)
@@ -24,7 +24,7 @@ export function initScroll() {
   initNativeAnchors();
 }
 
-// In-page links ("Check in", "Back to top", the corridor's "Skip") glide instead of jumping.
+// In-page links ("Check in", "Back to top") glide instead of jumping.
 // The browser does the work: the link is followed normally (hash, focus order, :target and
 // scroll-padding all stay native) and only the scroll behaviour is smooth while it travels.
 function initNativeAnchors() {

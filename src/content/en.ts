@@ -63,6 +63,9 @@ export const en: Copy = {
     alt: 'A walk by torchlight down a dark hotel corridor with numbered doors, to room 313.',
     skip: 'Skip',
     skipLabel: 'Skip the corridor',
+    replay: 'Replay',
+    replayLabel: 'Replay the corridor',
+    tap: 'Tap to enter',
   },
   file: {
     title: 'The file',
