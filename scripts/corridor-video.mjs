@@ -1,47 +1,55 @@
-// Builds the corridor videos the site ships from the masters in corridor-src/ (see
+// Builds the corridor clip the site ships from the masters in corridor-src/ (see
 // corridor-src/SOURCES.md for where those came from):
-//   public/corridor/{d,m}/c1.{av1,h264}.mp4    chapter 1: door 301 to door 304
-//   public/corridor/{d,m}/c2.{av1,h264}.mp4    chapter 2: to the scratched door 305
-//   public/corridor/{d,m}/c3.{av1,h264}.mp4    chapter 3: to door 308 and on to the last door, 313
-//   public/corridor/{d,m}/c3s.{av1,h264}.mp4   chapter 3 with the scare beat at door 308
-//   public/corridor/{d,m}/p0..p3.webp          the pose at each stop: the start, and the end of each chapter
-//                                              (stills; on the phone set 900 x 1800, the size the image sequence had)
-//   public/corridor/poster-{d,m}.webp          the first frame, small: the only file that loads with the page
-//   public/corridor/manifest.json              what src/scripts/corridor.ts reads
-// d is the landscape set (1600 x 900), m the phone set (720 x 1440, a portrait window cut from
-// the same frames that follows the subject).
+//   public/corridor/{d,m}/walk-door.{av1,h264}.mp4   the walk from door 301 to the last door, 313, with the
+//                                                    door beat at 308: what a visitor sees the first time
+//   public/corridor/{d,m}/walk.{av1,h264}.mp4        the same walk without the beat: what Replay plays
+//   public/corridor/{d,m}/first.webp                 the first frame, as a still: what the stage shows before the clip
+//   public/corridor/{d,m}/last.webp                  the last frame, the last door: what it shows after
+//   public/corridor/{d,m}/still-1.webp, still-2.webp doors 304 and 305, for visitors who asked for reduced motion
+//   public/corridor/poster-{d,m}.webp                the first frame, small: the only file that loads with the page
+//   public/corridor/manifest.json                    what src/scripts/corridor.ts reads
+// d is the landscape set (1600 x 900), m the phone set (a 4:5 window cut from the same frames,
+// 896 x 1120; see FRAMINGS).
 //
 //   npm run corridor:video                          build everything
 //   node scripts/corridor-video.mjs --set=mobile    one set only (the manifest keeps the other)
 //   node scripts/corridor-video.mjs --frames        only render the finished frames into the cache
 //   node scripts/corridor-video.mjs --crf-h264=24 --crf-av1=34   fixed quality instead of the search for the byte budget
 //   node scripts/corridor-video.mjs --out=DIR       write there instead of public/corridor (for trials)
+//   node scripts/corridor-video.mjs --fps=24        trial: the same cut with 24 pictures a second instead of 60
+//   node scripts/corridor-video.mjs --framing=a     trial: another phone window (FRAMINGS)
+//   node scripts/corridor-video.mjs --stills=DIR --at=0,60,123   trial: only these timeline frames of the phone
+//                                                   set, finished, as WebP files (for scripts/corridor-shots.mjs)
 //
 // Needs ffmpeg with libx264 and libsvtav1 on the PATH (or FFMPEG=/path/to/ffmpeg). Frames are
 // extracted once into corridor-src/.cache/ (gitignored, about 2 GB), and the finished frames
-// are kept there too (about 5 GB), so a change to the encoder settings does not render again.
+// are kept there too (about 4 GB), so a change to the cut or the encoder settings does not
+// render again.
 //
-// The picture. Every frame is made exactly as the frames of the image sequence this replaces
-// were made (the reviewed look): the four clips in order with the last three frames of each
-// dissolving into the first frame of the next, the phone window that follows the subject, the
+// The picture. Every frame is made exactly as the frames of the image sequence and of the
+// chapter videos before this were made (the reviewed look): the four clips in order with the
+// last three frames of each dissolving into the first frame of the next, the phone window, the
 // sharpness evened out (corridor-even.cjs), the finishing pass (corridor-finish.cjs) with the
 // extra darkening of the first two clips by timeline index, and for the scare the grade
-// (corridor-grade.cjs), feathered into the held frame at door 308. A frame that was part of the
-// old sequence keeps the grain seed it had there.
+// (corridor-grade.cjs), feathered into the held frame at door 308.
 //
-// What is different is only the sampling. The old sequence was 168 (phone: 112) frames picked
-// at equal steps of motion, to be scrubbed. This is video: every frame of the timeline, shown
-// for as long as the camera exposed it, so the walk eases in and out of each door as it was
-// generated.
-//   - clips 1 to 3 play at 24 frames a second, as generated
-//   - the last clip was generated at about half the pace of the others (10 seconds; its motion
-//     per frame is half that of clip 3). It plays at 1.5 times its speed: every frame is kept
-//     and shown for 1/36 s instead of 1/24 s. No frame is dropped, repeated or blended.
+// The cut. The masters are 25 seconds of walking; the clip is 9. Frames are picked, never
+// blended or interpolated, and each picked frame is shown for a whole number of sixtieths of a
+// second, so a 60 Hz screen shows every one of them for the same time as its neighbours:
+//   - the walk in clips 1 to 3: every frame, one sixtieth each. That is 2.5 times the speed it
+//     was generated at, and nothing is dropped.
+//   - the last clip was generated at half the pace of the others: every second frame, one
+//     sixtieth each, which is the same 2.5 times in steps on the floor.
+//   - at each numbered door the masters stand almost still for a second or more (the video
+//     model eases into and out of every keyframe). Those frames are the slow part of the cut:
+//     they are stretched or thinned to the time HOLD gives each door, and the easing the model
+//     made around them is kept frame for frame.
 //   - the scare beat is the same 15 frames at 24 frames a second: the held frame, 13 graded
-//     frames of the scare clip, the held frame
+//     frames of the scare clip, the held frame. It plays at the speed it was generated at.
+// CUT below is where all of it is written down; the build prints the resulting times.
 //
 // Film grain. The finishing pass can add fine grain with a new pattern on every frame, and the
-// reviewed frames had it. None of it is baked into the videos or the poses (GRAIN below is 0),
+// reviewed frames had it. None of it is baked into the video or the stills (GRAIN below is 0),
 // for a measured reason: no encoder at these sizes keeps it. The frames of the image sequence
 // this replaces had already lost all of it to their AVIF and WebP compression (they carry less
 // fine detail than the same frames rendered without grain), and the video encoders drop it
@@ -81,40 +89,68 @@ const DARK_FADE = 30; // timeline frames over which the extra darkening of the f
 const LW = 320; // motion is measured at this size
 const LH = 180;
 
-// Time. One tick is 1/72 s: a frame at 24 a second lasts 3 ticks, a frame at 36 a second 2.
-const TICKS = 72;
-const WALK_TICKS = 3;
-const LAST_TICKS = args.seg4 === '1x' ? 3 : 2; // the last clip, 1.5 times its generated speed
-const SEG4_DROP = args.seg4 === 'drop'; // trial only: drop every third frame of the last clip instead
-const FPS = TICKS / WALK_TICKS;
+// Time. One tick is 1/120 s: a picture of the walk lasts a multiple of 2 ticks (sixtieths of a
+// second), a frame of the scare beat 5 (a twenty-fourth).
+const TICKS = 120;
+const FPS = args.fps ? Number(args.fps) : 60; // pictures a second in the walk, at most
+const GRID = TICKS / FPS; // ticks from one picture of the walk to the next
+const BEAT_TICKS = 5;
+if (!Number.isFinite(GRID) || GRID < 2) throw new Error(`--fps=${args.fps}: 60 at most`);
+
+// The cut (see the top of this file). Times are in sixtieths of a second per timeline frame.
+//   still   a step of the timeline that moves the picture less than this (the motion measure
+//           further down) belongs to a keyframe's stand-still
+//   hold    how long the stand-still at each keyframe lasts in the cut, seconds: door 301 (the
+//           clip starts on it, and the stage has shown it as a still before), 304, 305, 308
+//           (the beat, when there is one, comes on top of this), 313 (the clip ends on it and
+//           the still of it stays)
+//   walk    what a moving frame of clips 1 to 3 gets, and of the last clip, which was generated
+//           at half the pace
+const CUT = { still: 1.5, hold: [0.3, 0.7, 0.7, 0.5, 0.7], walk: 1, last: 0.5 };
+const LENGTH = [8, 10]; // what either variant of the clip may last, seconds
 
 // How much of the reviewed film grain is baked into the frames (1 is all of it).
 const GRAIN = args.grain !== undefined ? Number(args.grain) : 0;
 
+// The phone window: a strip of the master, full height, that pans with the walk. `at` is where
+// its centre is (x in master pixels) at timeline frames; between them it follows a monotone
+// curve, so it never turns round between two points and never moves while the walk stands
+// still. Three were tried (docs/screenshots/22-framing-*.jpg); `b` is the one that ships: 4:5,
+// the widest that still shows the door plates at a size a phone can read.
+// What each point is there for:
+//   0, 14      door 301 and its plate, the edge of the light on the wall, the corridor beyond
+//   106, 125   door 304 with its plate, and the far end with the green sign on the left
+//   228, 255   door 305: plate, scratches, handle; the dark corridor to the right
+//   348, 380   door 308: plate, handle, the gap the hand comes through, the lit wall beyond
+//   450, 520   down the middle of the corridor, the far end in the centre
+//   574, 611   door 313 with plate and handle, the exit doors and the sign to the right
+const FRAMINGS = {
+  a: { win: 1080, w: 720, h: 960, look: [900, 1200], poster: [360, 480], at: [[0, 1250], [14, 1250], [106, 1360], [125, 1360], [228, 1480], [255, 1480], [348, 1690], [380, 1690], [450, 1300], [520, 1330], [574, 1530], [611, 1530]] },
+  b: { win: 1152, w: 896, h: 1120, look: [900, 1125], poster: [360, 450], at: [[0, 1290], [14, 1290], [106, 1370], [125, 1370], [228, 1490], [255, 1490], [348, 1690], [380, 1690], [450, 1300], [520, 1330], [574, 1560], [611, 1560]] },
+  c: { win: 1440, w: 720, h: 720, look: [900, 900], poster: [360, 360], at: [[0, 1290], [14, 1290], [106, 1420], [125, 1420], [228, 1600], [255, 1600], [348, 1640], [380, 1640], [450, 1300], [520, 1330], [574, 1560], [611, 1560]] },
+};
+const FRAMING = FRAMINGS[args.framing ?? 'b'];
+if (!FRAMING) throw new Error(`--framing=${args.framing}: one of ${Object.keys(FRAMINGS).join(', ')}`);
+const WIN_W = FRAMING.win;
+
 // seed: the finishing pass's grain seed for frame `index` of the old image sequence, which had
-// `old` frames picked at equal steps of motion. budget: what one visitor may download, bytes.
-// look: the size the sharpness is evened out at. The phone frames were shipped at 900 x 1800
-// (the 720 x 1440 window, enlarged), and the evening step decides by a measure taken at that
-// size, so it is still run there; the frame is then brought back to the window's own 720 x 1440
-// for the video, which is all the detail there is.
+// `old` frames picked at equal steps of motion. budget: what one visitor may download, bytes:
+// one variant of the clip, the poster and the two stills the stage rests on.
+// look: the size the sharpness is evened out at and the stills are made at. The stage rests on
+// a still, so on a phone the stills are larger than the video (900 px wide against 720).
 // best: the quality that is good enough, per codec (the encoders' own scales, lower is better):
 // a set whose budget allows better than this stops here instead of filling the budget.
-// pose: WebP quality of the stills, before the lift dark pictures get (darkBoost below). The
-// stills are what the stage rests on, so they are made at the `look` size: on a phone they are
-// the 900 x 1800 pictures the image sequence had, not the video's 720 x 1440.
+// pose: WebP quality of the stills, before the lift dark pictures get (darkBoost below).
+// codecs: best first for this set, as the page lists them in <source>. A phone takes H.264,
+// which every phone decodes in hardware; AV1 is there for a browser without it. A desktop takes
+// AV1 where it can, at two thirds of the bytes.
+// level: the H.264 level the set's size and 60 pictures a second need.
 const SETS = {
-  desktop: { dir: 'd', w: 1600, h: 900, look: [1600, 900], poster: [640, 360], seed: 1000, old: 168, budget: 8_000_000, ref: 5, best: { h264: 23, av1: 32 }, pose: 68 },
-  mobile: { dir: 'm', w: 720, h: 1440, look: [900, 1800], poster: [360, 720], seed: 3000, old: 112, budget: 3_000_000, ref: 6, best: { h264: 23, av1: 32 }, pose: 56 },
+  desktop: { dir: 'd', w: 1600, h: 900, look: [1600, 900], poster: [640, 360], seed: 1000, old: 168, budget: 8_000_000, ref: 5, level: '4.2', best: { h264: 23, av1: 32 }, pose: 68, codecs: ['av1', 'h264'] },
+  mobile: { dir: 'm', w: FRAMING.w, h: FRAMING.h, look: FRAMING.look, poster: FRAMING.poster, seed: 3000, old: 112, budget: 3_000_000, ref: 6, level: '4.0', best: { h264: 23, av1: 32 }, pose: 56, codecs: ['h264', 'av1'] },
 };
 const NEW_SEED = 20000; // plus the timeline index, for frames the old sequence did not have
 const SCARE_SEED = 5000; // plus the clip frame number
-// The phone window: 720 x 1440 of the master. Where its centre is at each
-// keyframe (x in master pixels); in between it moves with the walk, eased.
-//   K1 the lit wall and door 301        K2 door 304, its plate, the shoes, the wall running away
-//   K3 door 305, plate and scratches    K4 door 308: plate, handle, the hand and the gap to its right
-//   K5 door 313 with plate and handle, the exit doors and the green sign at the right edge
-const WIN_W = 720;
-const WINDOW = [830, 1520, 1100, 1770, 1300];
 
 // The scare beat: 15 frames at 24 fps. The first and the last are the held walk frame itself
 // (the door shut); the 13 between come from these frames of the clip: fingers come round the
@@ -134,26 +170,23 @@ const GAP_BLACK = 0.07;
 const HEAD = { top: 410, bottom: 640, width: 175, lead: 71 };
 const FACE_DIR = join(ROOT, 'src', 'assets', 'scare');
 
-// Captions: which one is up when, in seconds of its chapter (negative: before the chapter's
-// end). Chapters 1 and 2 arrive on their caption. Chapter 3 shows the third on the way to door
-// 308 and takes it away before the door fills the frame; the fourth comes up as the walk
-// arrives at the last door, and stays.
-const CUES = {
-  1: [{ cap: 0, in: -2.4 }],
-  2: [{ cap: 1, in: -2.4 }],
-  3: [
-    { cap: 2, in: 0.7, out: 2.8 }, // door 308 fills the phone's frame from 3.5 s
-    { cap: 3, in: -2.6 },
-  ],
-};
-
-// Best first: the page takes the first one the browser can play. (--codec=h264: trials with one.)
-const CODEC_LIST = ['av1', 'h264'].filter((c) => !args.codec || args.codec === c);
+// Captions: which one is up when, in seconds of the walk without the beat (a time after door
+// 308 is moved back by the beat in the variant that has it). One at a time, in order, each up
+// for CUE_MIN seconds or more, which leaves a second and a half fully shown between its fades
+// (Corridor.astro: 0.2 s each way). The first is up as the walk leaves door 301, the second
+// comes with door 304 and the third with the scratched door; it is gone before door 308 stands
+// still. The fourth comes up on the way to the last door, and stays.
+const CUES = [
+  { cap: 0, in: 0.15, out: 2.05 },
+  { cap: 1, in: 2.35, out: 4.25 },
+  { cap: 2, in: 4.55, out: 6.45 },
+  { cap: 3, in: 7.05 },
+];
+const CUE_MIN = 1.9;
 
 const pad = (n, w = 3) => String(n).padStart(w, '0');
 const exists = (p) => stat(p).then(() => true, () => false);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-const smooth = (t) => t * t * (3 - 2 * t);
 const round = (v, d = 3) => Number(v.toFixed(d));
 
 // --- extraction ------------------------------------------------------------------------------
@@ -219,8 +252,8 @@ const mad = (a, b) => {
 };
 
 // Motion along the timeline: mean absolute difference between consecutive frames at 320 x 180.
-// It moves the phone window (and it is what the old sequence was sampled by). The small frames
-// are kept in one cache file.
+// It says where the walk stands still (the cut), and it is what the old sequence was sampled
+// by. The small frames are kept in one cache file.
 async function motion(tl) {
   const size = LW * LH * 3;
   const file = join(CACHE, `timeline-${LW}.bin`);
@@ -272,14 +305,36 @@ function oldPicks(cum, k4, count) {
   return list;
 }
 
-// The phone window's left edge for a timeline index.
-function windowLeft(cum, keys, i) {
-  let s = 0;
-  while (s < keys.length - 2 && i > keys[s + 1]) s++;
-  const u = clamp((cum[i] - cum[keys[s]]) / (cum[keys[s + 1]] - cum[keys[s]]), 0, 1);
-  const cx = WINDOW[s] + (WINDOW[s + 1] - WINDOW[s]) * smooth(u);
-  return clamp(Math.round(cx - WIN_W / 2), 0, W - WIN_W);
+// A monotone cubic through the points (Fritsch and Carlson): it passes through every one of
+// them, never overshoots, has no corner, and between two points at the same height it does
+// not move at all.
+function curve(points) {
+  const x = points.map((p) => p[0]);
+  const y = points.map((p) => p[1]);
+  const n = x.length;
+  const d = [];
+  for (let i = 0; i < n - 1; i++) d.push((y[i + 1] - y[i]) / (x[i + 1] - x[i]));
+  const m = [d[0]];
+  for (let i = 1; i < n - 1; i++) {
+    if (d[i - 1] * d[i] <= 0) m.push(0);
+    else {
+      const a = 2 * (x[i + 1] - x[i]) + (x[i] - x[i - 1]);
+      const b = x[i + 1] - x[i] + 2 * (x[i] - x[i - 1]);
+      m.push((a + b) / (a / d[i - 1] + b / d[i]));
+    }
+  }
+  m.push(d[n - 2]);
+  return (t) => {
+    let i = 0;
+    while (i < n - 2 && t > x[i + 1]) i++;
+    const h = x[i + 1] - x[i];
+    const u = clamp((t - x[i]) / h, 0, 1);
+    return (2 * u ** 3 - 3 * u ** 2 + 1) * y[i] + (u ** 3 - 2 * u ** 2 + u) * h * m[i] + (-2 * u ** 3 + 3 * u ** 2) * y[i + 1] + (u ** 3 - u ** 2) * h * m[i + 1];
+  };
 }
+// The phone window's left edge for a timeline index.
+const windowCentre = curve(FRAMING.at);
+const windowLeft = (i) => clamp(Math.round(windowCentre(i) - WIN_W / 2), 0, W - WIN_W);
 
 // How much further the finishing pass pulls down everything outside the beam, for a timeline
 // index: fully up to the keyframe at door 305 (in the first two clips the video model lit the
@@ -449,13 +504,13 @@ async function render(set, def, tl, cum, K3, K4) {
     const out = await evenSharpness(px, lw, lh);
     return lw === def.w && lh === def.h ? out : image(out, lw, lh).resize(def.w, def.h, { kernel: 'lanczos3' }).raw().toBuffer();
   };
-  const key = JSON.stringify({ tl: tl.frames, w: def.w, h: def.h, look: def.look, poses: POSE_AT(tl), grain: GRAIN, window: WINDOW, pick: SCARE_PICK, face: face ? (await stat(face)).size + ':' + (await stat(face)).mtimeMs : null });
+  const key = JSON.stringify({ tl: tl.frames, w: def.w, h: def.h, look: def.look, stills: STILL_AT(tl), grain: GRAIN, window: set === 'mobile' ? [WIN_W, FRAMING.at] : null, pick: SCARE_PICK, face: face ? (await stat(face)).size + ':' + (await stat(face)).mtimeMs : null });
   const old = oldPicks(cum, K4, def.old);
   const seedOf = (t) => {
     const i = old.indexOf(t);
     return i >= 0 ? def.seed + i : def.seed + NEW_SEED + t;
   };
-  const left = (t) => (set === 'mobile' ? windowLeft(cum, tl.keys, t) : 0);
+  const left = (t) => (set === 'mobile' ? windowLeft(t) : 0);
   const file = (name) => join(dir, `${name}.rgb`);
   const size = def.w * def.h * 3;
   const info = { dir, file, seedOf, left, face: Boolean(face) };
@@ -477,9 +532,9 @@ async function render(set, def, tl, cum, K3, K4) {
         finish(px, def.w, def.h, seedOf(t), darkAt(t, K3), GRAIN);
         if (px.length !== size) throw new Error(`frame ${t}: ${px.length} bytes`);
         await writeFile(file(`t${pad(t, 4)}`), px);
-        // a pose: the same frame, finished at the look size
-        const k = POSE_AT(tl).indexOf(t);
-        if (k >= 0) await writeFile(file(`pose${k}`), finish(await evenSharpness(plain, lw, lh), lw, lh, seedOf(t), darkAt(t, K3), GRAIN));
+        // a still: the same frame, finished at the look size
+        const k = STILL_AT(tl).indexOf(t);
+        if (k >= 0) await writeFile(file(`still${k}`), finish(await evenSharpness(plain, lw, lh), lw, lh, seedOf(t), darkAt(t, K3), GRAIN));
       }
     }),
   );
@@ -545,72 +600,105 @@ async function render(set, def, tl, cum, K3, K4) {
   return info;
 }
 
-// The poses: the first frame, and the last frame of each chapter (timeline indices).
-function POSE_AT(tl) {
+// The stills (timeline indices): the first frame, doors 304 and 305, the last frame.
+function STILL_AT(tl) {
   return [0, tl.keys[1], tl.keys[2], tl.keys[4]];
 }
+const STILL_NAMES = ['first', 'still-1', 'still-2', 'last'];
 
-// --- chapters ------------------------------------------------------------------------------------
-// A chapter is a list of frames, each with the time it is shown for, in ticks. Every chapter
-// starts on the frame the one before it ends on, so a chapter handing over to the next shows
-// no change.
-function chapters(tl) {
-  const [, K2, K3, K4, K5] = tl.keys;
-  const walk = (a, b, ticks) => Array.from({ length: b - a + 1 }, (_, i) => ({ name: `t${pad(a + i, 4)}`, ticks }));
-  let last = walk(K4 + 1, K5, LAST_TICKS);
-  if (SEG4_DROP) last = last.filter((_, i) => i % 3 !== 1 || i === last.length - 1).map((f) => ({ ...f, ticks: WALK_TICKS }));
-  const beat = SCARE_PICK.map((_, j) => ({ name: `s${pad(j, 2)}`, ticks: WALK_TICKS }));
-  const to308 = walk(K3, K4, WALK_TICKS);
-  return [
-    { id: 'c1', chapter: 1, frames: walk(0, K2, WALK_TICKS) },
-    { id: 'c2', chapter: 2, frames: walk(K2, K3, WALK_TICKS) },
-    { id: 'c3', chapter: 3, frames: [...to308, ...last] },
-    { id: 'c3s', chapter: 3, scare: { at: to308.length, count: beat.length }, frames: [...to308, ...beat, ...last] },
-  ];
+// --- the cut ---------------------------------------------------------------------------------------
+// The clip is a list of frames, each with the time it is shown for, in ticks.
+// Every timeline frame is first given the time it would get if all of them were shown: a
+// moving frame CUT.walk sixtieths (CUT.last in the last clip), and the frames of the
+// stand-still around a keyframe share that keyframe's CUT.hold. Then one frame is picked for
+// every picture of the clip, FPS a second: the one whose time has come. Where the times are
+// whole sixtieths every frame is picked once; in the last clip, every second one.
+// The walk is cut in two at door 308, so that the held frame there is picked whatever the
+// times around it are: the beat goes in between the two halves.
+function cut(tl, steps) {
+  const [K1, K2, K3, K4, K5] = tl.keys;
+  const n = tl.frames.length;
+  const on = Array.from({ length: n }, (_, i) => (i > K4 ? CUT.last : CUT.walk));
+  // the stand-still around each keyframe: as far as the picture moves less than CUT.still a step
+  const zones = [K1, K2, K3, K4, K5].map((k, j) => {
+    let a = k;
+    let b = k;
+    while (a > 0 && steps[a - 1] < CUT.still) a--;
+    while (b < n - 1 && steps[b] < CUT.still) b++;
+    for (let i = a; i <= b; i++) on[i] = (CUT.hold[j] * 60) / (b - a + 1);
+    return [a, b];
+  });
+  // frames a to b, and the pictures they make: `late` is how far into its first picture the
+  // stretch starts, in sixtieths
+  const part = (a, b, lastOne) => {
+    const start = [0];
+    for (let i = a; i <= b; i++) start.push(start[start.length - 1] + on[i]);
+    const pictures = Math.max(1, Math.round((start[start.length - 1] * 2) / GRID));
+    const out = [];
+    let i = 0;
+    for (let p = 0; p < pictures; p++) {
+      const at = (p * GRID) / 2;
+      while (i < b - a && start[i + 1] <= at + 1e-9) i++;
+      const t = p === pictures - 1 ? lastOne : a + i;
+      if (out.length && out[out.length - 1].t === t) out[out.length - 1].ticks += GRID;
+      else out.push({ t, name: `t${pad(t, 4)}`, ticks: GRID });
+    }
+    return out;
+  };
+  const to308 = part(0, K4, K4);
+  const on313 = part(K4 + 1, K5, K5);
+  const beat = SCARE_PICK.map((_, j) => ({ name: `s${pad(j, 2)}`, ticks: BEAT_TICKS }));
+  return {
+    zones,
+    // when a timeline frame comes up, in seconds of the walk without the beat
+    time: (t) => {
+      let ticks = 0;
+      for (const f of [...to308, ...on313]) {
+        if (f.t >= t) break;
+        ticks += f.ticks;
+      }
+      return ticks / TICKS;
+    },
+    clips: [
+      { id: 'walk-door', variant: 'scare', scare: { at: to308.length, count: beat.length }, frames: [...to308, ...beat, ...on313] },
+      { id: 'walk', variant: 'plain', frames: [...to308, ...on313] },
+    ],
+  };
 }
 const ticksOf = (frames) => frames.reduce((s, f) => s + f.ticks, 0);
 const seconds = (ticks) => round(ticks / TICKS, 4);
 
 // --- encoding ------------------------------------------------------------------------------------
-// The frames are piped to ffmpeg as raw RGB, and their times are set there from the tick list
-// (runs of frames with the same duration), so the file carries the exact time of every frame.
+// The frames are piped to ffmpeg as raw RGB, and their times are set there from the tick list,
+// so the file carries the exact time of every frame. The time of frame N is written as one
+// flat sum: the first frame's duration times N, plus, wherever the duration changes, the
+// change times the number of frames since.
 function ptsExpr(frames) {
-  const runs = [];
-  for (const f of frames) {
-    const r = runs[runs.length - 1];
-    if (r && r.ticks === f.ticks) r.count++;
-    else runs.push({ ticks: f.ticks, count: 1 });
+  let expr = `${frames[0].ticks}*N`;
+  for (let i = 1; i < frames.length; i++) {
+    const d = frames[i].ticks - frames[i - 1].ticks;
+    if (d) expr += `${d > 0 ? '+' : '-'}${Math.abs(d)}*max(N-${i}\\,0)`;
   }
-  let n0 = 0;
-  let t0 = 0;
-  const parts = runs.map((r) => {
-    const p = { n0, t0, ticks: r.ticks, end: n0 + r.count };
-    n0 += r.count;
-    t0 += r.count * r.ticks;
-    return p;
-  });
-  let expr = '';
-  parts.forEach((p, i) => {
-    const e = `${p.t0}+${p.ticks}*(N-${p.n0})`;
-    expr += i === parts.length - 1 ? e : `if(lt(N\\,${p.end})\\,${e}\\,`;
-  });
-  return expr + ')'.repeat(parts.length - 1);
+  return expr;
 }
 
 // How the files say their colours are to be read: BT.709 primaries and matrix, video range,
 // and the sRGB transfer curve, which is what the frames are in (they are made from PNGs). With
 // the usual BT.709 curve written there instead, Safari and Chrome with a hardware decoder show
 // the video two to four levels lighter than the stills next to it (measured on the built page:
-// a pose against the first frame of its chapter), and every chapter would start and end with
-// a small jump in brightness. ffmpeg takes these from the filter, not from output options.
+// a still against the first frame of the video that starts on it), and the clip would start
+// and end with a small jump in brightness. ffmpeg takes these from the filter, not from
+// output options.
 const COLOUR = 'setparams=range=tv:colorspace=bt709:color_primaries=bt709:color_trc=iec61966-2-1';
 
 const CODECS = {
-  // H.264 High, level 4.0, 8 bit 4:2:0: what every iPhone and every Android phone decodes in
-  // hardware. One keyframe (nothing ever seeks), reference frames within the level's limit.
+  // H.264 High, 8 bit 4:2:0: what every iPhone and every Android phone decodes in hardware
+  // (the phone set is level 4.0; the landscape set needs 4.2 for its size at 60 pictures a
+  // second). One keyframe, the first frame (the clip only ever starts from there), reference
+  // frames within the level's limit.
   h264: (def, crf) => ({
     pix: 'yuv420p',
-    args: ['-c:v', 'libx264', '-preset', 'veryslow', '-profile:v', 'high', '-level:v', '4.0', '-crf', String(crf), '-g', '9999', '-keyint_min', '9999', '-sc_threshold', '0', '-x264-params', `ref=${def.ref}:aq-mode=3:aq-strength=0.8:psy-rd=0.6,0:deblock=0,0`],
+    args: ['-c:v', 'libx264', '-preset', 'veryslow', '-profile:v', 'high', '-level:v', def.level, '-crf', String(crf), '-g', '9999', '-keyint_min', '9999', '-sc_threshold', '0', '-x264-params', `ref=${def.ref}:aq-mode=3:aq-strength=0.8:psy-rd=0.6,0:deblock=0,0`],
   }),
   // AV1 Main, 10 bit 4:2:0 (the walk is mostly dark gradients, which band at 8 bit).
   av1: (def, crf) => ({
@@ -619,16 +707,19 @@ const CODECS = {
   }),
 };
 
-function encodeOne(def, cache, ch, codec, crf, outFile) {
+async function encodeOne(def, cache, ch, codec, crf, outFile) {
   const { pix, args: codecArgs } = CODECS[codec](def, crf);
-  const vf = `settb=1/${TICKS},setpts='${ptsExpr(ch.frames)}',scale=in_range=full:out_range=limited:out_color_matrix=bt709:flags=accurate_rnd+full_chroma_int,format=${pix},${COLOUR}`;
+  // (the filter chain goes in a file: the time expression is too long for a command line)
+  const script = `${outFile}.filter`;
+  await writeFile(script, `settb=1/${TICKS},setpts='${ptsExpr(ch.frames)}',scale=in_range=full:out_range=limited:out_color_matrix=bt709:flags=accurate_rnd+full_chroma_int,format=${pix},${COLOUR}`);
   const ff = spawn(
     FFMPEG,
-    ['-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${def.w}x${def.h}`, '-framerate', String(FPS), '-i', 'pipe:0', '-vf', vf, '-fps_mode', 'passthrough', '-enc_time_base', `1/${TICKS}`, ...codecArgs, '-an', '-movflags', '+faststart', '-map_metadata', '-1', '-fflags', '+bitexact', outFile],
+    ['-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${def.w}x${def.h}`, '-framerate', String(FPS), '-i', 'pipe:0', '-/filter:v', script, '-fps_mode', 'passthrough', '-enc_time_base', `1/${TICKS}`, ...codecArgs, '-an', '-movflags', '+faststart', '-map_metadata', '-1', '-fflags', '+bitexact', outFile],
     { stdio: ['pipe', 'ignore', 'pipe'], env: { ...process.env, SVT_LOG: '1' } },
   );
   let err = '';
   ff.stderr.on('data', (d) => (err += d));
+  ff.stdin.on('error', () => {}); // ffmpeg gave up: its own message, below, says why
   const done = new Promise((resolve, reject) => {
     ff.on('error', reject);
     ff.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg ${codec} ${ch.id}: exit ${code}\n${err}`))));
@@ -640,40 +731,39 @@ function encodeOne(def, cache, ch, codec, crf, outFile) {
     }
     ff.stdin.end();
   })();
-  return Promise.all([done, feed]).then(async () => (await stat(outFile)).size);
+  await Promise.all([done, feed]);
+  await rm(script);
+  return (await stat(outFile)).size;
 }
 
-// All four files of a set in one codec at one quality. Returns their sizes.
+// Both variants of a set in one codec at one quality. Returns their sizes.
 async function encodeAll(def, cache, list, codec, crf, dir, tag = '') {
   const sizes = {};
-  const queue = [...list];
-  await Promise.all(
-    Array.from({ length: 2 }, async () => {
-      for (let ch = queue.shift(); ch; ch = queue.shift()) sizes[ch.id] = await encodeOne(def, cache, ch, codec, crf, join(dir, `${ch.id}.${codec}${tag}.mp4`));
-    }),
-  );
+  await Promise.all(list.map(async (ch) => (sizes[ch.id] = await encodeOne(def, cache, ch, codec, crf, join(dir, `${ch.id}.${codec}${tag}.mp4`)))));
   return sizes;
 }
-// What one visitor downloads: chapters 1 and 2, and the larger variant of chapter 3.
-const visitor = (s) => s.c1 + s.c2 + Math.max(s.c3, s.c3s);
+// What one visitor downloads: one variant. The one with the beat is the longer of the two.
+const visitor = (s) => Math.max(...Object.values(s));
 
 // The best quality whose visitor total fits: sizes fall by about half for every 5 steps of
-// x264's quality scale and every 11 of SVT-AV1's, so a few encodes find it.
+// x264's quality scale and every 11 of SVT-AV1's, so a few encodes find it. The search is made
+// with the longer variant alone; the other is encoded once, at the quality found.
 async function fit(def, cache, list, codec, room, dir) {
   const fixed = args[`crf-${codec}`];
   if (fixed !== undefined) return { crf: Number(fixed), sizes: await encodeAll(def, cache, list, codec, Number(fixed), dir) };
   const step = codec === 'h264' ? 0.5 : 1;
   const floor = def.best[codec];
+  const long = list.filter((ch) => ch.scare);
   const tried = new Map();
   const at = async (crf) => {
     if (!tried.has(crf)) {
-      const sizes = await encodeAll(def, cache, list, codec, crf, dir, '.try');
+      const sizes = await encodeAll(def, cache, long, codec, crf, dir, '.try');
       tried.set(crf, sizes);
       console.log(`  ${codec} crf ${crf}: ${visitor(sizes)} bytes for one visitor (room ${room})`);
     }
     return tried.get(crf);
   };
-  let crf = Math.max(floor, codec === 'h264' ? 29 : 44);
+  let crf = Math.max(floor, codec === 'h264' ? 26 : 38);
   for (let i = 0; i < 8; i++) {
     const total = visitor(await at(crf));
     // estimate the quality that fills the room, then settle within one step
@@ -720,13 +810,65 @@ if (darkAt(K4, K3) !== 0) throw new Error('the held frame would be darkened');
 const { steps, cum } = await motion(tl);
 const perFrame = tl.keys.slice(1).map((k, s) => steps.slice(tl.keys[s], k).reduce((a, b) => a + b, 0) / (k - tl.keys[s]));
 console.log(`timeline: ${tl.frames.length} frames, keyframes at ${tl.keys.join(', ')}; motion per frame in clips 1 to 4: ${perFrame.map((v) => v.toFixed(2)).join(', ')}`);
-const list = chapters(tl);
+const made = cut(tl, steps);
+const list = made.clips;
+
+// what the cut came to: lengths, the frames kept, and when each door stands still
+const beatSeconds = (SCARE_PICK.length * BEAT_TICKS) / TICKS;
+const beatAt = made.time(K4 + 1);
+const DOORS = [301, 304, 305, 308, 313];
+for (const ch of list) {
+  const length = ticksOf(ch.frames) / TICKS;
+  const walked = ch.frames.filter((f) => f.t !== undefined);
+  console.log(`${ch.id}: ${seconds(ticksOf(ch.frames))} s, ${ch.frames.length} frames (${walked.length} of the ${tl.frames.length} of the walk${ch.scare ? `, ${ch.scare.count} of the beat` : ''}), ${FPS} pictures a second at most`);
+  if (length < LENGTH[0] || length > LENGTH[1]) throw new Error(`${ch.id} lasts ${length.toFixed(2)} s: it has to be ${LENGTH[0]} to ${LENGTH[1]}`);
+}
+{
+  // how far the picture moves from one picture of the walk to the next (the motion measure,
+  // summed over the timeline frames in between): what the eye reads as smooth or as stepping
+  const walked = list[1].frames;
+  const moves = walked.slice(1).map((f, i) => steps.slice(walked[i].t, f.t).reduce((a, b) => a + b, 0));
+  const sorted = [...moves].sort((a, b) => a - b);
+  console.log(`from one picture to the next the walk moves ${(moves.reduce((a, b) => a + b, 0) / moves.length).toFixed(1)} on average, ${sorted[Math.floor(sorted.length * 0.95)].toFixed(1)} at the 95th percentile, ${sorted[sorted.length - 1].toFixed(1)} at most`);
+}
+console.log(`stand-stills: ${made.zones.map(([a, b], j) => `door ${DOORS[j]} frames ${a} to ${b}, ${made.time(a).toFixed(2)} to ${(j === 4 ? made.time(b) + GRID / TICKS : made.time(b + 1)).toFixed(2)} s`).join('; ')}; the beat at ${beatAt.toFixed(2)} s`);
+// the captions: one at a time, long enough, and none of them over the beat
+const cuesOf = (ch) => {
+  const at = (v) => round(ch.scare && v >= beatAt ? v + beatSeconds : v);
+  return CUES.map((c) => ({ cap: c.cap, in: at(c.in), ...(c.out !== undefined ? { out: at(c.out) } : {}) }));
+};
+for (const ch of list) {
+  const length = ticksOf(ch.frames) / TICKS;
+  const cues = cuesOf(ch);
+  cues.forEach((c, i) => {
+    const out = c.out ?? length;
+    if (out - c.in < CUE_MIN) throw new Error(`${ch.id}: caption ${c.cap + 1} is up for ${(out - c.in).toFixed(2)} s`);
+    if (i && c.in < cues[i - 1].out) throw new Error(`${ch.id}: caption ${c.cap + 1} comes before caption ${c.cap} has gone`);
+    if (ch.scare && c.in < beatAt + beatSeconds && out > beatAt) throw new Error(`${ch.id}: caption ${c.cap + 1} is up while door 308 opens`);
+  });
+}
+
+// trial: some frames of the phone set, finished, as pictures
+if (args.stills) {
+  const def = SETS.mobile;
+  const [lw, lh] = def.look;
+  const dir = String(args.stills);
+  await mkdir(dir, { recursive: true });
+  for (const t of String(args.at ?? tl.keys.join(',')).split(',').map(Number)) {
+    const plain = await blend(tl.frames[t], FIT.mobile(windowLeft(t)));
+    const px = finish(await evenSharpness(plain, lw, lh), lw, lh, def.seed + NEW_SEED + t, darkAt(t, K3), GRAIN);
+    await image(px, lw, lh).webp({ quality: 80 }).toFile(join(dir, `t${pad(t, 4)}.webp`));
+  }
+  await writeFile(join(dir, 'frames.json'), JSON.stringify({ win: WIN_W, w: lw, h: lh, time: Object.fromEntries(String(args.at ?? tl.keys.join(',')).split(',').map((t) => [t, round(made.time(Number(t)), 2)])) }));
+  console.log(`stills in ${dir}`);
+  process.exit(0);
+}
 
 const manifestFile = join(PUB, 'manifest.json');
-let manifest = { version: 2, sets: {} };
+let manifest = { version: 3, sets: {} };
 if (args.set && (await exists(manifestFile))) {
   const have = JSON.parse(await readFile(manifestFile, 'utf8'));
-  if (have.version === 2) manifest = have;
+  if (have.version === 3) manifest = have;
 }
 manifest.grain = GRAIN;
 
@@ -738,61 +880,65 @@ for (const [set, def] of Object.entries(SETS)) {
   await rm(dst, { recursive: true, force: true });
   await mkdir(dst, { recursive: true });
 
-  // the poses: the first frame and the last frame of each chapter, as stills; and the small poster
-  const poses = [];
-  let poseBytes = 0;
-  for (const k of POSE_AT(tl).keys()) {
-    const px = await readFile(cache.file(`pose${k}`));
+  // the stills, and the small poster
+  const stills = [];
+  let restBytes = 0; // what the stage rests on: the poster, the first frame and the last
+  for (const [k, name] of STILL_NAMES.entries()) {
+    const px = await readFile(cache.file(`still${k}`));
     const buf = await image(px, ...def.look).webp({ quality: def.pose + darkBoost(lumaOf(px)), effort: 6, smartSubsample: true }).toBuffer();
-    await writeFile(join(dst, `p${k}.webp`), buf);
-    poses.push({ src: `${def.dir}/p${k}.webp`, bytes: buf.length });
-    poseBytes += buf.length;
-    if (k === 0) {
+    await writeFile(join(dst, `${name}.webp`), buf);
+    stills.push({ name, src: `${def.dir}/${name}.webp`, bytes: buf.length });
+    if (name === 'first' || name === 'last') restBytes += buf.length;
+    if (name === 'first') {
       const small = await image(px, ...def.look).resize(...def.poster).webp({ quality: 42, effort: 6 }).toBuffer();
       await writeFile(join(PUB, `poster-${def.dir}.webp`), small);
-      poseBytes += small.length;
+      restBytes += small.length;
       manifest.sets[set] = { poster: `poster-${def.dir}.webp`, posterBytes: small.length };
     }
   }
 
-  const room = def.budget - poseBytes;
+  const room = def.budget - restBytes;
+  const codecs = def.codecs.filter((c) => !args.codec || args.codec === c);
   const result = {};
-  for (const codec of CODEC_LIST) {
+  for (const codec of codecs) {
     console.log(`${set}: ${codec}, ${room} bytes of video for one visitor`);
     result[codec] = await fit(def, cache, list, codec, room, dst);
   }
 
-  const cuesOf = (ch) => {
-    const dur = ticksOf(ch.frames) / TICKS;
-    // times in chapter 3 are those of the walk: the scare beat pushes everything after it back
-    const beat = ch.scare ? (ch.scare.count * WALK_TICKS) / TICKS : 0;
-    const beatAt = ch.scare ? (ch.scare.at * WALK_TICKS) / TICKS : Infinity;
-    const at = (v) => (v < 0 ? dur + v : v >= beatAt ? v + beat : v);
-    return CUES[ch.chapter].map((c) => ({ cap: c.cap, in: round(at(c.in)), ...(c.out !== undefined ? { out: round(at(c.out)) } : {}) }));
-  };
-  const files = {};
+  const clips = {};
   for (const ch of list) {
     const ticks = ticksOf(ch.frames);
-    files[ch.id] = {
-      chapter: ch.chapter,
+    clips[ch.variant] = {
       frames: ch.frames.length,
       duration: seconds(ticks),
       cues: cuesOf(ch),
-      sources: CODEC_LIST.map((codec) => ({ codec, src: `${def.dir}/${ch.id}.${codec}.mp4`, type: typeOf(join(dst, `${ch.id}.${codec}.mp4`), codec), bytes: result[codec].sizes[ch.id] })),
+      sources: codecs.map((codec) => ({ codec, src: `${def.dir}/${ch.id}.${codec}.mp4`, type: typeOf(join(dst, `${ch.id}.${codec}.mp4`), codec), bytes: result[codec].sizes[ch.id] })),
     };
-    if (ch.scare) {
-      // the beat: from the first held frame to the end of the last one, and the door rectangle
-      const t0 = (ch.scare.at * WALK_TICKS) / TICKS;
-      files[ch.id].scare = { at: round(t0), end: round(t0 + (ch.scare.count * WALK_TICKS) / TICKS), rect: [cache.rect.x, cache.rect.y, cache.rect.w, cache.rect.h] };
-    }
+    // the beat: from the first held frame to the end of the last one, and the door rectangle
+    if (ch.scare) clips[ch.variant].scare = { at: round(beatAt), end: round(beatAt + beatSeconds), rect: [cache.rect.x, cache.rect.y, cache.rect.w, cache.rect.h] };
   }
-  manifest.sets[set] = { ...manifest.sets[set], w: def.w, h: def.h, fps: FPS, poseSize: def.look, poses: poses.map((p) => p.src), poseBytes: poses.map((p) => p.bytes), face: cache.face, quality: Object.fromEntries(CODEC_LIST.map((c) => [c, result[c].crf])), files };
+  const src = (name) => stills.find((p) => p.name === name).src;
+  manifest.sets[set] = {
+    ...manifest.sets[set],
+    w: def.w,
+    h: def.h,
+    fps: FPS,
+    stillSize: def.look,
+    first: src('first'),
+    last: src('last'),
+    stills: [src('still-1'), src('still-2')],
+    stillBytes: Object.fromEntries(stills.map((p) => [p.name, p.bytes])),
+    ...(set === 'mobile' ? { window: WIN_W } : {}),
+    face: cache.face,
+    quality: Object.fromEntries(codecs.map((c) => [c, result[c].crf])),
+    clips,
+  };
 
-  for (const codec of CODEC_LIST) {
+  for (const codec of codecs) {
     const s = result[codec].sizes;
     console.log(`${set} ${codec} (quality ${result[codec].crf}): ${list.map((ch) => `${ch.id} ${ch.frames.length} frames ${seconds(ticksOf(ch.frames))} s ${s[ch.id]} bytes`).join('; ')}`);
-    console.log(`${set} ${codec}: one visitor downloads ${visitor(s) + poseBytes} bytes (${((visitor(s) + poseBytes) / 1048576).toFixed(2)} MB): video ${visitor(s)}, poses and poster ${poseBytes}; budget ${def.budget}`);
-    if (visitor(s) + poseBytes > def.budget) throw new Error(`${set} ${codec} is over its budget`);
+    console.log(`${set} ${codec}: one visitor downloads ${visitor(s) + restBytes} bytes (${((visitor(s) + restBytes) / 1048576).toFixed(2)} MB): video ${visitor(s)}, poster and two stills ${restBytes}; budget ${def.budget}`);
+    if (visitor(s) + restBytes > def.budget) throw new Error(`${set} ${codec} is over its budget`);
   }
 }
 if (!args.frames) {
