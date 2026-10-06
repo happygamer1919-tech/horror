@@ -532,8 +532,8 @@ for (const lang of LANGS) {
       await page.goto(`${BASE}/${lang}/`);
       await expect(page.locator('[data-lift]')).toBeHidden();
       await expect(page.locator('.torch')).toBeHidden();
-      // No pin: the corridor is an ordinary block (three stills, under three screens; pinned it
-      // is five) and every caption can be read.
+      // Nothing held: the corridor is an ordinary block (three stills, under three screens) and
+      // every caption can be read.
       const corr = await page.locator('#corridor').boundingBox();
       expect(corr!.height).toBeLessThan(844 * 3);
       for (const cap of await page.locator('[data-cap]').all()) {

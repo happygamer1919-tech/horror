@@ -1,7 +1,7 @@
 // Scrolling: the browser's own, on every device; in-page links glide.
-// Performance itself is measured by `npm run test:perf` (tests/perf), not here. The corridor's
-// scroll snap is in tests/corridor.spec.ts, the audit of every touch and wheel listener in
-// tests/listeners.spec.ts.
+// Performance itself is measured by `npm run test:perf` (tests/perf), not here. The corridor,
+// the one place that holds the page, is in tests/corridor.spec.ts, the audit of every touch
+// and wheel listener in tests/listeners.spec.ts.
 import { test, expect, type Page } from '@playwright/test';
 
 const BASE = '/horror';

@@ -2,10 +2,11 @@
 // makes the browser wait for the page's JavaScript before it may move the page, and one that
 // calls preventDefault stops it. So: every touch and wheel listener the page ever registers is
 // recorded, with its options, from before the first script runs, while the whole page is used
-// (the hero, the corridor, the booking dialog, the floating menu, the footer), and each one
-// must have been registered with `passive: true`. Runs on phone, desktop and WebKit.
+// (the hero, the corridor with the page held under its clip, the booking dialog, the floating
+// menu, the footer), and each one must have been registered with `passive: true`. Runs on
+// phone, desktop and WebKit.
 import { test, expect } from '@playwright/test';
-import { expectRest, jumpTo, open, stage, stopsOf } from './corridor.util';
+import { again, expectHeld, expectRest, fling, gesturesOf, jumpTo, open, primed, replay, stage, topOf } from './corridor.util';
 
 const TYPES = ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'wheel', 'mousewheel'];
 
@@ -53,20 +54,30 @@ test('no touch or wheel listener on the page is ever registered without passive:
   else await page.mouse.click(vp.width / 2, vp.height * 0.4);
   await page.waitForTimeout(700);
 
-  // the corridor: every chapter, played and left
-  const stops = await stopsOf(page);
-  await jumpTo(page, stops[0]);
-  await expectRest(page, 0, stops);
-  for (const k of [1, 2, 3]) {
-    await page.keyboard.press('ArrowDown');
-    await expectRest(page, k, stops);
+  // the corridor: caught by a real scroll and held while its clip plays (the page may not hold
+  // a scroll back with a listener there either), a second gesture made on the held page, the
+  // clip played out, and played again by its button
+  const top = await topOf(page);
+  // (Playwright's phone WebKit makes neither a finger swipe nor a wheel turn: keys there)
+  const kind = test.info().project.use.browserName === 'webkit' ? 'key' : gesturesOf(test.info())[0];
+  if ((await primed(page)) !== 'none') {
+    await jumpTo(page, 0);
+    await fling(page, kind);
+    await expectHeld(page);
+    if (kind === 'wheel') await page.waitForTimeout(1200);
+    if (kind === 'key') await page.keyboard.press('Escape');
+    else await again(page, kind, -1);
+    await expect(stage(page)).toHaveAttribute('data-state', 'idle', { timeout: 30000 });
+    await jumpTo(page, top);
+    await expectRest(page);
+    await replay(page).click();
+    await expectHeld(page);
+    await expect(stage(page)).toHaveAttribute('data-end', /ended|watchdog/, { timeout: 30000 });
   }
-  await page.keyboard.press('ArrowUp');
-  await expectRest(page, 2, stops);
 
   // the rest of the page, top to bottom, so everything that waits for its section has started
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
-  for (let y = stops[3] + 40; y <= height; y += vp.height * 0.7) {
+  for (let y = top + vp.height + 40; y <= height; y += vp.height * 0.7) {
     await page.evaluate((v) => window.scrollTo(0, v), y);
     await page.waitForTimeout(120);
   }
@@ -97,7 +108,7 @@ test('no touch or wheel listener on the page is ever registered without passive:
   await page.waitForTimeout(200);
   await page.locator('[data-booking-close]').click();
   await expect(dialog).toBeHidden();
-  await expect(stage(page)).toHaveAttribute('data-chapter', /\d/);
+  await expect(stage(page)).toHaveAttribute('data-state', 'idle');
 
   const seen = await page.evaluate(() => (window as unknown as { __listeners: Seen[] }).__listeners);
   const prevented = await page.evaluate(() => (window as unknown as { __prevented: string[] }).__prevented);
