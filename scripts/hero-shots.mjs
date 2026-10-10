@@ -23,7 +23,7 @@ for (const s of shots) {
   const page = await ctx.newPage();
   page.on('console', (m) => m.type() === 'error' && console.log('console error:', m.text()));
   page.on('pageerror', (e) => console.log('page error:', e.message));
-  await page.goto(`http://localhost:${PORT}/horror/${s.lang ?? 'ro'}/`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/${s.lang ?? 'ro'}/`, { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(s.settle ?? 700);
   if (s.mouse) await page.mouse.move(s.mouse[0], s.mouse[1], { steps: 4 });

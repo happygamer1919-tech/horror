@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-const BASE = '/horror';
+const BASE = '';
 const LANGS = ['ro', 'ru', 'en'] as const;
 // The wordmark is the same on every language page. RO and EN add a subtitle under it.
 const BRAND = 'Проклятие Отеля';
@@ -324,7 +324,7 @@ for (const lang of LANGS) {
     test('share image: og:image and twitter:card are wired to a 1200 x 630 picture', async ({ page, request }) => {
       await open(page, lang);
       const og = await page.locator('meta[property="og:image"]').getAttribute('content');
-      expect(og).toBe(`https://happygamer1919-tech.github.io${BASE}/og/${lang}.jpg`);
+      expect(og).toBe(`https://lastquestmd.com${BASE}/og/${lang}.jpg`);
       await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image');
       await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute('content', og!);
       const res = await request.get(`${BASE}/og/${lang}.jpg`);

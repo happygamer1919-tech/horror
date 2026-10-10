@@ -1,4 +1,4 @@
-// Minimal static server for tests and screenshots: serves dist/ under the /horror base path,
+// Minimal static server for tests and screenshots: serves dist/ from the root,
 // the same way GitHub Pages does (including 404.html). No dependencies.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -6,7 +6,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'dist');
-const BASE = '/horror';
+const BASE = '';
 const port = Number(process.env.PORT ?? 4321);
 const types = {
   '.html': 'text/html; charset=utf-8',

@@ -4,8 +4,8 @@
 // and no JSON-LD. Set SITE_INDEXABLE=true in the build environment to go public.
 export const SITE_INDEXABLE = (process.env.SITE_INDEXABLE ?? 'false') === 'true';
 
-export const SITE_ORIGIN = 'https://happygamer1919-tech.github.io';
-export const BASE = '/horror';
+export const SITE_ORIGIN = 'https://lastquestmd.com';
+export const BASE = '';
 
 export const LANGS = ['ro', 'ru', 'en'] as const;
 export type Lang = (typeof LANGS)[number];

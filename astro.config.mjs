@@ -1,9 +1,9 @@
 import { defineConfig } from 'astro/config';
 
-// Deployed to GitHub Pages under /horror. Change both values when a custom domain is attached.
+// Deployed to GitHub Pages on the custom domain lastquestmd.com, served from the root.
 export default defineConfig({
-  site: 'https://happygamer1919-tech.github.io',
-  base: '/horror',
+  site: 'https://lastquestmd.com',
+  base: '/',
   trailingSlash: 'always',
   output: 'static',
   build: { inlineStylesheets: 'always' },

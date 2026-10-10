@@ -14,7 +14,7 @@ export default defineConfig({
   },
   webServer: {
     command: `npm run build && PORT=${PORT} node scripts/serve.mjs`,
-    url: `http://localhost:${PORT}/horror/ro/`,
+    url: `http://localhost:${PORT}/ro/`,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },

@@ -4,7 +4,7 @@
 // and wheel listener in tests/listeners.spec.ts.
 import { test, expect, type Page } from '@playwright/test';
 
-const BASE = '/horror';
+const BASE = '';
 const LANGS = ['ro', 'ru', 'en'] as const;
 
 const open = async (page: Page, lang: string = 'ro') => {

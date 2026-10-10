@@ -337,7 +337,7 @@ export async function measureScroll(
     .catch(() => undefined);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
 
-  await page.goto(opts.path ?? '/horror/ro/', { waitUntil: 'load' });
+  await page.goto(opts.path ?? '/ro/', { waitUntil: 'load' });
   if (variant.css) await page.addStyleTag({ content: variant.css });
   await settle(page);
 

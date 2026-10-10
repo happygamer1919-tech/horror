@@ -35,7 +35,7 @@ const framings = argv.filter((a) => a.startsWith('--framing=')).map((a) => a.sli
 const PORT = 4343;
 const server = spawn('node', [join(ROOT, 'scripts', 'serve.mjs')], { cwd: ROOT, env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 800));
-const url = `http://localhost:${PORT}/horror/${lang}/`;
+const url = `http://localhost:${PORT}/${lang}/`;
 const out = (name, w) => join(ROOT, 'docs', 'screenshots', `${name}-${w}.jpg`);
 const sizes = [
   { w: 390, h: 844, dpr: 2, mobile: true, tile: 240, cols: 6 },

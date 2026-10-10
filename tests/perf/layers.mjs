@@ -23,7 +23,7 @@ await context.addInitScript(() => sessionStorage.setItem('hotel:lift', '1'));
 const page = await context.newPage();
 const cdp = await context.newCDPSession(page);
 await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'hover', value: 'none' }, { name: 'pointer', value: 'coarse' }] }).catch(() => {});
-await page.goto(`http://localhost:${PORT}/horror/ro/`, { waitUntil: 'load' });
+await page.goto(`http://localhost:${PORT}/ro/`, { waitUntil: 'load' });
 await page.waitForTimeout(2500);
 
 let layers = [];

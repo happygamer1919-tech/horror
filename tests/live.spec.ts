@@ -1,7 +1,7 @@
 // Checks against the deployed site. Run after a deploy: npm run test:live
 import { test, expect } from '@playwright/test';
 
-const LIVE = 'https://happygamer1919-tech.github.io/horror';
+const LIVE = 'https://lastquestmd.com';
 const BRAND = 'Проклятие Отеля';
 
 for (const lang of ['ro', 'ru', 'en']) {

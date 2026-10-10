@@ -3,7 +3,7 @@ import { test, expect, type Page, type CDPSession } from '@playwright/test';
 // The arrival hero: darkness and the flashlight, the loose E, the route button, the facade.
 // The page exposes its hero state on window.__hero (src/scripts/hero-hooks.ts).
 
-const BASE = '/horror';
+const BASE = '';
 const LANGS = ['ro', 'ru', 'en'] as const;
 const ROUTE_URL =
   'https://www.google.com/maps/dir/?api=1&destination=Strada+Onisifor+Ghibu+10%2C+Chi%C8%99in%C4%83u+MD-2071&destination_place_id=ChIJ8UbS8b3Xy0ARaOu6EZ-iXhU';

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 // The guest book: three Google reviews as handwritten entries, the rating and the links
 // above them, one line pulled out large, the whole section right before the registration card.
 
-const BASE = '/horror';
+const BASE = '';
 const LANGS = ['ro', 'ru', 'en'] as const;
 type L = (typeof LANGS)[number];
 

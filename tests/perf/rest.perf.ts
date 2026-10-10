@@ -36,7 +36,7 @@ test('work per second with no input, by experiment', async ({ browser, baseURL }
     await cdp
       .send('Emulation.setEmulatedMedia', { features: [{ name: 'hover', value: 'none' }, { name: 'pointer', value: 'coarse' }] })
       .catch(() => undefined);
-    await page.goto('/horror/ro/', { waitUntil: 'load' });
+    await page.goto('/ro/', { waitUntil: 'load' });
     if (variant.css) await page.addStyleTag({ content: variant.css });
     // One tap, so the parts that wait for a first sign of life (the fog) are running.
     await page.touchscreen.tap(195, 300);

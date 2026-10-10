@@ -7,7 +7,7 @@
 //                              (Playwright's mobile WebKit refuses wheel events, and it has no CDP)
 import { expect, type Browser, type BrowserContext, type CDPSession, type Page, type TestInfo } from '@playwright/test';
 
-export const BASE = '/horror';
+export const BASE = '';
 export const VIDEO = /\/corridor\/(d|m)\/(walk|walk-door)\.(av1|h264)\.mp4$/;
 export const STILL = /\/corridor\/(d|m)\/(first|last|still-1|still-2)\.webp$/;
 export const POSTER = /\/corridor\/poster-(d|m)\.webp$/;
