@@ -85,7 +85,7 @@ async function ready(browser: Browser, baseURL: string, throttle: number, codec 
   const cdp = await context.newCDPSession(page);
   await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'hover', value: 'none' }, { name: 'any-hover', value: 'none' }, { name: 'pointer', value: 'coarse' }] }).catch(() => undefined);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
-  await page.goto('/horror/ro/', { waitUntil: 'load' });
+  await page.goto('/ro/', { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await page.waitForTimeout(1000);
   // the throttle does not always survive the first navigation: set it again

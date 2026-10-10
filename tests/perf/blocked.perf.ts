@@ -42,7 +42,7 @@ const controlPage = (script: string) =>
 const ARMS = [
   { name: 'control-free', html: controlPage("addEventListener('touchstart',()=>{},{passive:true});") },
   { name: 'control-blocking', html: controlPage("document.addEventListener('touchmove',()=>{},{passive:false});") },
-  { name: 'site', path: '/horror/ro/' },
+  { name: 'site', path: '/ro/' },
 ] as const;
 
 type Run = { touchToScrollMs: number; scrolledDuringHang: boolean; hangMs: number };

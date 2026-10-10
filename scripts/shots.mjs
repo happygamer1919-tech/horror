@@ -6,7 +6,7 @@ import { chromium } from '@playwright/test';
 const args = process.argv.slice(2);
 const flags = Object.fromEntries(args.filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')).map(([k, v]) => [k, v ?? true]));
 const [name = 'page', selector = '', lang = 'ro'] = args.filter((a) => !a.startsWith('--'));
-const url = `http://localhost:4321/horror/${lang}/`;
+const url = `http://localhost:4321/${lang}/`;
 const sizes = [
   { w: 390, h: 844, dpr: 2, mobile: true },
   { w: 1440, h: 900, dpr: 1, mobile: false },

@@ -27,7 +27,7 @@ try {
   for (const lang of ['ro', 'ru', 'en']) {
     const ctx = await browser.newContext({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
     const page = await ctx.newPage();
-    await page.goto(`http://localhost:${PORT}/horror/${lang}/`, { waitUntil: 'load' });
+    await page.goto(`http://localhost:${PORT}/${lang}/`, { waitUntil: 'load' });
     await page.addStyleTag({ content: css });
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(300);

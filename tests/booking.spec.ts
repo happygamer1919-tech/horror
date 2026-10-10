@@ -3,7 +3,7 @@ import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 // Booking flow: the check-in card, the summary line, the booking dialog, Telegram, the
 // floating control. Hermetic: the widget, t.me and wa.me are answered locally.
 
-const BASE = '/horror';
+const BASE = '';
 const LANGS = ['ro', 'ru', 'en'] as const;
 type L = (typeof LANGS)[number];
 const BRAND = 'Проклятие Отеля';

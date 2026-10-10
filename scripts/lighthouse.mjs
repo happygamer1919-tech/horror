@@ -4,7 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 
-const url = process.argv[2] ?? 'https://happygamer1919-tech.github.io/horror/ro/';
+const url = process.argv[2] ?? 'https://lastquestmd.com/ro/';
 const out = `.lighthouse/${url.replace(/[^a-z0-9]+/gi, '-')}.json`;
 mkdirSync('.lighthouse', { recursive: true });
 
