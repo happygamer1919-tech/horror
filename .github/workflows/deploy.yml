@@ -14,8 +14,10 @@ concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: true
 
+# Public since 2026-10-25 (owner): indexed by search engines, readable by AI assistants. The
+# tests build with the same value, so they check the site that is published.
 env:
-  SITE_INDEXABLE: 'false'
+  SITE_INDEXABLE: 'true'
 
 # The suite builds the site itself. Started by hand on another branch, the workflow runs the
 # two test jobs and publishes nothing.

@@ -20,3 +20,21 @@ for (const lang of ['ro', 'ru', 'en']) {
     expect(html).toContain('1000 MDL');
   });
 }
+
+// The site is public (deploy.yml SITE_INDEXABLE): search engines and AI assistants may read it.
+test('live: open to crawlers, sitemap and llms.txt are served', async ({ request }) => {
+  const robots = await request.get(`${LIVE}/robots.txt`);
+  expect(robots.status()).toBe(200);
+  expect(await robots.text()).toContain(`Allow: /\n\nSitemap: ${LIVE}/sitemap.xml`);
+  const sitemap = await request.get(`${LIVE}/sitemap.xml`);
+  expect(sitemap.status()).toBe(200);
+  for (const lang of ['ro', 'ru', 'en']) expect(await sitemap.text()).toContain(`<loc>${LIVE}/${lang}/</loc>`);
+  const llms = await request.get(`${LIVE}/llms.txt`);
+  expect(llms.status()).toBe(200);
+  expect(await llms.text()).toContain(`# ${BRAND}`);
+  const logo = await request.get(`${LIVE}/logo.png`);
+  expect(logo.status()).toBe(200);
+  const page = await (await request.get(`${LIVE}/ro/`)).text();
+  expect(page).toContain('<meta name="robots" content="index, follow">');
+  expect(page).toContain('"@type":"EntertainmentBusiness"');
+});

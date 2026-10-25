@@ -1,16 +1,36 @@
-# Handoff: "Проклятие Отеля" preview site
+# Handoff: "Проклятие Отеля" site
 
-Live: https://happygamer1919-tech.github.io/horror/
+Live: https://lastquestmd.com/
 
-- Romanian (default): https://happygamer1919-tech.github.io/horror/ro/
-- Russian: https://happygamer1919-tech.github.io/horror/ru/
-- English: https://happygamer1919-tech.github.io/horror/en/
+- Romanian (default): https://lastquestmd.com/ro/
+- Russian: https://lastquestmd.com/ru/
+- English: https://lastquestmd.com/en/
 
-Status on 2026-10-06: everything below is live. The corridor is one continuous clip: when the
-section reaches the top of the screen the page is held, the walk plays full screen (about ten
-seconds), and the page then goes on to the next section. The chapter design of 2026-10-05
-failed the owner's test on a real iPhone and is retired. The site is a preview and is hidden
-from search engines.
+Status on 2026-10-25: the site is public. Search engines may index it and AI assistants may
+read it (see "Search engines and AI assistants" below). The corridor is one continuous clip:
+when the section reaches the top of the screen the page is held, the walk plays full screen
+(about ten seconds), and the page then goes on to the next section.
+
+## Search engines and AI assistants
+
+Public since 2026-10-25 (`SITE_INDEXABLE: 'true'` in `.github/workflows/deploy.yml`).
+
+- `robots.txt` lets every crawler in (AI assistants' crawlers too) and names the sitemap.
+- `sitemap.xml`: the three language pages, each with its translations.
+- `llms.txt`: a plain English summary for AI assistants (address, hours, prices, languages,
+  booking link, every answered FAQ), written from `src/content/site.ts`, so it changes when
+  the facts do.
+- Each page: its own title and description, canonical link, hreflang for ro / ru / en with
+  Romanian as the default, share image.
+- Structured data (JSON-LD): one `EntertainmentBusiness` with the same id on every language
+  (address, coordinates, hours, phone, price range, cash, game languages, logo, Instagram,
+  Google Maps), one `WebSite`, and the page's FAQ. No rating and no reviews, on the owner's
+  ruling.
+- The 404 page is never indexed.
+- To hide the site again: set `SITE_INDEXABLE` to 'false' and push. The tests follow it.
+
+Owner's side: Google Search Console and Bing Webmaster Tools (verify the domain at Hostinger,
+submit `https://lastquestmd.com/sitemap.xml`), the `www` DNS record (see Not verified).
 
 ## What is live
 
@@ -181,7 +201,10 @@ In `src/content/site.ts`:
 - `SLOTS_URL`: the EasyWeek widget. `TELEGRAM_URL`: the Telegram link.
 - `site.duration`, `site.reviews`, `site.reviewPull`, `site.instagram`, `site.rating`.
 
-In `.github/workflows/deploy.yml`: `SITE_INDEXABLE` ('false').
+In `.github/workflows/deploy.yml`: `SITE_INDEXABLE` ('true' since 2026-10-25: public).
+
+In `src/content/site.ts`, `site.geo`: the coordinates in the structured data, from the
+OpenStreetMap building at Onisifor Ghibu 10 (not supplied by the owner).
 
 After changing the wordmark or the hero: `npm run build && npm run og && npm run build`, then
 commit `public/og/`. Logo: `npm run logo`.
@@ -297,3 +320,9 @@ along the walk (the video model); the legend still mentions a child's silhouette
 
 - The paste step inside the EasyWeek widget, end to end.
 - The ambient sound and the door sound by ear.
+- **`https://www.lastquestmd.com` shows a certificate error** (checked 2026-10-25): the
+  certificate covers `lastquestmd.com` only. Fix at Hostinger: the `www` CNAME must point to
+  `happygamer1919-tech.github.io` (it points to the apex now). GitHub then issues a
+  certificate for both; after that tick "Enforce HTTPS" in Settings > Pages.
+- **Postal code.** The site says MD-2071; OpenStreetMap puts Onisifor Ghibu 10 in MD-2051.
+  The site is unchanged until the owner confirms which one is right (`docs/QUESTIONS.md` Q-1).

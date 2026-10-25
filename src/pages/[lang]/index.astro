@@ -14,8 +14,8 @@ import Footer from '../../components/Footer.astro';
 import Sticky from '../../components/Sticky.astro';
 import Prices from '../../components/Prices.astro';
 import Voucher from '../../components/Voucher.astro';
-import { LANGS, abs, type Lang } from '../../config';
-import { copy, site, priceFrom, durationRange, instagramUrl, CONTACT_LEVELS_ENABLED, VOUCHERS_ENABLED, CONFIRM_CALL_ENABLED } from '../../content';
+import { LANGS, SITE_ORIGIN, abs, type Lang } from '../../config';
+import { copy, site, priceFrom, durationRange, instagramUrl, faqFor, VOUCHERS_ENABLED } from '../../content';
 
 export function getStaticPaths() {
   return LANGS.map((lang) => ({ params: { lang } }));
@@ -23,32 +23,28 @@ export function getStaticPaths() {
 
 const lang = Astro.params.lang as Lang;
 const t = copy[lang];
-const address = `${site.address.street}, ${site.address.postalCode}, ${site.city[lang]}`;
-const faq = t.faq.items({
-  minutes: durationRange,
-  players: site.players,
-  priceFrom: t.keys.priceFrom(priceFrom, site.currency),
-  minAge: site.ageLimit,
-  phone: site.phone.display,
-  address,
-  levels: CONTACT_LEVELS_ENABLED,
-  vouchers: VOUCHERS_ENABLED,
-  confirmCall: CONFIRM_CALL_ENABLED ? t.checkin.confirmCall : null,
-});
+const faq = faqFor(lang);
 
 // Structured data. Base.astro only prints it when SITE_INDEXABLE=true.
+// One business and one website for all three pages: the @id is the same on every language,
+// so search engines and AI assistants see one entity, not three.
+const businessId = `${SITE_ORIGIN}/#business`;
 const jsonLd = [
   {
     '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    '@id': `${abs(`/${lang}/`)}#business`,
+    '@type': 'EntertainmentBusiness',
+    '@id': businessId,
     name: site.brand,
     alternateName: Object.values(site.brandSubtitle).filter(Boolean),
     description: t.meta.description(durationRange),
     url: abs(`/${lang}/`),
+    logo: abs('/logo.png'),
     image: abs(`/og/${lang}.jpg`),
     telephone: site.phone.e164,
     priceRange: `${priceFrom}-${Math.max(...site.prices.map((p) => p.total))} ${site.currency}`,
+    currenciesAccepted: site.currency,
+    paymentAccepted: 'Cash',
+    knowsLanguage: site.gameLanguages,
     address: {
       '@type': 'PostalAddress',
       streetAddress: site.address.street,
@@ -56,6 +52,7 @@ const jsonLd = [
       addressLocality: site.city[lang],
       addressCountry: site.countryCode,
     },
+    geo: { '@type': 'GeoCoordinates', latitude: site.geo.lat, longitude: site.geo.lng },
     openingHoursSpecification: site.hours.map((h) => ({
       '@type': 'OpeningHoursSpecification',
       dayOfWeek: h.schema,
@@ -64,6 +61,16 @@ const jsonLd = [
     })),
     hasMap: site.maps.profileUrl,
     ...(instagramUrl ? { sameAs: [instagramUrl] } : {}),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${SITE_ORIGIN}/#website`,
+    url: `${SITE_ORIGIN}/`,
+    name: site.brand,
+    alternateName: Object.values(site.brandSubtitle).filter(Boolean),
+    inLanguage: [...LANGS],
+    publisher: { '@id': businessId },
   },
   {
     '@context': 'https://schema.org',
