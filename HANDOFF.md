@@ -35,9 +35,12 @@ Test finds the local business and the organization, no errors. It does not show 
 August 2023 Google gives FAQ rich results to government and health sites only. The FAQ markup
 stays, other search engines and AI assistants read it.
 
-Still open: Bing Webmaster Tools (import from Search Console), the `www` DNS record and
-Enforce HTTPS (see Not verified). The Google Business Profile matches the site (address with
-MD-2071, phone, hours, website); it is managed from another Google account.
+Also done on 2026-10-25: Bing Webmaster Tools (imported from Search Console, sitemap
+submitted), the `www` record points to GitHub, the certificate covers `lastquestmd.com` and
+`www.lastquestmd.com` (expires 2027-01-23, GitHub renews it), Enforce HTTPS is on. Every
+address (http, https, www) ends on `https://lastquestmd.com/`. The Google Business Profile
+matches the site (address with MD-2071, phone, hours, website); it is managed from another
+Google account.
 
 ## What is live
 
@@ -327,7 +330,3 @@ along the walk (the video model); the legend still mentions a child's silhouette
 
 - The paste step inside the EasyWeek widget, end to end.
 - The ambient sound and the door sound by ear.
-- **`https://www.lastquestmd.com` shows a certificate error** (checked 2026-10-25): the
-  certificate covers `lastquestmd.com` only. Fix at Hostinger: the `www` CNAME must point to
-  `happygamer1919-tech.github.io` (it points to the apex now). GitHub then issues a
-  certificate for both; after that tick "Enforce HTTPS" in Settings > Pages.
