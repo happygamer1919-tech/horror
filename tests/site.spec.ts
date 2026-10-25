@@ -1,6 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const BASE = '';
+// The suite runs against whichever build the environment asks for: the public site in CI
+// (deploy.yml), the preview by default on a Mac.
+const INDEXABLE = process.env.SITE_INDEXABLE === 'true';
 const LANGS = ['ro', 'ru', 'en'] as const;
 // The wordmark is the same on every language page. RO and EN add a subtitle under it.
 const BRAND = 'Проклятие Отеля';
@@ -163,14 +166,14 @@ for (const lang of LANGS) {
       expect(seen.external, 'external requests').toEqual([]);
     });
 
-    test('head: preview is not indexable, hreflang is complete', async ({ page }) => {
+    test('head: robots follows the build, hreflang is complete', async ({ page }) => {
       await open(page, lang);
-      await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', INDEXABLE ? 'index, follow' : 'noindex, nofollow');
       for (const l of [...LANGS, 'x-default']) {
         await expect(page.locator(`link[rel="alternate"][hreflang="${l}"]`)).toHaveCount(1);
       }
       await expect(page.locator(`link[rel="alternate"][hreflang="${lang}"]`)).toHaveAttribute('href', new RegExp(`${BASE}/${lang}/$`));
-      await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
+      await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(INDEXABLE ? 3 : 0);
       await expect(page).toHaveTitle(new RegExp(BRAND));
     });
 
@@ -563,10 +566,10 @@ test('preloader clears itself in under 1.5 seconds and can be skipped', async ({
   await expect(lift).toBeHidden({ timeout: 300 });
 });
 
-test('root redirects to the default language and robots.txt blocks crawlers', async ({ page, request }) => {
+test('root redirects to the default language and robots.txt follows the build', async ({ page, request }) => {
   const robots = await request.get(`${BASE}/robots.txt`);
   expect(robots.status()).toBe(200);
-  expect(await robots.text()).toContain('Disallow: /');
+  expect(await robots.text()).toBe(INDEXABLE ? 'User-agent: *\nAllow: /\n\nSitemap: https://lastquestmd.com/sitemap.xml\n' : 'User-agent: *\nDisallow: /\n');
   await page.goto(`${BASE}/`);
   await page.waitForURL(`**${BASE}/ro/`);
   await expect(page.locator('html')).toHaveAttribute('lang', 'ro');
@@ -575,6 +578,8 @@ test('root redirects to the default language and robots.txt blocks crawlers', as
 test('unknown paths get the 404 page with links back', async ({ page }) => {
   const res = await page.goto(`${BASE}/no-such-room/`);
   expect(res!.status()).toBe(404);
+  // Never indexed, even on the public site.
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
   await expect(page.locator('[data-wa-float]')).toBeVisible();
   for (const l of LANGS) await expect(page.locator(`a[href="${BASE}/${l}/"]`)).toHaveCount(1);
 });
@@ -678,4 +683,71 @@ test('the tab title changes while the tab is hidden', async ({ page }) => {
     document.dispatchEvent(new Event('visibilitychange'));
   });
   expect(await page.title()).toBe(title);
+});
+
+test('sitemap lists the three language pages, each with all its translations', async ({ request }) => {
+  const res = await request.get(`${BASE}/sitemap.xml`);
+  expect(res.status()).toBe(200);
+  expect(res.headers()['content-type']).toContain('xml');
+  const xml = await res.text();
+  const locs = Array.from(xml.matchAll(/<loc>(.*?)<\/loc>/g)).map((m) => m[1]);
+  expect(locs).toEqual(LANGS.map((l) => `https://lastquestmd.com/${l}/`));
+  for (const l of [...LANGS, 'x-default']) {
+    const target = `https://lastquestmd.com/${l === 'x-default' ? 'ro' : l}/`;
+    expect(xml.split(`hreflang="${l}" href="${target}"`).length - 1, l).toBe(3);
+  }
+});
+
+test('llms.txt states the facts the page states, and nothing unfilled', async ({ request }) => {
+  const res = await request.get(`${BASE}/llms.txt`);
+  expect(res.status()).toBe(200);
+  const txt = await res.text();
+  expect(txt.startsWith(`# ${BRAND} (Blestemul Hotelului / The Hotel's Curse)\n`)).toBe(true);
+  for (const fact of ['Strada Onisifor Ghibu 10', '+373 682 32 596', '60-90 minutes', '2-11 players', '2-3 players 1000 MDL', '11 players 3300 MDL', 'Cash only', SLOTS_URL, INSTAGRAM_URL, 'https://lastquestmd.com/ru/']) {
+    expect(txt, fact).toContain(fact);
+  }
+  expect(txt).not.toMatch(/undefined|null|NaN|\[object/);
+  expect(txt).not.toMatch(PLACEHOLDERS);
+});
+
+test('indexable build: one business and one website, the same on every language', async ({}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'one build is enough');
+  test.setTimeout(240000);
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, readFileSync, rmSync, existsSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const out = mkdtempSync(join(tmpdir(), 'horror-seo-'));
+  try {
+    execFileSync('npx', ['astro', 'build', '--outDir', out], { cwd: fileURLToPath(new URL('..', import.meta.url)), env: { ...process.env, SITE_INDEXABLE: 'true' }, stdio: 'pipe' });
+    const ids = new Set<string>();
+    for (const lang of LANGS) {
+      const html = readFileSync(join(out, lang, 'index.html'), 'utf8');
+      expect(html).toContain('<meta name="robots" content="index, follow">');
+      const blocks = Array.from(html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)).map((m) => JSON.parse(m[1]));
+      expect(blocks.map((b) => b['@type'])).toEqual(['EntertainmentBusiness', 'WebSite', 'FAQPage']);
+      const [business, website, faq] = blocks;
+      ids.add(business['@id']);
+      expect(business['@id']).toBe('https://lastquestmd.com/#business');
+      expect(website.publisher).toEqual({ '@id': business['@id'] });
+      expect(business.url).toBe(`https://lastquestmd.com/${lang}/`);
+      expect(business.logo).toBe('https://lastquestmd.com/logo.png');
+      expect(existsSync(join(out, 'logo.png'))).toBe(true);
+      expect(business.telephone).toBe('+37368232596');
+      expect(business.priceRange).toBe('1000-3300 MDL');
+      expect(business.knowsLanguage).toEqual(['ro', 'ru', 'en']);
+      // Chisinau, at the building on Onisifor Ghibu.
+      expect(business.geo.latitude).toBeCloseTo(47.0345, 3);
+      expect(business.geo.longitude).toBeCloseTo(28.7742, 3);
+      expect(business.sameAs).toEqual([INSTAGRAM_URL]);
+      expect(faq.inLanguage).toBe(lang);
+      expect(faq.mainEntity.length).toBeGreaterThanOrEqual(10);
+    }
+    expect([...ids]).toHaveLength(1);
+    expect(readFileSync(join(out, '404.html'), 'utf8')).toContain('<meta name="robots" content="noindex, nofollow">');
+    expect(readFileSync(join(out, 'robots.txt'), 'utf8')).toContain('Sitemap: https://lastquestmd.com/sitemap.xml');
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
 });

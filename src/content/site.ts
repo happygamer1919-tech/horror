@@ -50,6 +50,9 @@ export const site = {
     street: 'Strada Onisifor Ghibu 10',
     postalCode: 'MD-2071',
   },
+  // The building at Onisifor Ghibu 10 in OpenStreetMap (not given by the owner), rounded to
+  // about 10 m. Search engines read it from the JSON-LD; the Google Maps profile is the authority.
+  geo: { lat: 47.0345, lng: 28.7742 },
 
   // Confirmed by the owner: this number is on WhatsApp and on Telegram.
   phone: {

@@ -196,10 +196,10 @@ for (const lang of LANGS) {
       expect(out.scroll).toBeLessThanOrEqual(0);
     });
 
-    test('no structured data in the preview build', async ({ page }) => {
+    test('no review markup in the structured data of this build', async ({ page }) => {
       await open(page, lang);
-      // The preview is not indexable, so no JSON-LD at all is printed.
-      await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
+      // The preview prints no JSON-LD at all; the public site prints it without any review.
+      await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(process.env.SITE_INDEXABLE === 'true' ? 3 : 0);
       expect(await page.content()).not.toMatch(/"@type":\s*"Review"/);
     });
   });
@@ -292,7 +292,7 @@ test('indexable build: the reviews add no Review markup and no second rating', a
       // business entry. The rating is shown on the page only.
       expect(types).not.toContain('AggregateRating');
       expect(keys).not.toContain('aggregateRating');
-      const business = blocks.find((b) => b['@type'] === 'LocalBusiness');
+      const business = blocks.find((b) => b['@type'] === 'EntertainmentBusiness');
       expect(business).toBeTruthy();
       expect(business.aggregateRating).toBeUndefined();
       // The quotes themselves are on the page.
