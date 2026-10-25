@@ -19,3 +19,10 @@ Append-only. Newest last.
 - No rating or review markup (owner's ruling of 2026-10-05 stands).
 - The tests read `SITE_INDEXABLE`, so CI checks the public build and `npm test` on a Mac the
   preview unless the variable is set.
+
+## 2026-10-25: SEO-02, results of the owner's Search Console pass
+
+- Postal code stays MD-2071: the Google Maps listing shows it (Q-1 answered).
+- FAQPage markup stays although the Rich Results Test does not list it: Google limits FAQ rich
+  results to government and health sites since August 2023. The markup is valid and is read
+  by other search engines and AI assistants.
