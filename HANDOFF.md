@@ -29,8 +29,15 @@ Public since 2026-10-25 (`SITE_INDEXABLE: 'true'` in `.github/workflows/deploy.y
 - The 404 page is never indexed.
 - To hide the site again: set `SITE_INDEXABLE` to 'false' and push. The tests follow it.
 
-Owner's side: Google Search Console and Bing Webmaster Tools (verify the domain at Hostinger,
-submit `https://lastquestmd.com/sitemap.xml`), the `www` DNS record (see Not verified).
+Done on 2026-10-25: Google Search Console (domain property verified by DNS TXT at Hostinger,
+sitemap Success with 3 pages, indexing requested for /ro/ /ru/ /en/). Google's Rich Results
+Test finds the local business and the organization, no errors. It does not show the FAQ: since
+August 2023 Google gives FAQ rich results to government and health sites only. The FAQ markup
+stays, other search engines and AI assistants read it.
+
+Still open: Bing Webmaster Tools (import from Search Console), the `www` DNS record and
+Enforce HTTPS (see Not verified). The Google Business Profile matches the site (address with
+MD-2071, phone, hours, website); it is managed from another Google account.
 
 ## What is live
 
@@ -324,5 +331,3 @@ along the walk (the video model); the legend still mentions a child's silhouette
   certificate covers `lastquestmd.com` only. Fix at Hostinger: the `www` CNAME must point to
   `happygamer1919-tech.github.io` (it points to the apex now). GitHub then issues a
   certificate for both; after that tick "Enforce HTTPS" in Settings > Pages.
-- **Postal code.** The site says MD-2071; OpenStreetMap puts Onisifor Ghibu 10 in MD-2051.
-  The site is unchanged until the owner confirms which one is right (`docs/QUESTIONS.md` Q-1).
